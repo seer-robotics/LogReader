@@ -21,6 +21,14 @@ def findrange(ts, t1, t2):
             break
     return small_ind, large_ind
 
+def polar2xy(angle, dist):
+    """ 将极坐标angle,dist 转化为xy坐标 """
+    x , y = [], []
+    for a, d in zip(angle, dist):
+        x.append(d * math.cos(a))
+        y.append(d * math.sin(a))
+    return x,y
+
 class ReadLog:
     """ 读取Log """
     def __init__(self, filename):
@@ -68,7 +76,7 @@ class IMU:
     """  陀螺仪数据
     data[0]: t
     data[1]: yaw degree
-    data[2]: yaw的时间戳
+    data[2]: ts yaw的时间戳
     data[3]: ax m/s^2
     data[4]: ay m/s^2
     data[5]: az m/s^2
@@ -107,7 +115,7 @@ class IMU:
         return self.data[0]
     def yaw(self):
         return self.data[1]
-    def yaw_t(self):
+    def ts(self):
         return self.data[2]
     def ax(self):
         return self.data[3]
@@ -131,7 +139,7 @@ class IMU:
 class Odometer:
     """  里程数据
     data[0]: t
-    data[1]: 里程的时间戳
+    data[1]: ts 里程的时间戳
     data[2]: x m
     data[3]: y m
     data[4]: theta degree
@@ -160,7 +168,7 @@ class Odometer:
             self.data[9].append(float(datas[9]))
     def t(self):
         return self.data[0]
-    def data_t(self):
+    def ts(self):
         return self.data[1]
     def x(self):
         return self.data[2]
@@ -257,6 +265,58 @@ class Get:
     def max_vw(self):
         return self.data[6]
 
+class Laser:
+    """  激光雷达的数据
+    data[0]: t
+    data[1]: ts 激光点的时间戳
+    data[2]: angle rad 
+    data[3]: dist m
+    data[4]: x m
+    data[5]: y m
+    """
+    def __init__(self, max_dist):
+        """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
+        self.regex = re.compile('\[(.*?)\].* \[Laser\]\[(.*?)\]')
+        self.data = [[] for _ in range(6)]
+        self.max_dist = max_dist
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            tmp_datas = datas[1].split('|')
+            self.data[1].append(float(tmp_datas[0]))
+            #min_angle = float(tmp_datas[1])
+            #max_angle = float(tmp_datas[2])
+            #step_angle = float(tmp_datas[3])
+            #data_number = int((max_angle - min_angle) / step_angle)
+            angle = [float(tmp)/180.0*math.pi for tmp in tmp_datas[4::2]]
+            dist = [float(tmp) for tmp in tmp_datas[5::2]]
+            tmp_a, tmp_d = [], []
+            for a, d in zip(angle,dist):
+                if d < self.max_dist:
+                    tmp_a.append(a)
+                    tmp_d.append(d)
+            angle = tmp_a 
+            dist = tmp_d
+            self.data[2].append(angle)
+            self.data[3].append(dist)
+            x , y = polar2xy(angle, dist)
+            self.data[4].append(x)
+            self.data[5].append(y)
+    def t(self):
+        return self.data[0]
+    def ts(self):
+        return self.data[1]
+    def angle(self):
+        return self.data[2]
+    def dist(self):
+        return self.data[3]
+    def x(self):
+        return self.data[4]
+    def y(self):
+        return self.data[5]
+
 class ErrorLine:
     """  错误信息
     data[0]: t
@@ -295,15 +355,17 @@ class WarningLine:
 
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
+    from matplotlib.widgets import Slider,RadioButtons
     mcl = MCLoc()
     imu = IMU()
     odo = Odometer()
     send = Send()
     get = Get()
+    laser = Laser(1000.0)
     err = ErrorLine()
     war = WarningLine()
     log = ReadLog("test.log")
-    log.parse(mcl, imu, odo, send, get, err, war)
+    log.parse(mcl, imu, odo, send, get, laser, err, war)
 
     print(len(err.content()), " ERRORs:")
     print(err.content())
@@ -401,4 +463,26 @@ if __name__ == '__main__':
     plt.plot(send.t(), send.steer_angle(), 'o', label= 'send steer_angle')
     plt.plot(get.t(), get.steer_angle(), '.', label= 'get steer_angle')
     plt.legend()
+
+    plt.figure(5)
+    plt.subplot(2,1,1)
+    plt.title("Laser")
+    plt.subplots_adjust(bottom=0.2,left=0.1) 
+    l1, = plt.plot(laser.x()[1], laser.y()[1], '.')
+    plt.axis('equal')
+    plt.grid()
+    plt.subplot(2,1,2,projection = 'polar')
+    plt.subplots_adjust(bottom=0.2,left=0.1) 
+    l2, = plt.plot(laser.angle()[1], laser.dist()[1], '.')
+    axcolor = 'lightgoldenrodyellow'  # slider的颜色
+    om1= plt.axes([0.1, 0.08, 0.8, 0.02], facecolor=axcolor) # 第一slider的位置
+    som1 = Slider(om1, r'Time', 0, len(laser.ts())-1, valinit=0, valfmt='%i') #产生第二slider
+    print(len(laser.ts()))
+    def update(val):
+        s1 = int(som1.val)
+        l1.set_xdata(laser.x()[s1])
+        l1.set_ydata(laser.y()[s1])
+        l2.set_xdata(laser.angle()[s1])
+        l2.set_ydata(laser.dist()[s1])
+    som1.on_changed(update)
     plt.show()

@@ -31,15 +31,17 @@ def polar2xy(angle, dist):
 
 class ReadLog:
     """ 读取Log """
-    def __init__(self, filename):
-        self.filename = filename
+    def __init__(self, *argv):
+        """ 支持传入多个文件名称"""
+        self.filenames = argv
     def parse(self,*argv):
         """依据输入的正则进行解析"""
         line_num = 0
-        for line in open(self.filename, encoding = "utf-8"): 
-            line_num += 1
-            for data in argv:
-                data.parse(line)
+        for file in self.filenames:
+            for line in open(file, encoding = "utf-8"): 
+                line_num += 1
+                for data in argv:
+                    data.parse(line)
 
 class MCLoc:
     """  融合后的激光定位
@@ -323,7 +325,7 @@ class ErrorLine:
     data[1]: 错误信息内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\]\[error\].*\n")
+        self.regex = re.compile("\[(.*?)\].*\[error\].*")
         self.data = [[] for _ in range(2)]
     def parse(self, line):
         out = self.regex.match(line)
@@ -341,7 +343,7 @@ class WarningLine:
     data[1]: 报警信息内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\]\[warning\].*\n")
+        self.regex = re.compile("\[(.*?)\].*\[warning\].*")
         self.data = [[] for _ in range(2)]
     def parse(self, line):
         out = self.regex.match(line)

@@ -9,14 +9,19 @@ get = Get()
 laser = Laser(1000.0)
 err = ErrorLine()
 war = WarningLine()
-log = ReadLog("test.log")
+log = ReadLog("test1.log", "test2.log")
 log.parse(mcl, imu, odo, send, get, laser, err, war)
 
-print(len(err.content()), " ERRORs:")
-print(err.content())
-print(len(war.content()), " WARNINGs:")
-print(war.content())
+f = open("Report.txt", "w") 
+print(len(err.content()), " ERRORs, ", len(war.content()), " WARNINGs", file = f)
+print("ERRORs:", file = f)
+for data in err.content():
+    print(data,file = f)
+print("WARNINGs:", file = f)
+for data in war.content():
+    print(data, file = f)
 
+f.close()
 plt.figure(1)
 plt.subplot(4,1,1)
 plt.title('MCLoc')
@@ -109,25 +114,25 @@ plt.plot(send.t(), send.steer_angle(), 'o', label= 'send steer_angle')
 plt.plot(get.t(), get.steer_angle(), '.', label= 'get steer_angle')
 plt.legend()
 
-plt.figure(5)
-plt.subplot(2,1,1)
-plt.title("Laser")
-plt.subplots_adjust(bottom=0.2,left=0.1) 
-l1, = plt.plot(laser.x()[1], laser.y()[1], '.')
-plt.axis('equal')
-plt.grid()
-plt.subplot(2,1,2,projection = 'polar')
-plt.subplots_adjust(bottom=0.2,left=0.1) 
-l2, = plt.plot(laser.angle()[1], laser.dist()[1], '.')
-axcolor = 'lightgoldenrodyellow'  # slider的颜色
-om1= plt.axes([0.1, 0.08, 0.8, 0.02], facecolor=axcolor) # 第一slider的位置
-som1 = Slider(om1, r'Time', 0, len(laser.ts())-1, valinit=0, valfmt='%i') #产生第二slider
-print(len(laser.ts()))
-def update(val):
-    s1 = int(som1.val)
-    l1.set_xdata(laser.x()[s1])
-    l1.set_ydata(laser.y()[s1])
-    l2.set_xdata(laser.angle()[s1])
-    l2.set_ydata(laser.dist()[s1])
-som1.on_changed(update)
+if len(laser.x()) > 0:
+    plt.figure(5)
+    plt.subplot(2,1,1)
+    plt.title("Laser")
+    plt.subplots_adjust(bottom=0.2,left=0.1) 
+    l1, = plt.plot(laser.x()[1], laser.y()[1], '.')
+    plt.axis('equal')
+    plt.grid()
+    plt.subplot(2,1,2,projection = 'polar')
+    plt.subplots_adjust(bottom=0.2,left=0.1) 
+    l2, = plt.plot(laser.angle()[1], laser.dist()[1], '.')
+    axcolor = 'lightgoldenrodyellow'  # slider的颜色
+    om1= plt.axes([0.1, 0.08, 0.8, 0.02], facecolor=axcolor) # 第一slider的位置
+    som1 = Slider(om1, r'Time', 0, len(laser.ts())-1, valinit=0, valfmt='%i') #产生第二slider
+    def update(val):
+        s1 = int(som1.val)
+        l1.set_xdata(laser.x()[s1])
+        l1.set_ydata(laser.y()[s1])
+        l2.set_xdata(laser.angle()[s1])
+        l2.set_ydata(laser.dist()[s1])
+    som1.on_changed(update)
 plt.show()

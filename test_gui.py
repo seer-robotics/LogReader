@@ -15,7 +15,7 @@ err = ErrorLine()
 war = WarningLine()
 fatal = FatalLine()
 notice = NoticeLine()
-log = ReadLog(['log\\robokit_2018-12-26_22-38-10.41.log'])
+log = ReadLog(sys.argv[1:])
 log.parse(mcl, imu, odo, send, get, laser, err, war,fatal, notice)
 
 tmax = max(mcl.t() + odo.t() + send.t() + get.t() + laser.t() + err.t() + fatal.t() + notice.t())

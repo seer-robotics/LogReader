@@ -1,6 +1,7 @@
-from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLine, ReadLog
+from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider,RadioButtons
+import sys
 mcl = MCLoc()
 imu = IMU()
 odo = Odometer()
@@ -9,19 +10,28 @@ get = Get()
 laser = Laser(1000.0)
 err = ErrorLine()
 war = WarningLine()
-log = ReadLog("test1.log", "test2.log")
-log.parse(mcl, imu, odo, send, get, laser, err, war)
+fat = FatalLine()
+notice = NoticeLine()
+print(sys.argv[1:])
+log = ReadLog(sys.argv[1:])
+log.parse(mcl, imu, odo, send, get, laser, err, war, fat, notice)
 
-f = open("Report.txt", "w") 
-print(len(err.content()), " ERRORs, ", len(war.content()), " WARNINGs", file = f)
+f = open("Report.txt", "w", encoding='utf-8') 
+print(len(err.content()), " ERRORs, ", len(war.content()), " WARNINGs, ", len(fat.content()), " FATALs, ", len(notice.content()), " NOTICEs", file = f)
 print("ERRORs:", file = f)
 for data in err.content():
     print(data,file = f)
 print("WARNINGs:", file = f)
 for data in war.content():
     print(data, file = f)
-
+print("FATALs:", file = f)
+for data in fat.content():
+    print(data, file = f)
+print("NOTICEs:", file = f)
+for data in notice.content():
+    print(data, file = f)
 f.close()
+
 plt.figure(1)
 plt.subplot(4,1,1)
 plt.title('MCLoc')

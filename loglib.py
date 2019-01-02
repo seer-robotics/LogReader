@@ -15,9 +15,9 @@ def findrange(ts, t1, t2):
     large_ind = len(ts)-1
     for i, data in enumerate(ts):
         large_ind = i
-        if(t1 < data and small_ind < 0):
+        if(t1 <= data and small_ind < 0):
             small_ind = i
-        if(t2 < data):
+        if(t2 <= data):
             break
     return small_ind, large_ind
 
@@ -31,9 +31,9 @@ def polar2xy(angle, dist):
 
 class ReadLog:
     """ 读取Log """
-    def __init__(self, *argv):
+    def __init__(self, filenames):
         """ 支持传入多个文件名称"""
-        self.filenames = argv
+        self.filenames = filenames
     def parse(self,*argv):
         """依据输入的正则进行解析"""
         line_num = 0
@@ -344,6 +344,42 @@ class WarningLine:
     """
     def __init__(self):
         self.regex = re.compile("\[(.*?)\].*\[warning\].*")
+        self.data = [[] for _ in range(2)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+    def t(self):
+        return self.data[0]
+    def content(self):
+        return self.data[1]
+
+class FatalLine:
+    """  错误信息
+    data[0]: t
+    data[1]: 报警信息内容
+    """
+    def __init__(self):
+        self.regex = re.compile("\[(.*?)\].*\[fatal\].*")
+        self.data = [[] for _ in range(2)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+    def t(self):
+        return self.data[0]
+    def content(self):
+        return self.data[1]
+
+class NoticeLine:
+    """  注意信息
+    data[0]: t
+    data[1]: 注意信息内容
+    """
+    def __init__(self):
+        self.regex = re.compile("\[(.*?)\].*\[Notice.*")
         self.data = [[] for _ in range(2)]
     def parse(self, line):
         out = self.regex.match(line)

@@ -1,10 +1,14 @@
 # LogReader
 Reading IMU, Odometer, MCLoc, Send, Get, Laser, fatal, error, warning and notice information from log
-* test.py 为调用 loglib.py的示例
-* test1.log, test2.log 为测试读取的log
+
+使用环境Python 3, 推荐使用[Anaconda](https://www.anaconda.com/download/)
+* test_get_report 为生成错误报告的脚本。在命名窗口输入:<pre><code>python test_get_report.py test1.log test2.log</pre></code>
+  将test1.log和test2.log替换为所需的log文件即可
+* test.py 为调用 loglib.py的示例。在命名窗口输入:<pre><code>python test.py test1.log test2.log</pre></code>
+ test1.log, test2.log 为测试读取的log
 * test_gui.py 为图形化的log解析器
-  * 使用方式：在命令窗口中处输入:<pre><code>python test_gui.py test1.log</pre></code>
-  将test1.log改为对应的log文件名即可
+  * 使用方式：在命令窗口中处输入:<pre><code>python test_gui.py test1.log test2.log</pre></code>
+  将test1.log和test2.log改为对应的log文件名即可
   * 支持两条曲线比较
   * 支持时间窗口选取
   * 支持定位(mcl), 里程(odo), 惯性传感器(imu), 下发速度(send), 获取速度(get)

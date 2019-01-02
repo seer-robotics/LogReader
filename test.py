@@ -16,18 +16,19 @@ log = ReadLog(sys.argv[1:])
 log.parse(mcl, imu, odo, send, get, laser, err, war, fat, notice)
 
 f = open("Report.txt", "w", encoding='utf-8') 
-print(len(err.content()), " ERRORs, ", len(war.content()), " WARNINGs, ", len(fat.content()), " FATALs, ", len(notice.content()), " NOTICEs", file = f)
+print("Files: ", sys.argv[1:], file = f)
+print(len(err.content()[0]), " ERRORs, ", len(war.content()[0]), " WARNINGs, ", len(fat.content()[0]), " FATALs, ", len(notice.content()[0]), " NOTICEs", file = f)
 print("ERRORs:", file = f)
-for data in err.content():
+for data in err.content()[0]:
     print(data,file = f)
 print("WARNINGs:", file = f)
-for data in war.content():
+for data in war.content()[0]:
     print(data, file = f)
 print("FATALs:", file = f)
-for data in fat.content():
+for data in fat.content()[0]:
     print(data, file = f)
 print("NOTICEs:", file = f)
-for data in notice.content():
+for data in notice.content()[0]:
     print(data, file = f)
 f.close()
 

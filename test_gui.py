@@ -24,6 +24,7 @@ dt = tmax - tmin
 tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
 
 f = open("Report.txt", "w", encoding='utf-8') 
+print("Files: ", sys.argv[1:], file = f)
 print(len(fatal.content()[0]), "FATALs", len(err.content()[0]), " ERRORs, ", len(war.content()[0]), " WARNINGs", len(notice.content()[0]), "NOTICEs", file = f )
 print("FATALs:", file = f)
 for data in fatal.content()[0]:

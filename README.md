@@ -2,7 +2,7 @@
 Reading IMU, Odometer, MCLoc, Send, Get, Laser, fatal, error, warning and notice information from log
 
 使用环境Python 3, 推荐使用[Anaconda](https://www.anaconda.com/download/)
-* test_get_report 为生成错误报告的脚本。在命名窗口输入:<pre><code>python test_get_report.py test1.log test2.log</pre></code>
+* test_get_report.py 为生成错误报告的脚本。在命名窗口输入:<pre><code>python test_get_report.py test1.log test2.log</pre></code>
   将test1.log和test2.log替换为所需的log文件即可
 * test.py 为调用 loglib.py的示例。在命名窗口输入:<pre><code>python test.py test1.log test2.log</pre></code>
  test1.log, test2.log 为测试读取的log

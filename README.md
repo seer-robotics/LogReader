@@ -5,7 +5,7 @@
 * get_report.py 为生成错误报告的脚本。在命名窗口输入:<pre><code>python test_get_report.py test1.log test2.log</pre></code>
   将test1.log和test2.log替换为所需的log文件即可
 
-  **将release中的get_report.exe至于rbk目录下，运行get_report.exe可以自动读取diagnosis\\log下的log文件，并生成报告**
+  **将release中的get_report.exe置于rbk目录下，运行get_report.exe可以自动读取diagnosis\\log下的log文件，并生成报告**
 * test.py 为调用 loglib.py的示例。在命名窗口输入:<pre><code>python test.py test1.log test2.log</pre></code>
  test1.log, test2.log 为测试读取的log
 * test_gui.py 为图形化的log解析器

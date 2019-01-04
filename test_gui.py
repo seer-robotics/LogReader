@@ -1,8 +1,8 @@
 from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
 from loglib import findrange
-import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider,Button, TextBox
 import sys
+import matplotlib.pyplot as plt
+from matplotlib.widgets import Slider, TextBox
 from datetime import datetime, timedelta
 
 mcl = MCLoc()

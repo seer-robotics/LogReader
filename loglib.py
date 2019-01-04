@@ -322,73 +322,155 @@ class ErrorLine:
     """  错误信息
     data[0]: t
     data[1]: 错误信息内容
+    data[2]: Alarm 错误编号
+    data[3]: Alarm 内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[error\].*")
-        self.data = [[] for _ in range(2)]
+        self.general_regex = re.compile("\[(.*?)\].*\[error\].*")
+        self.regex = re.compile("\[(.*?)\].*\[error\].*\[Alarm\]\[.*?\|(.*?)\|(.*?)\|.*")
+        self.data = [[] for _ in range(4)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            new_num = out.group(2)
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)
+                self.data[3].append(out.group(3))
+        out = self.general_regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+            new_num = '00000'
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)                
+                self.data[3].append('unKnown Error')
     def t(self):
         return self.data[0]
     def content(self):
         return self.data[1], self.data[0]
+    def alarmnum(self):
+        return self.data[2], self.data[0]
+    def alarminfo(self):
+        return self.data[3], self.data[0]
 
 class WarningLine:
     """  报警信息
     data[0]: t
     data[1]: 报警信息内容
+    data[2]: Alarm 错误编号
+    data[3]: Alarm 内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[warning\].*")
-        self.data = [[] for _ in range(2)]
+        self.general_regex = re.compile("\[(.*?)\].*\[warning\].*")
+        self.regex = re.compile("\[(.*?)\].*\[warning\].*\[Alarm\]\[.*?\|(.*?)\|(.*?)\|.*")
+        self.data = [[] for _ in range(4)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            new_num = out.group(2)
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)
+                self.data[3].append(out.group(3))
+        out = self.general_regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+            new_num = '00000'
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)
+                self.data[3].append('unKnown Warning')
     def t(self):
         return self.data[0]
     def content(self):
         return self.data[1], self.data[0]
+    def alarmnum(self):
+        return self.data[2], self.data[0]
+    def alarminfo(self):
+        return self.data[3], self.data[0]
 
 class FatalLine:
     """  错误信息
     data[0]: t
     data[1]: 报警信息内容
+    data[2]: Alarm 错误编号
+    data[3]: Alarm 内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[fatal\].*")
-        self.data = [[] for _ in range(2)]
+        self.regex = re.compile("\[(.*?)\].*\[fatal\].*\[Alarm\]\[.*?\|(.*?)\|(.*?)\|.*")
+        self.data = [[] for _ in range(4)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            new_num = out.group(2)
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)
+                self.data[3].append(out.group(3))
     def t(self):
         return self.data[0]
     def content(self):
         return self.data[1], self.data[0]
+    def alarmnum(self):
+        return self.data[2], self.data[0]
+    def alarminfo(self):
+        return self.data[3], self.data[0]
 
 class NoticeLine:
     """  注意信息
     data[0]: t
     data[1]: 注意信息内容
+    data[2]: Alarm 错误编号
+    data[3]: Alarm 内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[Notice.*")
-        self.data = [[] for _ in range(2)]
+        self.regex = re.compile("\[(.*?)\].*\[Alarm\]\[Notice\|(.*?)\|(.*?)\|.*")
+        self.data = [[] for _ in range(4)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            new_num = out.group(2)
+            new_data_flag = True
+            for num in self.data[2]:
+                if num == new_num: 
+                    new_data_flag = False
+            if new_data_flag:
+                self.data[2].append(new_num)
+                self.data[3].append(out.group(3))
     def t(self):
         return self.data[0]
     def content(self):
         return self.data[1], self.data[0]
+    def alarmnum(self):
+        return self.data[2], self.data[0]
+    def alarminfo(self):
+        return self.data[3], self.data[0]
 
 # if __name__ == '__main__':
 #     import matplotlib.pyplot as plt

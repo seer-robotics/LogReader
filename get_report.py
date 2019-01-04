@@ -28,6 +28,23 @@ for filename in filenames:
     else:
         print("Files: ", filename)
     print( len(fat.content()[0]), " FATALs, ", len(err.content()[0]), " ERRORs, ", len(war.content()[0]), " WARNINGs, ", len(notice.content()[0]), " NOTICEs")
+    if len(fat.alarmnum()[0]) >= 1:
+        print("FATAL:")
+        for iter in range(0, len(fat.alarmnum()[0])):
+            print(' '*2, fat.alarmnum()[0][iter]," ",fat.alarminfo()[0][iter])
+    if len(err.alarmnum()[0]) >= 1:
+        print("ERRORS:")
+        for iter in range(0, len(err.alarmnum()[0])):
+            print(' '*2,err.alarmnum()[0][iter]," ",err.alarminfo()[0][iter])
+    if len(war.alarmnum()[0]) >= 1:
+        print("WARNING:")
+        for iter in range(0, len(war.alarmnum()[0])):
+            print(' '*2,war.alarmnum()[0][iter]," ",war.alarminfo()[0][iter])
+    if len(notice.alarmnum()[0]) >= 1:
+        print("NOTICE:")
+        for iter in range(0, len(notice.alarmnum()[0])):
+            print(' '*2,notice.alarmnum()[0][iter]," ",notice.alarminfo()[0][iter])
+
 
     print("="*20, file = fid)
     print("Files: ", filename, file = fid)
@@ -45,5 +62,5 @@ for filename in filenames:
     for data in notice.content()[0]:
         print(data, file = fid)
 fid.close()
-print("FINISHED!!!")
+print("Detail information is in the", colored("Report.txt",  'yellow', 'on_red', ['bold']), "\nFINISHED!!!")
 ch = sys.stdin.read(1)

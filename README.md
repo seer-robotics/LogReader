@@ -1,5 +1,5 @@
 # LogReader
-Reading IMU, Odometer, MCLoc, Send, Get, Laser, fatal, error, warning and notice information from log
+从log文件中读取IMU, Odometer, MCLoc, Send, Get, Laser, fatal, error, warning and notice信息
 
 使用环境Python 3, 推荐使用[Anaconda](https://www.anaconda.com/download/)
 * test_get_report.py 为生成错误报告的脚本。在命名窗口输入:<pre><code>python test_get_report.py test1.log test2.log</pre></code>

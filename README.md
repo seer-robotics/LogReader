@@ -22,4 +22,20 @@
     * 下发速度: send.vx, send.vy, send.vw, send.steer_angle, send.max_vx, send.max_vw
     * 获取速度：get.vx, get.vy, get.vw, get.steer_angle, get.max_vx, get.max_vw
 * 图形界面截图
-![screen shot](screen_shot.PNG)
+![screen shot1](screen_shot.PNG)
+
+* loggui.py 为PyQt5图形化的log解析器
+  * 使用方式：直接运行即可
+  * 支持两条曲线比较
+  * 支持时间窗口选取
+  * 支持定位(mcl), 里程(odo), 惯性传感器(imu), 下发速度(send), 获取速度(get)
+  * 支持fatal, error, warning, notice的同步显示, 并且输出到Report.txt中
+  * Evaluate可以输入的参数:
+    * 定位: mcl.x, mcl.y, mcl.theta, mcl.confidence
+    * 惯性传感器: imu.yaw, imu.ax, imu.ay, imu.gz, imu.gx, imu.gy, imu.gz, imu.offx, imu.offy, imu.offz
+    * 里程: odo.x, odo.y, odo.theta, odo.stop,  odo.vx, odo.vy, odo.vw, odo.steer_angle
+    * 下发速度: send.vx, send.vy, send.vw, send.steer_angle, send.max_vx, send.max_vw
+    * 获取速度：get.vx, get.vy, get.vw, get.steer_angle, get.max_vx, get.max_vw
+* 图形界面截图
+![screen shot2](screen_shot2.PNG)
+![screen shot3](screen_shot3.PNG)

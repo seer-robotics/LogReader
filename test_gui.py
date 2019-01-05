@@ -15,7 +15,13 @@ err = ErrorLine()
 war = WarningLine()
 fatal = FatalLine()
 notice = NoticeLine()
-log = ReadLog(sys.argv[1:])
+
+filenames = []
+if len(sys.argv) > 1:
+    filenames = sys.argv[1:]
+else:
+    filenames = ['test1.log', 'test2.log']
+log = ReadLog(filenames)
 log.parse(mcl, imu, odo, send, get, laser, err, war,fatal, notice)
 
 tmax = max(mcl.t() + odo.t() + send.t() + get.t() + laser.t() + err.t() + fatal.t() + notice.t())
@@ -24,7 +30,7 @@ dt = tmax - tmin
 tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
 
 f = open("Report.txt", "w", encoding='utf-8') 
-print("Files: ", sys.argv[1:], file = f)
+print("Files: ", filenames, file = f)
 print(len(fatal.content()[0]), "FATALs", len(err.content()[0]), " ERRORs, ", len(war.content()[0]), " WARNINGs", len(notice.content()[0]), "NOTICEs", file = f )
 print("FATALs:", file = f)
 for data in fatal.content()[0]:
@@ -44,7 +50,7 @@ def drawFEWN(ax):
     """ 绘制 Fatal, Error, Warning在坐标轴上"""
     fl, el, wl,nl = None, None, None, None
     for tmp in fatal.t():
-        fl, = ax.plot((tmp,tmp),[-1e10, 1e10],'k-')
+        fl, = ax.plot((tmp,tmp),[-1e10, 1e10],'m-')
     for tmp in err.t():
         el, = ax.plot((tmp,tmp),[-1e10, 1e10],'r-.')
     for tmp in war.t():

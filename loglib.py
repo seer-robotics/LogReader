@@ -335,25 +335,18 @@ class ErrorLine:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
             new_num = out.group(2)
-            new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
+            if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
-        out = self.general_regex.match(line)
-        if out:
-            self.data[0].append(rbktimetodate(out.group(1)))
-            self.data[1].append(out.group(0))
-            new_num = '00000'
-            new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
-                self.data[2].append(new_num)                
-                self.data[3].append('unKnown Error')
+        else:
+            out = self.general_regex.match(line)
+            if out:
+                self.data[0].append(rbktimetodate(out.group(1)))
+                self.data[1].append(out.group(0))
+                new_num = '00000'
+                if not new_num in self.data[2]:
+                    self.data[2].append(new_num)                
+                    self.data[3].append('unKnown Error')
     def t(self):
         return self.data[0]
     def content(self):
@@ -380,25 +373,18 @@ class WarningLine:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
             new_num = out.group(2)
-            new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
+            if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
-        out = self.general_regex.match(line)
-        if out:
-            self.data[0].append(rbktimetodate(out.group(1)))
-            self.data[1].append(out.group(0))
-            new_num = '00000'
-            new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
-                self.data[2].append(new_num)
-                self.data[3].append('unKnown Warning')
+        else:
+            out = self.general_regex.match(line)
+            if out:
+                self.data[0].append(rbktimetodate(out.group(1)))
+                self.data[1].append(out.group(0))
+                new_num = '00000'
+                if not new_num in self.data[2]:
+                    self.data[2].append(new_num)
+                    self.data[3].append('unKnown Warning')
     def t(self):
         return self.data[0]
     def content(self):
@@ -425,10 +411,7 @@ class FatalLine:
             self.data[1].append(out.group(0))
             new_num = out.group(2)
             new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
+            if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
     def t(self):
@@ -456,11 +439,7 @@ class NoticeLine:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
             new_num = out.group(2)
-            new_data_flag = True
-            for num in self.data[2]:
-                if num == new_num: 
-                    new_data_flag = False
-            if new_data_flag:
+            if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
     def t(self):

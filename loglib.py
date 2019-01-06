@@ -190,7 +190,7 @@ class Odometer:
             self.data[2].append(float(datas[2]))
             self.data[3].append(float(datas[3]))
             self.data[4].append(float(datas[4])/math.pi * 180.0)
-            self.data[5].append(bool(datas[5] == "true"))
+            self.data[5].append(float(datas[5] == "true"))
             self.data[6].append(float(datas[6]))
             self.data[7].append(float(datas[7]))
             self.data[8].append(float(datas[8]))

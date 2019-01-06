@@ -66,6 +66,9 @@ class ReadThread(QThread):
                      "imu.yaw":self.imu.yaw(),"imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
                      "imu.gx":self.imu.gx(),"imu.gy":self.imu.gy(),"imu.gz":self.imu.gz(),
                      "imu.offx":self.imu.offx(),"imu.offy":self.imu.offy(),"imu.offz":self.imu.offz(),
+                     "imu.org_gx":([i+j for (i,j) in zip(self.imu.gx()[0],self.imu.offx()[0])], self.imu.gx()[1]),
+                     "imu.org_gy":([i+j for (i,j) in zip(self.imu.gy()[0],self.imu.offy()[0])], self.imu.gy()[1]),
+                     "imu.org_gz":([i+j for (i,j) in zip(self.imu.gz()[0],self.imu.offz()[0])], self.imu.gz()[1]),
                      "odo.x":self.odo.x(),"odo.y":self.odo.y(),"odo.theta":self.odo.theta(),"odo.stop":self.odo.stop(),
                      "odo.vx":self.odo.vx(),"odo.vy":self.odo.vy(),"odo.vw":self.odo.vw(),"odo.steer_angle":self.odo.steer_angle(),
                      "send.vx":self.send.vx(),"send.vy":self.send.vy(),"send.vw":self.send.vw(),"send.steer_angle":self.send.steer_angle(),
@@ -174,14 +177,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def readFinished(self, result):
         print("Current: {0}.".format(result))  # Show the output to the user
-        self.statusBar().showMessage('Current: {0}'.format([f.split('/')[-1] for f in self.filenames]))
+        self.statusBar().showMessage('Finished')
+        self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())
             self.combo1.addItems(keys)
-            self.drawdata(self.ax1, self.read_thread.data[keys[0]], keys[0])
+            self.drawdata(self.ax1, self.read_thread.data[self.combo1.currentText()],self.combo1.currentText())
             self.combo2.addItems(keys)
-            self.drawdata(self.ax2, self.read_thread.data[keys[0]], keys[0])
+            self.drawdata(self.ax2, self.read_thread.data[self.combo2.currentText()], self.combo2.currentText())
 
     def fileQuit(self):
         self.close()

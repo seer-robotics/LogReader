@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import sys
 
 
+
 class ReadThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
 
@@ -169,11 +170,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if self.filenames:
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
-            self.statusBar().showMessage('Loading......: {0}'.format(self.filenames))
+            self.statusBar().showMessage('Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames]))
 
     def readFinished(self, result):
         print("Current: {0}.".format(result))  # Show the output to the user
-        self.statusBar().showMessage('Current: {0}'.format(self.filenames))
+        self.statusBar().showMessage('Current: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())

@@ -9,6 +9,7 @@ from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLin
 from loglib import findrange
 from datetime import datetime, timedelta
 import sys
+from numpy import searchsorted
 
 
 
@@ -63,7 +64,8 @@ class ReadThread(QThread):
                     print(data, file = fid)
             fid.close()
         self.data = {"mcl.x":self.mcl.x(),"mcl.y":self.mcl.y(),"mcl.theta":self.mcl.theta(), "mcl.confidence":self.mcl.confidence(),
-                     "imu.yaw":self.imu.yaw(),"imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
+                     "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), 
+                     "imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
                      "imu.gx":self.imu.gx(),"imu.gy":self.imu.gy(),"imu.gz":self.imu.gz(),
                      "imu.offx":self.imu.offx(),"imu.offy":self.imu.offy(),"imu.offz":self.imu.offz(),
                      "imu.org_gx":([i+j for (i,j) in zip(self.imu.gx()[0],self.imu.offx()[0])], self.imu.gx()[1]),
@@ -81,6 +83,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle('Log分析器')
+        self.finishReadFlag = False
         self.read_thread = ReadThread()
         self.openLogFilesDialog()
         self.setupUI()
@@ -108,17 +111,19 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.combo1 = QtWidgets.QComboBox(self)
         self.combo1.activated[str].connect(self.combo_onActivated1)
         grid.addWidget(self.label1,1,0)
-        grid.addWidget(self.combo1,1,1,1,14)
+        grid.addWidget(self.combo1,1,1,1,50)
         self.label2 = QtWidgets.QLabel("图片2",self)
         self.label2.adjustSize()
         self.combo2 = QtWidgets.QComboBox(self)
         self.combo2.activated[str].connect(self.combo_onActivated2)
         grid.addWidget(self.label2,2,0)
-        grid.addWidget(self.combo2,2,1,2,14)
+        grid.addWidget(self.combo2,2,1,2,50)
+        self.label_info = QtWidgets.QLabel("",self)
+        grid.addWidget(self.label_info,4,0,2,50)
         layout.addLayout(grid)
 
         #图形化结构
-        self.static_canvas = FigureCanvas(Figure(figsize=(10,10)))
+        self.static_canvas = FigureCanvas(Figure(figsize=(100,100)))
         layout.addWidget(self.static_canvas)
         self.old_home = NavigationToolbar.home
         self.old_forward = NavigationToolbar.forward
@@ -129,6 +134,51 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.addToolBar(NavigationToolbar(self.static_canvas, self))
         self.ax1, self.ax2 = self.static_canvas.figure.subplots(2, 1, sharex = True)
         self.ax2.set_xlabel("t")
+
+        #鼠标移动消息
+        self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
+
+    def mouse_move(self, event):
+        if event.inaxes and self.finishReadFlag:
+            mouse_time = event.xdata * 86400 - 62135712000
+            mouse_time = datetime.fromtimestamp(mouse_time)
+            content = []
+            dt_min = 1e10
+            if self.read_thread.fatal.t():
+                fatal_ind = searchsorted(self.read_thread.fatal.t(), mouse_time)
+                if fatal_ind >= len(self.read_thread.fatal.t()):
+                    fatal_ind = len(self.read_thread.fatal.t()) - 1
+                dt_min = abs((self.read_thread.fatal.t()[fatal_ind] - mouse_time).total_seconds())
+                content = self.read_thread.fatal.content()[0][fatal_ind]
+            if self.read_thread.err.t(): 
+                err_ind = searchsorted(self.read_thread.err.t(), mouse_time)
+                if err_ind >= len(self.read_thread.err.t()):
+                    err_ind = len(self.read_thread.err.t()) - 1
+                tmpdt = abs((self.read_thread.err.t()[err_ind] - mouse_time).total_seconds())
+                if tmpdt < dt_min:
+                    dt_min = tmpdt
+                    content = self.read_thread.err.content()[0][err_ind]
+            if self.read_thread.war.t():
+                war_ind = searchsorted(self.read_thread.war.t(), mouse_time)
+                if war_ind >= len(self.read_thread.war.t()):
+                    war_ind = len(self.read_thread.war.t()) - 1
+                tmpdt = abs((self.read_thread.war.t()[war_ind] - mouse_time).total_seconds())
+                if tmpdt < dt_min:
+                    dt_min = tmpdt
+                    content = self.read_thread.war.content()[0][war_ind]
+            if self.read_thread.notice.t():
+                not_ind = searchsorted(self.read_thread.notice.t(),mouse_time)
+                if not_ind >= len(self.read_thread.notice.t()):
+                    not_ind = len(self.read_thread.notice.t()) - 1
+                tmpdt = abs((self.read_thread.notice.t()[not_ind] - mouse_time).total_seconds())
+                if tmpdt < dt_min:
+                    dt_min = tmpdt
+                    content = self.read_thread.notice.content()[0][not_ind]
+            if dt_min < 1:
+                self.label_info.setText(content)
+        else:
+            self.label_info.setText("")
+
 
     def new_home(self, *args, **kwargs):
         text1 = self.combo1.currentText()
@@ -178,14 +228,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def readFinished(self, result):
         print("Current: {0}.".format(result))  # Show the output to the user
         self.statusBar().showMessage('Finished')
+        self.finishReadFlag = True
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())
             self.combo1.addItems(keys)
-            self.drawdata(self.ax1, self.read_thread.data[self.combo1.currentText()],self.combo1.currentText())
+            self.drawdata(self.ax1, self.read_thread.data[self.combo1.currentText()],self.combo1.currentText(), True)
             self.combo2.addItems(keys)
-            self.drawdata(self.ax2, self.read_thread.data[self.combo2.currentText()], self.combo2.currentText())
+            self.drawdata(self.ax2, self.read_thread.data[self.combo2.currentText()], self.combo2.currentText(), True)
 
     def fileQuit(self):
         self.close()
@@ -195,22 +246,26 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def combo_onActivated1(self,text):
         # print("combo1: ",text)
-        self.drawdata(self.ax1, self.read_thread.data[text], text)
+        self.drawdata(self.ax1, self.read_thread.data[text], text, False)
 
     def combo_onActivated2(self,text):
         # print("combo2: ",text)
-        self.drawdata(self.ax2, self.read_thread.data[text], text)
+        self.drawdata(self.ax2, self.read_thread.data[text], text, False)
 
     
 
-    def drawdata(self, ax, data, ylabel):
+    def drawdata(self, ax, data, ylabel, resize = False):
+        xmin,xmax =  ax.get_xlim()
         ax.cla()
         self.drawFEWN(ax)
-        ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         if data[1]:
             ax.plot(data[1], data[0], '.')
             max_range = max(max(data[0]) - min(data[0]), 1e-6)
             ax.set_ylim(min(data[0]) - 0.05 * max_range, max(data[0]) + 0.05 * max_range)
+        if resize:
+            ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
+        else:
+            ax.set_xlim(xmin, xmax)
         ax.set_ylabel(ylabel)
         ax.grid()
         self.static_canvas.figure.canvas.draw()

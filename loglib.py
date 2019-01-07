@@ -81,65 +81,96 @@ class IMU:
     """  陀螺仪数据
     data[0]: t
     data[1]: yaw degree
-    data[2]: ts yaw的时间戳
-    data[3]: ax m/s^2
-    data[4]: ay m/s^2
-    data[5]: az m/s^2
-    data[6]: gx LSB
-    data[7]: gy LSB
-    data[8]: gz LSB
-    data[9]: offx LSB
-    data[10]: offy LSB
-    data[11]: offz LSB
+    data[2]: pitch degree
+    data[3]: roll degree
+    data[4]: ts yaw的时间戳
+    data[5]: ax m/s^2
+    data[6]: ay m/s^2
+    data[7]: az m/s^2
+    data[8]: gx LSB
+    data[9]: gy LSB
+    data[10]: gz LSB
+    data[11]: offx LSB
+    data[12]: offy LSB
+    data[13]: offz LSB
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
-        self.data = [[] for _ in range(12)]
+        self.regex1 = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
+        self.regex2 = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\|(.*?)\|(.*?)\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
+        self.data = [[] for _ in range(14)]
     def parse(self, line):
-        out = self.regex.match(line)
+        out = self.regex1.match(line)
         if out:
             datas = out.groups()
             self.data[0].append(rbktimetodate(datas[0]))
             self.data[1].append(float(datas[1])/math.pi * 180.0)
-            self.data[2].append(float(datas[2]))
-            self.data[3].append(float(datas[3]))
-            self.data[4].append(float(datas[4]))
-            self.data[5].append(float(datas[5]))
+            self.data[4].append(float(datas[2]))
+            self.data[5].append(float(datas[3]))
+            self.data[6].append(float(datas[4]))
+            self.data[7].append(float(datas[5]))
             if OLD_IMU_FLAG:
-                self.data[6].append(float(datas[6])/math.pi*180.0*16.4)
-                self.data[7].append(float(datas[7])/math.pi*180.0*16.4)
-                self.data[8].append(float(datas[8])/math.pi*180.0*16.4)
+                self.data[8].append(float(datas[6])/math.pi*180.0*16.4)
+                self.data[9].append(float(datas[7])/math.pi*180.0*16.4)
+                self.data[10].append(float(datas[8])/math.pi*180.0*16.4)
             else:
+                self.data[8].append(float(datas[6]))
+                self.data[9].append(float(datas[7]))
+                self.data[10].append(float(datas[8]))
+            self.data[11].append(float(datas[9]))
+            self.data[12].append(float(datas[10]))
+            self.data[13].append(float(datas[11]))
+        else:
+            out = self.regex2.match(line)
+            if out:
+                datas = out.groups()
+                self.data[0].append(rbktimetodate(datas[0]))
+                self.data[1].append(float(datas[1])/math.pi * 180.0)
+                self.data[2].append(float(datas[2])/math.pi * 180.0)
+                self.data[3].append(float(datas[3])/math.pi * 180.0)
+                self.data[4].append(float(datas[4]))
+                self.data[5].append(float(datas[5]))
                 self.data[6].append(float(datas[6]))
                 self.data[7].append(float(datas[7]))
-                self.data[8].append(float(datas[8]))
-            self.data[9].append(float(datas[9]))
-            self.data[10].append(float(datas[10]))
-            self.data[11].append(float(datas[11]))
+                if OLD_IMU_FLAG:
+                    self.data[8].append(float(datas[8])/math.pi*180.0*16.4)
+                    self.data[9].append(float(datas[9])/math.pi*180.0*16.4)
+                    self.data[10].append(float(datas[10])/math.pi*180.0*16.4)
+                else:
+                    self.data[8].append(float(datas[8]))
+                    self.data[9].append(float(datas[9]))
+                    self.data[10].append(float(datas[10]))
+                self.data[11].append(float(datas[11]))
+                self.data[12].append(float(datas[12]))
+                self.data[13].append(float(datas[13]))
+
     def t(self):
         return self.data[0]
     def yaw(self):
         return self.data[1], self.data[0]
-    def ts(self):
+    def pitch(self):
         return self.data[2], self.data[0]
-    def ax(self):
+    def roll(self):
         return self.data[3], self.data[0]
-    def ay(self):
+    def ts(self):
         return self.data[4], self.data[0]
-    def az(self):
+    def ax(self):
         return self.data[5], self.data[0]
-    def gx(self):
+    def ay(self):
         return self.data[6], self.data[0]
-    def gy(self):
+    def az(self):
         return self.data[7], self.data[0]
-    def gz(self):
+    def gx(self):
         return self.data[8], self.data[0]
-    def offx(self):
+    def gy(self):
         return self.data[9], self.data[0]
-    def offy(self):
+    def gz(self):
         return self.data[10], self.data[0]
-    def offz(self):
+    def offx(self):
         return self.data[11], self.data[0]
+    def offy(self):
+        return self.data[12], self.data[0]
+    def offz(self):
+        return self.data[13], self.data[0]
 
 class Odometer:
     """  里程数据

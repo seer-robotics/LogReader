@@ -41,7 +41,7 @@ class ReadLog:
         for file in self.filenames:
             for line in open(file, 'rb'): 
                 codeType = chardet.detect(line)['encoding']
-                line = line.decode('utf-8')
+                line = line.decode(codeType)
                 line_num += 1
                 for data in argv:
                     data.parse(line)

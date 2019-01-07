@@ -176,6 +176,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     content = self.read_thread.notice.content()[0][not_ind]
             if dt_min < 1:
                 self.label_info.setText(content)
+            else:
+                self.label_info.setText("")
         else:
             self.label_info.setText("")
 

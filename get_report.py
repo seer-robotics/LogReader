@@ -1,18 +1,26 @@
 from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
 import sys
 from os import listdir
-from os.path import isfile, join
+from os.path import isfile, join, isdir, splitext
 from termcolor import colored
 from colorama import init
-init()
 
+init()
 filenames = []
 if len(sys.argv) > 1:
     filenames = sys.argv[1:]
+    if len(filenames) == 1 and isdir(filenames[0]):
+        mypath = filenames[0]
+        tmp_files = [join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f))]
+        filenames = []
+        for file in tmp_files:
+            if splitext(file)[1] == ".log":
+                filenames.append(file)
+
 else:
     mypath = "diagnosis\\log"
     filenames = [join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f))]
-fid = open("Report.txt", "w", encoding='utf-8') 
+fid = open("Report.txt", "w") 
 for filename in filenames:
     log = ReadLog([filename])
     err = ErrorLine()

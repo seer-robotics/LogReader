@@ -43,7 +43,7 @@ class ReadThread(QThread):
             dt = tmax - tmin
             self.tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
             #save Error
-            fid = open("Report.txt", "w", encoding='utf-8') 
+            fid = open("Report.txt", "w") 
             for filename in self.filenames:
                 print("="*20, file = fid)
                 print("Files: ", filename, file = fid)

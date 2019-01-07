@@ -258,7 +258,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         xmin,xmax =  ax.get_xlim()
         ax.cla()
         self.drawFEWN(ax)
-        if data[1]:
+        if data[1] and data[0]:
             ax.plot(data[1], data[0], '.')
             max_range = max(max(data[0]) - min(data[0]), 1e-6)
             ax.set_ylim(min(data[0]) - 0.05 * max_range, max(data[0]) + 0.05 * max_range)

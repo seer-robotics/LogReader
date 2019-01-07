@@ -6,28 +6,6 @@ import chardet
 
 OLD_IMU_FLAG = False
 
-def convert(file, in_enc="GBK", out_enc="UTF-8"):
-    """
-    该程序用于将目录下的文件从指定格式转换到指定格式，默认的是GBK转到utf-8
-    :param file:    文件路径
-    :param in_enc:  输入文件格式
-    :param out_enc: 输出文件格式
-    :return:
-    """
-    in_enc = in_enc.upper()
-    out_enc = out_enc.upper()
-    if not in_enc == out_enc:
-        try:
-            print("convert [ " + file.split('/')[-1] + " ].....From " + in_enc + " --> " + out_enc )
-            f = codecs.open(file, 'r', in_enc)
-            new_content = f.read()
-            codecs.open(file, 'w', out_enc).write(new_content)
-        # print (f.read())
-        except IOError as err:
-            print("I/O error: {0}".format(err))
-    else:
-        print(file.split('/')[-1] + " is " + out_enc)
-
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
     return datetime.strptime(rbktime, '%Y-%m-%d %H:%M:%S.%f')
@@ -61,11 +39,9 @@ class ReadLog:
         """依据输入的正则进行解析"""
         line_num = 0
         for file in self.filenames:
-            # with open(file, "rb") as f:
-            #     info = f.read()
-            #     codeType = chardet.detect(info)['encoding']
-            #     convert(file, codeType, 'UTF-8')
-            for line in open(file, encoding = "utf-8"): 
+            for line in open(file, 'rb'): 
+                codeType = chardet.detect(line)['encoding']
+                line = line.decode('utf-8')
                 line_num += 1
                 for data in argv:
                     data.parse(line)
@@ -79,7 +55,7 @@ class MCLoc:
     data[4]: confidence
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[Location\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\|0\|0\|0\|0\]\n")
+        self.regex = re.compile("\[(.*?)\].*\[Location\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\|0\|0\|0\|0\]")
         self.data = [[] for _ in range(5)]
     def parse(self, line):
         out = self.regex.match(line)

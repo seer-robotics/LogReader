@@ -45,23 +45,22 @@ class ReadThread(QThread):
             self.tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
             #save Error
             fid = open("Report.txt", "w") 
-            for filename in self.filenames:
-                print("="*20, file = fid)
-                print("Files: ", filename, file = fid)
-                print(len(self.fatal.content()[0]), " FATALs, ", len(self.err.content()[0]), " ERRORs, ", 
-                      len(self.war.content()[0]), " WARNINGs, ", len(self.notice.content()[0]), " NOTICEs", file = fid)
-                print("FATALs:", file = fid)
-                for data in self.fatal.content()[0]:
-                    print(data, file = fid)
-                print("ERRORs:", file = fid)
-                for data in self.err.content()[0]:
-                    print(data,file = fid)
-                print("WARNINGs:", file = fid)
-                for data in self.war.content()[0]:
-                    print(data, file = fid)
-                print("NOTICEs:", file = fid)
-                for data in self.notice.content()[0]:
-                    print(data, file = fid)
+            print("="*20, file = fid)
+            print("Files: ", self.filenames, file = fid)
+            print(len(self.fatal.content()[0]), " FATALs, ", len(self.err.content()[0]), " ERRORs, ", 
+                    len(self.war.content()[0]), " WARNINGs, ", len(self.notice.content()[0]), " NOTICEs", file = fid)
+            print("FATALs:", file = fid)
+            for data in self.fatal.content()[0]:
+                print(data, file = fid)
+            print("ERRORs:", file = fid)
+            for data in self.err.content()[0]:
+                print(data,file = fid)
+            print("WARNINGs:", file = fid)
+            for data in self.war.content()[0]:
+                print(data, file = fid)
+            print("NOTICEs:", file = fid)
+            for data in self.notice.content()[0]:
+                print(data, file = fid)
             fid.close()
         self.data = {"mcl.x":self.mcl.x(),"mcl.y":self.mcl.y(),"mcl.theta":self.mcl.theta(), "mcl.confidence":self.mcl.confidence(),
                      "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), 
@@ -145,35 +144,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             content = []
             dt_min = 1e10
             if self.read_thread.fatal.t():
-                fatal_ind = searchsorted(self.read_thread.fatal.t(), mouse_time)
-                if fatal_ind >= len(self.read_thread.fatal.t()):
-                    fatal_ind = len(self.read_thread.fatal.t()) - 1
-                dt_min = abs((self.read_thread.fatal.t()[fatal_ind] - mouse_time).total_seconds())
-                content = self.read_thread.fatal.content()[0][fatal_ind]
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
+                dt_min = min(vdt)
+                content = self.read_thread.fatal.content()[0][vdt.index(dt_min)]
             if self.read_thread.err.t(): 
-                err_ind = searchsorted(self.read_thread.err.t(), mouse_time)
-                if err_ind >= len(self.read_thread.err.t()):
-                    err_ind = len(self.read_thread.err.t()) - 1
-                tmpdt = abs((self.read_thread.err.t()[err_ind] - mouse_time).total_seconds())
-                if tmpdt < dt_min:
-                    dt_min = tmpdt
-                    content = self.read_thread.err.content()[0][err_ind]
-            if self.read_thread.war.t():
-                war_ind = searchsorted(self.read_thread.war.t(), mouse_time)
-                if war_ind >= len(self.read_thread.war.t()):
-                    war_ind = len(self.read_thread.war.t()) - 1
-                tmpdt = abs((self.read_thread.war.t()[war_ind] - mouse_time).total_seconds())
-                if tmpdt < dt_min:
-                    dt_min = tmpdt
-                    content = self.read_thread.war.content()[0][war_ind]
-            if self.read_thread.notice.t():
-                not_ind = searchsorted(self.read_thread.notice.t(),mouse_time)
-                if not_ind >= len(self.read_thread.notice.t()):
-                    not_ind = len(self.read_thread.notice.t()) - 1
-                tmpdt = abs((self.read_thread.notice.t()[not_ind] - mouse_time).total_seconds())
-                if tmpdt < dt_min:
-                    dt_min = tmpdt
-                    content = self.read_thread.notice.content()[0][not_ind]
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
+                tmp_dt = min(vdt)
+                if tmp_dt < dt_min:
+                    dt_min = tmp_dt
+                    content = self.read_thread.err.content()[0][vdt.index(tmp_dt)]
+            if self.read_thread.war.t(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
+                tmp_dt = min(vdt)
+                if tmp_dt < dt_min:
+                    dt_min = tmp_dt
+                    content = self.read_thread.war.content()[0][vdt.index(tmp_dt)]
+            if self.read_thread.notice.t(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
+                tmp_dt = min(vdt)
+                if tmp_dt < dt_min:
+                    dt_min = tmp_dt
+                    content = self.read_thread.notice.content()[0][vdt.index(tmp_dt)]
             if dt_min < 1:
                 self.label_info.setText(content)
             else:
@@ -217,7 +208,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.static_canvas.figure.canvas.draw()
 
     def openLogFilesDialog(self):
-        self.setGeometry(50,50,640,480)
+        # self.setGeometry(50,50,640,480)
         self.read_thread.signal.connect(self.readFinished)
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog

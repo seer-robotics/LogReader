@@ -90,40 +90,59 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def setupUI(self):
         """初始化窗口结构""" 
         self.setGeometry(50,50,800,800)
+        self.max_fig_num = 5 
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Open', self.openLogFilesDialog,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_O)
         self.file_menu.addAction('&Quit', self.fileQuit,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
         self.menuBar().addMenu(self.file_menu)
+
+        self.fig_menu = QtWidgets.QMenu('&Numer', self)
+        group = QtWidgets.QActionGroup(self.fig_menu)
+        texts = [str(i) for i in range(2,self.max_fig_num+1)]
+        cur_id = 1
+        cur_fig_num = int(texts[cur_id])
+        for text in texts:
+            action = QtWidgets.QAction(text, self.fig_menu, checkable=True, checked=text==texts[cur_id])
+            self.fig_menu.addAction(action)
+            group.addAction(action)
+        group.setExclusive(True)
+        group.triggered.connect(self.fignum_changed)
+        self.menuBar().addMenu(self.fig_menu)
+
         self.help_menu = QtWidgets.QMenu('&Help', self)
-        self.menuBar().addSeparator()
         self.help_menu.addAction('&About', self.about)
         self.menuBar().addMenu(self.help_menu)
+
         self._main = QtWidgets.QWidget()
         self.setCentralWidget(self._main)
         #Add ComboBox
-        layout = QtWidgets.QVBoxLayout(self._main)
-        grid = QtWidgets.QGridLayout()
-        self.label1 = QtWidgets.QLabel("图片1",self)
-        self.label1.adjustSize()
-        self.combo1 = QtWidgets.QComboBox(self)
-        self.combo1.activated[str].connect(self.combo_onActivated1)
-        grid.addWidget(self.label1,1,0)
-        grid.addWidget(self.combo1,1,1,1,50)
-        self.label2 = QtWidgets.QLabel("图片2",self)
-        self.label2.adjustSize()
-        self.combo2 = QtWidgets.QComboBox(self)
-        self.combo2.activated[str].connect(self.combo_onActivated2)
-        grid.addWidget(self.label2,2,0)
-        grid.addWidget(self.combo2,2,1,2,50)
+        self.layout = QtWidgets.QVBoxLayout(self._main)
+        self.grid = QtWidgets.QGridLayout()
+        for i in range(0, cur_fig_num):
+            self.grid.setColumnMinimumWidth(i*2,40)
+            self.grid.setColumnStretch(i*2+1,1)
+        self.labels = []
+        self.combos = []
+        for i in range(0,cur_fig_num):
+            label = QtWidgets.QLabel("图片"+str(i+1),self)
+            label.adjustSize()
+            combo = QtWidgets.QComboBox(self)
+            combo.resize(10,10)
+            combo.activated.connect(self.combo_onActivated)
+            self.labels.append(label)
+            self.combos.append(combo)
+            self.grid.addWidget(label,1,i*2)
+            self.grid.addWidget(combo,1,i*2+1)
         self.label_info = QtWidgets.QLabel("",self)
-        grid.addWidget(self.label_info,4,0,2,50)
-        layout.addLayout(grid)
+        self.label_info.setStyleSheet("background-color: white;")
+        self.grid.addWidget(self.label_info,2,0,1,50)
+        self.layout.addLayout(self.grid)
 
         #图形化结构
         self.static_canvas = FigureCanvas(Figure(figsize=(100,100)))
-        layout.addWidget(self.static_canvas)
+        self.layout.addWidget(self.static_canvas)
         self.old_home = NavigationToolbar.home
         self.old_forward = NavigationToolbar.forward
         self.old_back = NavigationToolbar.back
@@ -131,8 +150,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         NavigationToolbar.forward = self.new_forward
         NavigationToolbar.back = self.new_back
         self.addToolBar(NavigationToolbar(self.static_canvas, self))
-        self.ax1, self.ax2 = self.static_canvas.figure.subplots(2, 1, sharex = True)
-        self.ax2.set_xlabel("t")
+        self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
 
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
@@ -140,33 +158,36 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def mouse_move(self, event):
         if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
-            mouse_time = datetime.fromtimestamp(mouse_time)
-            content = []
-            dt_min = 1e10
-            if self.read_thread.fatal.t():
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
-                dt_min = min(vdt)
-                content = self.read_thread.fatal.content()[0][vdt.index(dt_min)]
-            if self.read_thread.err.t(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
-                tmp_dt = min(vdt)
-                if tmp_dt < dt_min:
-                    dt_min = tmp_dt
-                    content = self.read_thread.err.content()[0][vdt.index(tmp_dt)]
-            if self.read_thread.war.t(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
-                tmp_dt = min(vdt)
-                if tmp_dt < dt_min:
-                    dt_min = tmp_dt
-                    content = self.read_thread.war.content()[0][vdt.index(tmp_dt)]
-            if self.read_thread.notice.t(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
-                tmp_dt = min(vdt)
-                if tmp_dt < dt_min:
-                    dt_min = tmp_dt
-                    content = self.read_thread.notice.content()[0][vdt.index(tmp_dt)]
-            if dt_min < 1:
-                self.label_info.setText(content)
+            if mouse_time > 1e6:
+                mouse_time = datetime.fromtimestamp(mouse_time)
+                content = []
+                dt_min = 1e10
+                if self.read_thread.fatal.t():
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
+                    dt_min = min(vdt)
+                    content = self.read_thread.fatal.content()[0][vdt.index(dt_min)]
+                if self.read_thread.err.t(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+                        content = self.read_thread.err.content()[0][vdt.index(tmp_dt)]
+                if self.read_thread.war.t(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+                        content = self.read_thread.war.content()[0][vdt.index(tmp_dt)]
+                if self.read_thread.notice.t(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+                        content = self.read_thread.notice.content()[0][vdt.index(tmp_dt)]
+                if dt_min < 1:
+                    self.label_info.setText(content)
+                else:
+                    self.label_info.setText("")
             else:
                 self.label_info.setText("")
         else:
@@ -174,37 +195,31 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
 
     def new_home(self, *args, **kwargs):
-        text1 = self.combo1.currentText()
-        data = self.read_thread.data[text1][0]
-        if data:
-            max_range = max(max(data) - min(data), 1e-6)
-            self.ax1.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
-            self.ax1.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
-
-        text2 = self.combo2.currentText()
-        data = self.read_thread.data[text2][0]
-        if data:
-            max_range = max(max(data) - min(data), 1e-6)
-            self.ax2.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
-            self.ax2.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
+        for ax, combo in zip(self.axs, self.combos):
+            text = combo.currentText()
+            data = self.read_thread.data[text][0]
+            if data:
+                max_range = max(max(data) - min(data), 1e-6)
+                ax.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
+                ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         self.static_canvas.figure.canvas.draw()
 
     def new_forward(self, *args, **kwargs):
-        xmin,xmax =  self.ax1.get_xlim()
+        xmin,xmax =  self.axs[0].get_xlim()
         range = xmax - xmin
         xmin = xmin + range /10.0
         xmax = xmax + range /10.0
-        self.ax1.set_xlim(xmin,xmax)
-        self.ax2.set_xlim(xmin,xmax)
+        for ax in self.axs:
+            ax.set_xlim(xmin,xmax)
         self.static_canvas.figure.canvas.draw()
 
     def new_back(self, *args, **kwargs):
-        xmin,xmax =  self.ax1.get_xlim()
+        xmin,xmax =  self.axs[0].get_xlim()
         range = xmax - xmin
         xmin = xmin - range /10.0
         xmax = xmax - range /10.0
-        self.ax1.set_xlim(xmin,xmax)
-        self.ax2.set_xlim(xmin,xmax)
+        for ax in self.axs:
+            ax.set_xlim(xmin,xmax)
         self.static_canvas.figure.canvas.draw()
 
     def openLogFilesDialog(self):
@@ -212,6 +227,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.read_thread.signal.connect(self.readFinished)
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        options |= QtCore.Qt.WindowStaysOnTopHint
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log);;All Files (*)", options=options)
         if self.filenames:
             self.read_thread.filenames = self.filenames
@@ -226,10 +242,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())
-            self.combo1.addItems(keys)
-            self.drawdata(self.ax1, self.read_thread.data[self.combo1.currentText()],self.combo1.currentText(), True)
-            self.combo2.addItems(keys)
-            self.drawdata(self.ax2, self.read_thread.data[self.combo2.currentText()], self.combo2.currentText(), True)
+            for ax, combo in zip(self.axs, self.combos):
+                combo.addItems(keys)
+                self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), True)
 
     def fileQuit(self):
         self.close()
@@ -237,15 +252,56 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def about(self):
         QtWidgets.QMessageBox.about(self, "关于", """Log Viewer""")
 
-    def combo_onActivated1(self,text):
+    def combo_onActivated(self):
         # print("combo1: ",text)
-        self.drawdata(self.ax1, self.read_thread.data[text], text, False)
+        curcombo = self.sender()
+        index = self.combos.index(curcombo)
+        text = curcombo.currentText()
+        print("index:", index, "sender:", self.sender()," text:", text)
+        ax = self.axs[index]
+        self.drawdata(ax, self.read_thread.data[text], text, False)
 
-    def combo_onActivated2(self,text):
-        # print("combo2: ",text)
-        self.drawdata(self.ax2, self.read_thread.data[text], text, False)
-
-    
+    def fignum_changed(self,action):
+        new_fig_num = int(action.text())
+        xmin, xmax = self.axs[0].get_xlim()
+        for ax in self.axs:
+            self.static_canvas.figure.delaxes(ax)
+        self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
+        self.static_canvas.figure.canvas.draw()
+        for i in reversed(range(2, self.grid.count())): 
+            self.grid.itemAt(i).widget().deleteLater()
+        for i in range(0, new_fig_num):
+            self.grid.setColumnMinimumWidth(i*2,40)
+            self.grid.setColumnStretch(i*2+1,1)
+        combo_ind = [] 
+        for combo in self.combos:
+            combo_ind.append(combo.currentIndex())
+        self.labels = []
+        self.combos = []
+        for i in range(0,new_fig_num):
+            label = QtWidgets.QLabel("图片"+str(i+1),self)
+            label.adjustSize()
+            combo = QtWidgets.QComboBox(self)
+            combo.resize(10,10)
+            combo.activated.connect(self.combo_onActivated)
+            self.labels.append(label)
+            self.combos.append(combo)
+            self.grid.addWidget(label,1,i*2)
+            self.grid.addWidget(combo,1,i*2+1)
+        self.label_info = QtWidgets.QLabel("",self)
+        self.label_info.setStyleSheet("background-color: white;")
+        self.grid.addWidget(self.label_info,2,0,1,50)
+        if self.finishReadFlag:
+            if self.read_thread.filenames:
+                keys = list(self.read_thread.data.keys())
+                count = 0
+                for ax, combo in zip(self.axs, self.combos):
+                    combo.addItems(keys)
+                    if count < len(combo_ind):
+                        combo.setCurrentIndex(combo_ind[count])
+                    count = count + 1
+                    ax.set_xlim(xmin, xmax)
+                    self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), False)
 
     def drawdata(self, ax, data, ylabel, resize = False):
         xmin,xmax =  ax.get_xlim()

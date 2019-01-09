@@ -95,53 +95,52 @@ class IMU:
     data[13]: offz LSB
     """
     def __init__(self):
-        self.regex1 = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
-        self.regex2 = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\|(.*?)\|(.*?)\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
+        self.regex = re.compile("\[(.*?)\].*\[IMU\]\[(.*?)\]")
         self.data = [[] for _ in range(14)]
     def parse(self, line):
-        out = self.regex1.match(line)
+        out = self.regex.match(line)
         if out:
             datas = out.groups()
             self.data[0].append(rbktimetodate(datas[0]))
-            self.data[1].append(float(datas[1])/math.pi * 180.0)
-            self.data[4].append(float(datas[2]))
-            self.data[5].append(float(datas[3]))
-            self.data[6].append(float(datas[4]))
-            self.data[7].append(float(datas[5]))
-            if OLD_IMU_FLAG:
-                self.data[8].append(float(datas[6])/math.pi*180.0*16.4)
-                self.data[9].append(float(datas[7])/math.pi*180.0*16.4)
-                self.data[10].append(float(datas[8])/math.pi*180.0*16.4)
-            else:
-                self.data[8].append(float(datas[6]))
-                self.data[9].append(float(datas[7]))
-                self.data[10].append(float(datas[8]))
-            self.data[11].append(float(datas[9]))
-            self.data[12].append(float(datas[10]))
-            self.data[13].append(float(datas[11]))
-        else:
-            out = self.regex2.match(line)
-            if out:
-                datas = out.groups()
-                self.data[0].append(rbktimetodate(datas[0]))
-                self.data[1].append(float(datas[1])/math.pi * 180.0)
-                self.data[2].append(float(datas[2])/math.pi * 180.0)
-                self.data[3].append(float(datas[3])/math.pi * 180.0)
-                self.data[4].append(float(datas[4]))
-                self.data[5].append(float(datas[5]))
-                self.data[6].append(float(datas[6]))
-                self.data[7].append(float(datas[7]))
+            values = datas[1].split('|')
+            if len(values) == 11:
+                self.data[1].append(float(values[0])/math.pi * 180.0)
+                self.data[4].append(float(values[1]))
+                self.data[5].append(float(values[2]))
+                self.data[6].append(float(values[3]))
+                self.data[7].append(float(values[4]))
                 if OLD_IMU_FLAG:
-                    self.data[8].append(float(datas[8])/math.pi*180.0*16.4)
-                    self.data[9].append(float(datas[9])/math.pi*180.0*16.4)
-                    self.data[10].append(float(datas[10])/math.pi*180.0*16.4)
+                    self.data[8].append(float(values[5])/math.pi*180.0*16.4)
+                    self.data[9].append(float(values[6])/math.pi*180.0*16.4)
+                    self.data[10].append(float(values[7])/math.pi*180.0*16.4)
                 else:
-                    self.data[8].append(float(datas[8]))
-                    self.data[9].append(float(datas[9]))
-                    self.data[10].append(float(datas[10]))
-                self.data[11].append(float(datas[11]))
-                self.data[12].append(float(datas[12]))
-                self.data[13].append(float(datas[13]))
+                    self.data[8].append(float(values[5]))
+                    self.data[9].append(float(values[6]))
+                    self.data[10].append(float(values[7]))
+                self.data[11].append(float(values[8]))
+                self.data[12].append(float(values[9]))
+                self.data[13].append(float(values[10]))
+            elif len(values) == 13:
+                self.data[1].append(float(values[0])/math.pi * 180.0)
+                self.data[2].append(float(values[1])/math.pi * 180.0)
+                self.data[3].append(float(values[2])/math.pi * 180.0)
+                self.data[4].append(float(values[3]))
+                self.data[5].append(float(values[4]))
+                self.data[6].append(float(values[5]))
+                self.data[7].append(float(values[6]))
+                if OLD_IMU_FLAG:
+                    self.data[8].append(float(values[7])/math.pi*180.0*16.4)
+                    self.data[9].append(float(values[8])/math.pi*180.0*16.4)
+                    self.data[10].append(float(values[9])/math.pi*180.0*16.4)
+                else:
+                    self.data[8].append(float(values[7]))
+                    self.data[9].append(float(values[8]))
+                    self.data[10].append(float(values[9]))
+                self.data[11].append(float(values[10]))
+                self.data[12].append(float(values[11]))
+                self.data[13].append(float(values[12]))
+            else:
+                print("Error in IMU parse: ", datas)
 
     def t(self):
         return self.data[0]

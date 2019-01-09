@@ -90,7 +90,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def setupUI(self):
         """初始化窗口结构""" 
         self.setGeometry(50,50,800,800)
-        self.max_fig_num = 5 
+        self.max_fig_num = 6 
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Open', self.openLogFilesDialog,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_O)
@@ -257,7 +257,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         curcombo = self.sender()
         index = self.combos.index(curcombo)
         text = curcombo.currentText()
-        print("index:", index, "sender:", self.sender()," text:", text)
+        # print("index:", index, "sender:", self.sender()," text:", text)
         ax = self.axs[index]
         self.drawdata(ax, self.read_thread.data[text], text, False)
 

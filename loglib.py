@@ -40,8 +40,14 @@ class ReadLog:
         line_num = 0
         for file in self.filenames:
             for line in open(file, 'rb'): 
-                codeType = chardet.detect(line)['encoding']
-                line = line.decode(codeType)
+                try:
+                    line = line.decode('utf-8')
+                except UnicodeDecodeError:
+                    try:
+                        line = line.decode('gbk')
+                    except UnicodeDecodeError:
+                        print("Line ",line_num+1, " is skipped due to decoding failure!", " ", line)
+                        continue
                 line_num += 1
                 for data in argv:
                     data.parse(line)

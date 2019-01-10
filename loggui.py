@@ -5,13 +5,25 @@ from matplotlib.backends.backend_qt5agg import (
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5.QtCore import QThread, pyqtSignal
 from matplotlib.figure import Figure
-from loglib import MCLoc, IMU, Odometer, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
+from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
 from loglib import findrange
 from datetime import datetime, timedelta
 import sys
 from numpy import searchsorted
 
 
+
+def decide_old_imu(gx,gy,gz):
+    for v in gx:
+        if abs(round(v) - v) > 1e-5:
+            return True
+    for v in gy:
+        if abs(round(v) - v) > 1e-5:
+            return True
+    for v in gz:
+        if abs(round(v) - v) > 1e-5:
+            return True
+    return False
 
 class ReadThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
@@ -28,6 +40,9 @@ class ReadThread(QThread):
         self.mcl = MCLoc()
         self.imu = IMU()
         self.odo = Odometer()
+        self.battery = Battery()
+        self.controller = Controller()
+        self.odo = Odometer()
         self.send = Send()
         self.get = Get()
         self.laser = Laser(1000.0)
@@ -38,7 +53,14 @@ class ReadThread(QThread):
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
-            log.parse(self.mcl, self.imu, self.odo, self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice)
+            log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice)
+            #analyze data
+            old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
+            if old_imu_flag:
+                self.imu.old2newGyro()
+                print('The unit of gx, gy, gz in file is rad/s.')
+            else:
+                print('The org unit of gx, gy, gz in IMU is LSB/s.')
             tmax = max(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
             tmin = min(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
             dt = tmax - tmin
@@ -62,6 +84,7 @@ class ReadThread(QThread):
             for data in self.notice.content()[0]:
                 print(data, file = fid)
             fid.close()
+        #creat dic
         self.data = {"mcl.x":self.mcl.x(),"mcl.y":self.mcl.y(),"mcl.theta":self.mcl.theta(), "mcl.confidence":self.mcl.confidence(),
                      "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), 
                      "imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
@@ -75,7 +98,12 @@ class ReadThread(QThread):
                      "send.vx":self.send.vx(),"send.vy":self.send.vy(),"send.vw":self.send.vw(),"send.steer_angle":self.send.steer_angle(),
                      "send.max_vx":self.send.max_vx(),"send.max_vw":self.send.max_vw(),
                      "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(),
-                     "get.max_vx":self.get.max_vx(),"get.max_vw":self.get.max_vw()}
+                     "get.max_vx":self.get.max_vx(),"get.max_vw":self.get.max_vw(),
+                     "battery.percentage": self.battery.percentage(), "battery.current": self.battery.current(), "battery.voltage": self.battery.voltage(),
+                     "battery.ischarging": self.battery.ischarging(), "battery.temperature": self.battery.temperature(), "battery.cycle": self.battery.cycle(),
+                     "controller.temp": self.controller.temp(), "controller.humi": self.controller.humi(), "controller.voltage":self.controller.voltage(),
+                     "controller.emc": self.controller.emc(),"controller.brake":self.controller.brake(),"controller.driveremc":self.controller.driveremc(),
+                     "controller.manualcharge": self.controller.manualcharge(),"controller.autocharge": self.controller.autocharge(), "controller.electric": self.controller.electric()}
         self.signal.emit(self.filenames)
 
 class ApplicationWindow(QtWidgets.QMainWindow):

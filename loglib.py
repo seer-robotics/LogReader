@@ -142,6 +142,11 @@ class IMU:
             else:
                 print("Error in IMU parse: ", datas)
 
+    def old2newGyro(self):
+        self.data[8] = [v/math.pi*180.0*16.4 for v in self.data[8]]
+        self.data[9] = [v/math.pi*180.0*16.4 for v in self.data[9]]
+        self.data[10] = [v/math.pi*180.0*16.4 for v in self.data[10]]
+
     def t(self):
         return self.data[0]
     def yaw(self):
@@ -220,6 +225,105 @@ class Odometer:
     def vw(self):
         return self.data[8], self.data[0]
     def steer_angle(self):
+        return self.data[9], self.data[0]
+
+class Battery:
+    """  电池数据
+    data[0]: t
+    data[1]: percentage  
+    data[2]: current
+    data[3]: voltage
+    data[4]: ischarging
+    data[5]: temperature
+    data[6]: cycle
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[Battery\]\[(.*?)\]')
+        self.data = [[] for _ in range(7)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 6:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3] == "true"))
+                self.data[5].append(float(values[4]))
+                self.data[6].append(float(values[5]))
+            else:
+                print("Error in Battery parse: ", datas)
+    def t(self):
+        return self.data[0]
+    def percentage(self):
+        return self.data[1], self.data[0]
+    def current(self):
+        return self.data[2], self.data[0]
+    def voltage(self):
+        return self.data[3], self.data[0]
+    def ischarging(self):
+        return self.data[4], self.data[0]
+    def temperature(self):
+        return self.data[5], self.data[0]
+    def cycle(self):
+        return self.data[6], self.data[0]
+
+class Controller:
+    """  控制器数据
+    data[0]: t
+    data[1]: temp  
+    data[2]: humi
+    data[3]: voltage
+    data[4]: emc
+    data[5]: brake
+    data[6]: driveremc
+    data[7]: manualcharge
+    data[8]: autocharge
+    data[9]: electric
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[Controller\]\[(.*?)\]')
+        self.data = [[] for _ in range(10)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 9:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3] == "true"))
+                self.data[5].append(float(values[4] == "true"))
+                self.data[6].append(float(values[5] == "true"))
+                self.data[7].append(float(values[6] == "true"))
+                self.data[8].append(float(values[7] == "true"))
+                self.data[9].append(float(values[8] == "true"))
+            else:
+                print("Error in Controller parse: ", datas)
+
+    def t(self):
+        return self.data[0]
+    def temp(self):
+        return self.data[1], self.data[0]
+    def humi(self):
+        return self.data[2], self.data[0]
+    def voltage(self):
+        return self.data[3], self.data[0]
+    def emc(self):
+        return self.data[4], self.data[0]
+    def brake(self):
+        return self.data[5], self.data[0]
+    def driveremc(self):
+        return self.data[6], self.data[0]
+    def manualcharge(self):
+        return self.data[7], self.data[0]
+    def autocharge(self):
+        return self.data[8], self.data[0]
+    def electric(self):
         return self.data[9], self.data[0]
 
 class Send:

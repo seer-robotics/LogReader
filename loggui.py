@@ -386,6 +386,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.grid.addWidget(combo,1,i*2+1)
         self.label_info = QtWidgets.QLabel("",self)
         self.label_info.setStyleSheet("background-color: white;")
+        self.label_info.setWordWrap(True)
         self.grid.addWidget(self.label_info,2,0,1,50)
         if self.finishReadFlag:
             if self.read_thread.filenames:

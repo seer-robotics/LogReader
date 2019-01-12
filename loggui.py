@@ -173,10 +173,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.layout.addLayout(self.grid)
 
         #消息框
-        self.label_info = QtWidgets.QLabel("",self)
-        self.label_info.setStyleSheet("background-color: white;")
-        self.label_info.setWordWrap(True)
-        self.grid.addWidget(self.label_info,2,0,1,50)
+        # self.label_info = QtWidgets.QLabel("",self)
+        # self.label_info.setStyleSheet("background-color: white;")
+        # self.label_info.setWordWrap(True)
+        self.info = QtWidgets.QTextBrowser(self)
+        self.info.setReadOnly(True)
+        self.info.setFixedHeight(50)
+        self.grid.addWidget(self.info,2,0,1,50)
 
         #图形化结构
         self.static_canvas = FigureCanvas(Figure(figsize=(100,100)))
@@ -229,45 +232,51 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 if self.read_thread.fatal.t() and self.check_fatal.ischecked():
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
                     dt_min = min(vdt)
-                    content = self.read_thread.fatal.content()[0][vdt.index(dt_min)]
+                    contents = [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    content = '\n'.join(contents)
                 if self.read_thread.err.t() and self.check_err.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        content = self.read_thread.err.content()[0][vdt.index(tmp_dt)]
+                        contents = [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                        content = '\n'.join(contents)
                 if self.read_thread.war.t() and self.check_war.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        content = self.read_thread.war.content()[0][vdt.index(tmp_dt)]
+                        contents = [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                        content = '\n'.join(contents)
                 if self.read_thread.notice.t() and self.check_notice.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        content = self.read_thread.notice.content()[0][vdt.index(tmp_dt)]
+                        contents = [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                        content = '\n'.join(contents)
                 if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        content = self.read_thread.taskstart.content()[0][vdt.index(tmp_dt)]
+                        contents = [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                        content = '\n'.join(contents)
                 if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        content = self.read_thread.taskfinish.content()[0][vdt.index(tmp_dt)]
+                        contents = [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                        content = '\n'.join(contents)
                 if dt_min < 10:
-                    self.label_info.setText(content)
+                    self.info.setText(content)
                 else:
-                    self.label_info.setText("")
+                    self.info.setText("")
             else:
-                self.label_info.setText("")
-        else:
-            self.label_info.setText("")
+                self.info.setText("")
+        elif not self.finishReadFlag:
+            self.info.setText("")
 
 
     def new_home(self, *args, **kwargs):
@@ -384,10 +393,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.combos.append(combo)
             self.grid.addWidget(label,1,i*2)
             self.grid.addWidget(combo,1,i*2+1)
-        self.label_info = QtWidgets.QLabel("",self)
-        self.label_info.setStyleSheet("background-color: white;")
-        self.label_info.setWordWrap(True)
-        self.grid.addWidget(self.label_info,2,0,1,50)
+        self.info = QtWidgets.QTextBrowser(self)
+        self.info.setReadOnly(True)
+        self.info.setFixedHeight(50)
+        self.grid.addWidget(self.info,2,0,1,50)
+        # self.label_info = QtWidgets.QLabel("",self)
+        # self.label_info.setStyleSheet("background-color: white;")
+        # self.label_info.setWordWrap(True)
+        # self.grid.addWidget(self.label_info,2,0,1,50)
         if self.finishReadFlag:
             if self.read_thread.filenames:
                 keys = list(self.read_thread.data.keys())
@@ -546,8 +559,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_err.setChecked(False)
             self.check_war.setChecked(False)
             self.check_notice.setChecked(False)
-            self.check_tstart.setChecked(True)
-            self.check_tfinish.setChecked(True)
+            self.check_tstart.setChecked(False)
+            self.check_tfinish.setChecked(False)
 
 if __name__ == "__main__":
     qapp = QtWidgets.QApplication(sys.argv)

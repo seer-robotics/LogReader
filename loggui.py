@@ -338,7 +338,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())
             for ax, combo in zip(self.axs, self.combos):
-                combo.addItems(keys)
+                if combo.count() == 0:
+                    combo.addItems(keys)
                 self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), True)
 
     def fileQuit(self):
@@ -424,42 +425,48 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         tsnum, tfnum = [],[]
         tsl, tfl = None,None
         for tmp in self.read_thread.fatal.t():
-            fl, = ax.plot((tmp,tmp),[-1e50, 1e50],'m-')
+            fl= ax.axvline(tmp, linestyle='-',color = 'm')
+            # fl, = ax.plot((tmp,tmp),[-1e50, 1e50],'m-')
             fnum.append(line_num)
             line_num = line_num + 1
         if fl:
             legend_info.append(fl)
             legend_info.append('fatal')
         for tmp in self.read_thread.err.t():
-            el, = ax.plot((tmp,tmp),[-1e50, 1e50],'r-.')
+            el= ax.axvline(tmp, linestyle = '-.', color='r')
+            # el, = ax.plot((tmp,tmp),[-1e50, 1e50],'r-.')
             ernum.append(line_num)
             line_num = line_num + 1
         if el:
             legend_info.append(el)
             legend_info.append('error')
         for tmp in self.read_thread.war.t():
-            wl, = ax.plot((tmp,tmp),[-1e50, 1e50],'y--')
+            wl = ax.axvline(tmp, linestyle = '--', color = 'y')
+            # wl, = ax.plot((tmp,tmp),[-1e50, 1e50],'y--')
             wnum.append(line_num)
             line_num = line_num + 1
         if wl:
             legend_info.append(wl)
             legend_info.append('warning')
         for tmp in self.read_thread.notice.t():
-            nl, = ax.plot((tmp,tmp),[-1e50, 1e50],'g:')
+            nl = ax.axvline(tmp, linestyle = ':', color = 'g')
+            # nl, = ax.plot((tmp,tmp),[-1e50, 1e50],'g:')
             nnum.append(line_num)
             line_num = line_num + 1
         if nl:
             legend_info.append(nl)
             legend_info.append('notice')
         for tmp in self.read_thread.taskstart.t():
-            tsl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b')
+            tsl = ax.axvline(tmp, linestyle = '-', color = 'b')
+            # tsl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b')
             tsnum.append(line_num)
             line_num = line_num + 1
         if tsl:
             legend_info.append(tsl)
             legend_info.append('task start')
         for tmp in self.read_thread.taskfinish.t():
-            tfl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b--')
+            tfl = ax.axvline(tmp, linestyle = '--', color = 'b')
+            # tfl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b--')
             tfnum.append(line_num)
             line_num = line_num + 1
         if tfl:

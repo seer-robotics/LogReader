@@ -650,6 +650,41 @@ class NoticeLine:
     def alarminfo(self):
         return self.data[3], self.data[0]
 
+class TaskStart:
+    """  任务开始信息
+    data[0]: t
+    data[1]: 开始信息内容
+    """
+    def __init__(self):
+        self.regex = re.compile("\[(.*?)\].*\[Text\]\[cnt:.*")
+        self.data = [[] for _ in range(2)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+    def t(self):
+        return self.data[0]
+    def content(self):
+        return self.data[1], self.data[0]
+
+class TaskFinish:
+    """  任务结束信息
+    data[0]: t
+    data[1]: 结束信息内容
+    """
+    def __init__(self):
+        self.regex = re.compile("\[(.*?)\].*\[Text\]\[Task finished.*")
+        self.data = [[] for _ in range(2)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+    def t(self):
+        return self.data[0]
+    def content(self):
+        return self.data[1], self.data[0]
 # if __name__ == '__main__':
 #     import matplotlib.pyplot as plt
 #     from matplotlib.widgets import Slider,RadioButtons

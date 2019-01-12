@@ -5,7 +5,7 @@ from matplotlib.backends.backend_qt5agg import (
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5.QtCore import QThread, pyqtSignal
 from matplotlib.figure import Figure
-from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer
+from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
 from loglib import findrange
 from datetime import datetime, timedelta
 import sys
@@ -51,11 +51,13 @@ class ReadThread(QThread):
         self.war = WarningLine()
         self.fatal = FatalLine()
         self.notice = NoticeLine()
+        self.taskstart = TaskStart()
+        self.taskfinish = TaskFinish()
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
             log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo,
-            self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice)
+            self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
             if old_imu_flag:
@@ -101,7 +103,7 @@ class ReadThread(QThread):
                      "laserOdo.ts":self.laserOdo.ts(),"laserOdo.x":self.laserOdo.x(),"laserOdo.y":self.laserOdo.y(),"laserOdo.angle":self.laserOdo.angle(),
                      "send.vx":self.send.vx(),"send.vy":self.send.vy(),"send.vw":self.send.vw(),"send.steer_angle":self.send.steer_angle(),
                      "send.max_vx":self.send.max_vx(),"send.max_vw":self.send.max_vw(),
-                     "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(),
+                     "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(), "get.steer_angle":self.get.steer_angle(),
                      "get.max_vx":self.get.max_vx(),"get.max_vw":self.get.max_vw(),
                      "battery.percentage": self.battery.percentage(), "battery.current": self.battery.current(), "battery.voltage": self.battery.voltage(),
                      "battery.ischarging": self.battery.ischarging(), "battery.temperature": self.battery.temperature(), "battery.cycle": self.battery.cycle(),
@@ -114,7 +116,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.finishReadFlag = False
-        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[]} 
+        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[]} 
         self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
         self.openLogFilesDialog()
@@ -173,6 +175,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         #消息框
         self.label_info = QtWidgets.QLabel("",self)
         self.label_info.setStyleSheet("background-color: white;")
+        self.label_info.setWordWrap(True)
         self.grid.addWidget(self.label_info,2,0,1,50)
 
         #图形化结构
@@ -196,17 +199,23 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_err = QtWidgets.QCheckBox('ERROR',self)
         self.check_war = QtWidgets.QCheckBox('WARNING',self)
         self.check_notice = QtWidgets.QCheckBox('NOTICE',self)
+        self.check_tstart = QtWidgets.QCheckBox('TASK START',self)
+        self.check_tfinish = QtWidgets.QCheckBox('TASK FINISHED',self)
         self.hbox.addWidget(self.check_all)
         self.hbox.addWidget(self.check_fatal)
         self.hbox.addWidget(self.check_err)
         self.hbox.addWidget(self.check_war)
         self.hbox.addWidget(self.check_notice)
+        self.hbox.addWidget(self.check_tstart)
+        self.hbox.addWidget(self.check_tfinish)
         self.hbox.setAlignment(QtCore.Qt.AlignLeft)
         self.layout.addLayout(self.hbox)
         self.check_fatal.stateChanged.connect(self.changeCheckBox)
         self.check_err.stateChanged.connect(self.changeCheckBox)
         self.check_war.stateChanged.connect(self.changeCheckBox)
         self.check_notice.stateChanged.connect(self.changeCheckBox)
+        self.check_tstart.stateChanged.connect(self.changeCheckBox)
+        self.check_tfinish.stateChanged.connect(self.changeCheckBox)
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
 
@@ -239,7 +248,19 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
                         content = self.read_thread.notice.content()[0][vdt.index(tmp_dt)]
-                if dt_min < 1:
+                if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+                        content = self.read_thread.taskstart.content()[0][vdt.index(tmp_dt)]
+                if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+                        content = self.read_thread.taskfinish.content()[0][vdt.index(tmp_dt)]
+                if dt_min < 10:
                     self.label_info.setText(content)
                 else:
                     self.label_info.setText("")
@@ -305,7 +326,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.1""")
 
     def combo_onActivated(self):
         # print("combo1: ",text)
@@ -364,7 +385,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.drawFEWN(ax)
         if data[1] and data[0]:
             ax.plot(data[1], data[0], '.')
-            max_range = max(max(data[0]) - min(data[0]), 1e-6)
+            max_range = max(max(data[0]) - min(data[0]), 1.0)
             ax.set_ylim(min(data[0]) - 0.05 * max_range, max(data[0]) + 0.05 * max_range)
         if resize:
             ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
@@ -381,6 +402,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         line_num = 0
         legend_info = []
         fnum, ernum, wnum, nnum = [], [], [], [] 
+        tsnum, tfnum = [],[]
+        tsl, tfl = None,None
         for tmp in self.read_thread.fatal.t():
             fl, = ax.plot((tmp,tmp),[-1e50, 1e50],'m-')
             fnum.append(line_num)
@@ -409,12 +432,28 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if nl:
             legend_info.append(nl)
             legend_info.append('notice')
+        for tmp in self.read_thread.taskstart.t():
+            tsl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b')
+            tsnum.append(line_num)
+            line_num = line_num + 1
+        if tsl:
+            legend_info.append(tsl)
+            legend_info.append('task start')
+        for tmp in self.read_thread.taskfinish.t():
+            tfl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b--')
+            tfnum.append(line_num)
+            line_num = line_num + 1
+        if tfl:
+            legend_info.append(tfl)
+            legend_info.append('task finish')
         if legend_info:
             ax.legend(legend_info[0::2], legend_info[1::2], loc='upper right')
         self.lines_dict['fatal'] = fnum
         self.lines_dict['error'] = ernum
         self.lines_dict['warning'] = wnum
         self.lines_dict['notice'] = nnum
+        self.lines_dict['taskstart'] = tsnum
+        self.lines_dict['taskfinish'] = tfnum
         lines = ax.get_lines()
         for n in fnum:
             lines[n].set_visible(self.check_fatal.isChecked())
@@ -424,6 +463,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             lines[n].set_visible(self.check_war.isChecked())
         for n in nnum:
             lines[n].set_visible(self.check_notice.isChecked())
+        for n in tsnum:
+            lines[n].set_visible(self.check_tstart.isChecked())
+        for n in tfnum:
+            lines[n].set_visible(self.check_tfinish.isChecked())
         
     def updateCheckInfoLine(self,key):
         for ax in self.axs:
@@ -456,6 +499,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.updateCheckInfoLine('warning')
         elif cur_check is self.check_notice:
             self.updateCheckInfoLine('notice')
+        elif cur_check is self.check_tstart:
+            self.updateCheckInfoLine('taskstart')
+        elif cur_check is self.check_tfinish:
+            self.updateCheckInfoLine('taskfinish')
 
     def changeCheckBoxAll(self):
         if self.check_all.checkState() == QtCore.Qt.Checked:
@@ -463,11 +510,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_err.setChecked(True)
             self.check_war.setChecked(True)
             self.check_notice.setChecked(True)
+            self.check_tstart.setChecked(True)
+            self.check_tfinish.setChecked(True)
         elif self.check_all.checkState() == QtCore.Qt.Unchecked:
             self.check_fatal.setChecked(False)
             self.check_err.setChecked(False)
             self.check_war.setChecked(False)
             self.check_notice.setChecked(False)
+            self.check_tstart.setChecked(True)
+            self.check_tfinish.setChecked(True)
 
 if __name__ == "__main__":
     qapp = QtWidgets.QApplication(sys.argv)

@@ -4,8 +4,6 @@ from datetime import datetime
 import codecs
 import chardet
 
-OLD_IMU_FLAG = False
-
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
     return datetime.strptime(rbktime, '%Y-%m-%d %H:%M:%S.%f')
@@ -115,14 +113,9 @@ class IMU:
                 self.data[5].append(float(values[2]))
                 self.data[6].append(float(values[3]))
                 self.data[7].append(float(values[4]))
-                if OLD_IMU_FLAG:
-                    self.data[8].append(float(values[5])/math.pi*180.0*16.4)
-                    self.data[9].append(float(values[6])/math.pi*180.0*16.4)
-                    self.data[10].append(float(values[7])/math.pi*180.0*16.4)
-                else:
-                    self.data[8].append(float(values[5]))
-                    self.data[9].append(float(values[6]))
-                    self.data[10].append(float(values[7]))
+                self.data[8].append(float(values[5]))
+                self.data[9].append(float(values[6]))
+                self.data[10].append(float(values[7]))
                 self.data[11].append(float(values[8]))
                 self.data[12].append(float(values[9]))
                 self.data[13].append(float(values[10]))
@@ -134,14 +127,9 @@ class IMU:
                 self.data[5].append(float(values[4]))
                 self.data[6].append(float(values[5]))
                 self.data[7].append(float(values[6]))
-                if OLD_IMU_FLAG:
-                    self.data[8].append(float(values[7])/math.pi*180.0*16.4)
-                    self.data[9].append(float(values[8])/math.pi*180.0*16.4)
-                    self.data[10].append(float(values[9])/math.pi*180.0*16.4)
-                else:
-                    self.data[8].append(float(values[7]))
-                    self.data[9].append(float(values[8]))
-                    self.data[10].append(float(values[9]))
+                self.data[8].append(float(values[7]))
+                self.data[9].append(float(values[8]))
+                self.data[10].append(float(values[9]))
                 self.data[11].append(float(values[10]))
                 self.data[12].append(float(values[11]))
                 self.data[13].append(float(values[12]))
@@ -185,53 +173,120 @@ class IMU:
 class Odometer:
     """  里程数据
     data[0]: t
-    data[1]: ts 里程的时间戳
-    data[2]: x m
-    data[3]: y m
-    data[4]: theta degree
-    data[5]: stopped
-    data[6]: vx m/s
-    data[7]: vy m/s
-    data[8]: vw rad/s
-    data[9]: steer_angle rad
+    data[1]: cycle
+    data[2]: ts 里程的时间戳
+    data[3]: x m
+    data[4]: y m
+    data[5]: theta degree
+    data[6]: stopped
+    data[7]: vx m/s
+    data[8]: vy m/s
+    data[9]: vw rad/s
+    data[10]: steer_angle rad
+    data[11]: steer_angle rad
+    data[12]: steer_angle rad
+    data[13]: steer_angle rad
+    data[14]: steer_angle rad
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[Odometer\]\[0\|(\d+)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\]")
-        self.data = [[] for _ in range(10)]
+        self.regex = re.compile("\[(.*?)\].*\[Odometer\]\[(.*?)\]")
+        self.data = [[] for _ in range(15)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             datas = out.groups()
             self.data[0].append(rbktimetodate(datas[0]))
-            self.data[1].append(float(datas[1]))
-            self.data[2].append(float(datas[2]))
-            self.data[3].append(float(datas[3]))
-            self.data[4].append(float(datas[4])/math.pi * 180.0)
-            self.data[5].append(float(datas[5] == "true"))
-            self.data[6].append(float(datas[6]))
-            self.data[7].append(float(datas[7]))
-            self.data[8].append(float(datas[8]))
-            self.data[9].append(float(datas[9]))
+            values = datas[1].split('|')
+            if len(values) >= 10:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3]))
+                self.data[5].append(float(values[4])/math.pi * 180.0)
+                self.data[6].append(float(values[5] == "true"))
+                self.data[7].append(float(values[6]))
+                self.data[8].append(float(values[7]))
+                self.data[9].append(float(values[8]))
+                self.data[10].append(float(values[9]))
+                if len(values) >= 11:
+                    self.data[11].append(float(values[10]))
+                    if len(values) >= 12:
+                        self.data[12].append(float(values[11]))
+                        if len(values) >= 13:
+                            self.data[13].append(float(values[12]))
+                            if len(values) >= 14:
+                                self.data[14].append(float(values[13]))
+                                if len(values) >= 15:
+                                    print("Error in Odometer parse: ", datas)
+            else:
+                print("Error in Odometer parse: ", datas)
+
+
+    def t(self):
+        return self.data[0]
+    def cycle(self):
+        return self.data[1], self.data[0]
+    def ts(self):
+        return self.data[2], self.data[0]
+    def x(self):
+        return self.data[3], self.data[0]
+    def y(self):
+        return self.data[4], self.data[0]
+    def theta(self):
+        return self.data[5], self.data[0]
+    def stop(self):
+        return self.data[6], self.data[0]
+    def vx(self):
+        return self.data[7], self.data[0]
+    def vy(self):
+        return self.data[8], self.data[0]
+    def vw(self):
+        return self.data[9], self.data[0]
+    def steer_angle(self):
+        return self.data[10], self.data[0]
+    def encode0(self):
+        return self.data[11], self.data[0]
+    def encode1(self):
+        return self.data[12], self.data[0]
+    def encode2(self):
+        return self.data[13], self.data[0]
+    def encode3(self):
+        return self.data[14], self.data[0]
+
+class LaserOdometer:
+    """ 激光里程数据 
+    data[0]: t
+    data[1]: ts  
+    data[2]: x
+    data[3]: y
+    data[4]: angle
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[LaserOdometer\]\[(.*?)\]')
+        self.data = [[] for _ in range(5)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 4:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3])/math.pi*180.0)
+            else:
+                print("Error in LaserOdometer parse: ", datas)
     def t(self):
         return self.data[0]
     def ts(self):
-        return self.data[1]
+        return self.data[1], self.data[0]
     def x(self):
         return self.data[2], self.data[0]
     def y(self):
         return self.data[3], self.data[0]
-    def theta(self):
+    def angle(self):
         return self.data[4], self.data[0]
-    def stop(self):
-        return self.data[5], self.data[0]
-    def vx(self):
-        return self.data[6], self.data[0]
-    def vy(self):
-        return self.data[7], self.data[0]
-    def vw(self):
-        return self.data[8], self.data[0]
-    def steer_angle(self):
-        return self.data[9], self.data[0]
 
 class Battery:
     """  电池数据

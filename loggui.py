@@ -5,7 +5,7 @@ from matplotlib.backends.backend_qt5agg import (
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5.QtCore import QThread, pyqtSignal
 from matplotlib.figure import Figure
-from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine
+from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer
 from loglib import findrange
 from datetime import datetime, timedelta
 import sys
@@ -43,6 +43,7 @@ class ReadThread(QThread):
         self.battery = Battery()
         self.controller = Controller()
         self.odo = Odometer()
+        self.laserOdo = LaserOdometer()
         self.send = Send()
         self.get = Get()
         self.laser = Laser(1000.0)
@@ -53,7 +54,8 @@ class ReadThread(QThread):
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
-            log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice)
+            log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo,
+            self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
             if old_imu_flag:
@@ -86,15 +88,17 @@ class ReadThread(QThread):
             fid.close()
         #creat dic
         self.data = {"mcl.x":self.mcl.x(),"mcl.y":self.mcl.y(),"mcl.theta":self.mcl.theta(), "mcl.confidence":self.mcl.confidence(),
-                     "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), 
+                     "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), "imu.ts":self.imu.ts(),
                      "imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
                      "imu.gx":self.imu.gx(),"imu.gy":self.imu.gy(),"imu.gz":self.imu.gz(),
                      "imu.offx":self.imu.offx(),"imu.offy":self.imu.offy(),"imu.offz":self.imu.offz(),
                      "imu.org_gx":([i+j for (i,j) in zip(self.imu.gx()[0],self.imu.offx()[0])], self.imu.gx()[1]),
                      "imu.org_gy":([i+j for (i,j) in zip(self.imu.gy()[0],self.imu.offy()[0])], self.imu.gy()[1]),
                      "imu.org_gz":([i+j for (i,j) in zip(self.imu.gz()[0],self.imu.offz()[0])], self.imu.gz()[1]),
-                     "odo.x":self.odo.x(),"odo.y":self.odo.y(),"odo.theta":self.odo.theta(),"odo.stop":self.odo.stop(),
+                     "odo.ts": self.odo.ts(),"odo.x":self.odo.x(),"odo.y":self.odo.y(),"odo.theta":self.odo.theta(),"odo.stop":self.odo.stop(),
                      "odo.vx":self.odo.vx(),"odo.vy":self.odo.vy(),"odo.vw":self.odo.vw(),"odo.steer_angle":self.odo.steer_angle(),
+                     "odo.encode0":self.odo.encode0(),"odo.encode1":self.odo.encode1(),"odo.encode2":self.odo.encode2(),"odo.encode3":self.odo.encode3(),
+                     "laserOdo.ts":self.laserOdo.ts(),"laserOdo.x":self.laserOdo.x(),"laserOdo.y":self.laserOdo.y(),"laserOdo.angle":self.laserOdo.angle(),
                      "send.vx":self.send.vx(),"send.vy":self.send.vy(),"send.vw":self.send.vw(),"send.steer_angle":self.send.steer_angle(),
                      "send.max_vx":self.send.max_vx(),"send.max_vw":self.send.max_vw(),
                      "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(),
@@ -109,8 +113,9 @@ class ReadThread(QThread):
 class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Log分析器')
         self.finishReadFlag = False
+        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[]} 
+        self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
         self.openLogFilesDialog()
         self.setupUI()
@@ -145,8 +150,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
         self._main = QtWidgets.QWidget()
         self.setCentralWidget(self._main)
-        #Add ComboBox
         self.layout = QtWidgets.QVBoxLayout(self._main)
+        #Add ComboBox
         self.grid = QtWidgets.QGridLayout()
         for i in range(0, cur_fig_num):
             self.grid.setColumnMinimumWidth(i*2,40)
@@ -163,10 +168,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.combos.append(combo)
             self.grid.addWidget(label,1,i*2)
             self.grid.addWidget(combo,1,i*2+1)
+        self.layout.addLayout(self.grid)
+
+        #消息框
         self.label_info = QtWidgets.QLabel("",self)
         self.label_info.setStyleSheet("background-color: white;")
         self.grid.addWidget(self.label_info,2,0,1,50)
-        self.layout.addLayout(self.grid)
 
         #图形化结构
         self.static_canvas = FigureCanvas(Figure(figsize=(100,100)))
@@ -179,9 +186,29 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         NavigationToolbar.back = self.new_back
         self.addToolBar(NavigationToolbar(self.static_canvas, self))
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
-
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
+
+        #选择消息框
+        self.hbox = QtWidgets.QHBoxLayout()
+        self.check_all = QtWidgets.QCheckBox('ALL',self)
+        self.check_fatal = QtWidgets.QCheckBox('FATAL',self)
+        self.check_err = QtWidgets.QCheckBox('ERROR',self)
+        self.check_war = QtWidgets.QCheckBox('WARNING',self)
+        self.check_notice = QtWidgets.QCheckBox('NOTICE',self)
+        self.hbox.addWidget(self.check_all)
+        self.hbox.addWidget(self.check_fatal)
+        self.hbox.addWidget(self.check_err)
+        self.hbox.addWidget(self.check_war)
+        self.hbox.addWidget(self.check_notice)
+        self.hbox.setAlignment(QtCore.Qt.AlignLeft)
+        self.layout.addLayout(self.hbox)
+        self.check_fatal.stateChanged.connect(self.changeCheckBox)
+        self.check_err.stateChanged.connect(self.changeCheckBox)
+        self.check_war.stateChanged.connect(self.changeCheckBox)
+        self.check_notice.stateChanged.connect(self.changeCheckBox)
+        self.check_all.stateChanged.connect(self.changeCheckBoxAll)
+        self.check_all.setChecked(True)
 
     def mouse_move(self, event):
         if event.inaxes and self.finishReadFlag:
@@ -190,23 +217,23 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 content = []
                 dt_min = 1e10
-                if self.read_thread.fatal.t():
+                if self.read_thread.fatal.t() and self.check_fatal.ischecked():
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
                     dt_min = min(vdt)
                     content = self.read_thread.fatal.content()[0][vdt.index(dt_min)]
-                if self.read_thread.err.t(): 
+                if self.read_thread.err.t() and self.check_err.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
                         content = self.read_thread.err.content()[0][vdt.index(tmp_dt)]
-                if self.read_thread.war.t(): 
+                if self.read_thread.war.t() and self.check_war.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
                         content = self.read_thread.war.content()[0][vdt.index(tmp_dt)]
-                if self.read_thread.notice.t(): 
+                if self.read_thread.notice.t() and self.check_notice.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
@@ -350,30 +377,97 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def drawFEWN(self,ax):
         """ 绘制 Fatal, Error, Warning在坐标轴上"""
         fl, el, wl,nl = None, None, None, None
+        self.lines_dict = dict()
+        line_num = 0
         legend_info = []
+        fnum, ernum, wnum, nnum = [], [], [], [] 
         for tmp in self.read_thread.fatal.t():
-            fl, = ax.plot((tmp,tmp),[-1e10, 1e10],'m-')
+            fl, = ax.plot((tmp,tmp),[-1e50, 1e50],'m-')
+            fnum.append(line_num)
+            line_num = line_num + 1
         if fl:
             legend_info.append(fl)
             legend_info.append('fatal')
         for tmp in self.read_thread.err.t():
-            el, = ax.plot((tmp,tmp),[-1e10, 1e10],'r-.')
+            el, = ax.plot((tmp,tmp),[-1e50, 1e50],'r-.')
+            ernum.append(line_num)
+            line_num = line_num + 1
         if el:
             legend_info.append(el)
             legend_info.append('error')
         for tmp in self.read_thread.war.t():
-            wl, = ax.plot((tmp,tmp),[-1e10, 1e10],'y--')
+            wl, = ax.plot((tmp,tmp),[-1e50, 1e50],'y--')
+            wnum.append(line_num)
+            line_num = line_num + 1
         if wl:
             legend_info.append(wl)
             legend_info.append('warning')
         for tmp in self.read_thread.notice.t():
-            nl, = ax.plot((tmp,tmp),[-1e10, 1e10],'g:')
+            nl, = ax.plot((tmp,tmp),[-1e50, 1e50],'g:')
+            nnum.append(line_num)
+            line_num = line_num + 1
         if nl:
             legend_info.append(nl)
             legend_info.append('notice')
         if legend_info:
             ax.legend(legend_info[0::2], legend_info[1::2], loc='upper right')
+        self.lines_dict['fatal'] = fnum
+        self.lines_dict['error'] = ernum
+        self.lines_dict['warning'] = wnum
+        self.lines_dict['notice'] = nnum
+        lines = ax.get_lines()
+        for n in fnum:
+            lines[n].set_visible(self.check_fatal.isChecked())
+        for n in ernum:
+            lines[n].set_visible(self.check_err.isChecked())
+        for n in wnum:
+            lines[n].set_visible(self.check_war.isChecked())
+        for n in nnum:
+            lines[n].set_visible(self.check_notice.isChecked())
+        
+    def updateCheckInfoLine(self,key):
+        for ax in self.axs:
+            lines = ax.get_lines()
+            for num in self.lines_dict[key]:
+                vis = not lines[num].get_visible()
+                lines[num].set_visible(vis)
+        # for ax, combo in zip(self.axs, self.combos):
+        #     if combo.currentText():
+        #         self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), False)
+        self.static_canvas.figure.canvas.draw()
 
+
+    def changeCheckBox(self):
+        if self.check_err.isChecked() and self.check_fatal.isChecked() and self.check_notice.isChecked() and self.check_war.isChecked():
+            self.check_all.setCheckState(QtCore.Qt.Checked)
+        elif self.check_err.isChecked() or self.check_fatal.isChecked() or self.check_notice.isChecked() or self.check_war.isChecked():
+            self.check_all.setTristate()
+            self.check_all.setCheckState(QtCore.Qt.PartiallyChecked)
+        else:
+            self.check_all.setTristate(False)
+            self.check_all.setCheckState(QtCore.Qt.Unchecked)
+
+        cur_check = self.sender()
+        if cur_check is self.check_fatal:
+            self.updateCheckInfoLine('fatal')
+        elif cur_check is self.check_err:
+            self.updateCheckInfoLine('error')
+        elif cur_check is self.check_war:
+            self.updateCheckInfoLine('warning')
+        elif cur_check is self.check_notice:
+            self.updateCheckInfoLine('notice')
+
+    def changeCheckBoxAll(self):
+        if self.check_all.checkState() == QtCore.Qt.Checked:
+            self.check_fatal.setChecked(True)
+            self.check_err.setChecked(True)
+            self.check_war.setChecked(True)
+            self.check_notice.setChecked(True)
+        elif self.check_all.checkState() == QtCore.Qt.Unchecked:
+            self.check_fatal.setChecked(False)
+            self.check_err.setChecked(False)
+            self.check_war.setChecked(False)
+            self.check_notice.setChecked(False)
 
 if __name__ == "__main__":
     qapp = QtWidgets.QApplication(sys.argv)

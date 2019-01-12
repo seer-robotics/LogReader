@@ -313,6 +313,25 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def readFinished(self, result):
         print("Current: {0}.".format(result))  # Show the output to the user
         self.statusBar().showMessage('Finished')
+        max_line = 1000
+        if len(self.read_thread.fatal.t()) > max_line:
+            print("FATALs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.fatal.t()))
+            self.read_thread.fatal = FatalLine()
+        if len(self.read_thread.err.t()) > max_line:
+            print("ERRORs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.err.t()))
+            self.read_thread.err = ErrorLine()
+        if len(self.read_thread.war.t()) > max_line:
+            print("WARNINGs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.war.t()))
+            self.read_thread.war = WarningLine()
+        if len(self.read_thread.notice.t()) > max_line:
+            print("NOTICEs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.notice.t()))
+            self.read_thread.notice = NoticeLine()
+        if len(self.read_thread.taskstart.t()) > max_line:
+            print("TASKSTART are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskstart.t()))
+            self.read_thread.taskstart = TaskStart()
+        if len(self.read_thread.taskfinish.t()) > max_line:
+            print("TASKFINISH are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskfinish.t()))
+            self.read_thread.taskfinish = TaskFinish()
         self.finishReadFlag = True
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
@@ -481,9 +500,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
 
     def changeCheckBox(self):
-        if self.check_err.isChecked() and self.check_fatal.isChecked() and self.check_notice.isChecked() and self.check_war.isChecked():
+        if self.check_err.isChecked() and self.check_fatal.isChecked() and self.check_notice.isChecked() and \
+        self.check_war.isChecked() and self.check_tstart.isChecked() and self.check_tfinish.isChecked():
             self.check_all.setCheckState(QtCore.Qt.Checked)
-        elif self.check_err.isChecked() or self.check_fatal.isChecked() or self.check_notice.isChecked() or self.check_war.isChecked():
+        elif self.check_err.isChecked() or self.check_fatal.isChecked() or self.check_notice.isChecked() or \
+        self.check_war.isChecked() or self.check_tstart.isChecked() and self.check_tfinish.isChecked():
             self.check_all.setTristate()
             self.check_all.setCheckState(QtCore.Qt.PartiallyChecked)
         else:

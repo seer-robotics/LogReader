@@ -230,7 +230,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 content = []
                 dt_min = 1e10
-                if self.read_thread.fatal.t() and self.check_fatal.ischecked():
+                if self.read_thread.fatal.t() and self.check_fatal.isChecked():
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
                     dt_min = min(vdt)
                     contents = [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]

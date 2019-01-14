@@ -119,6 +119,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[]} 
         self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
+        self.read_thread.signal.connect(self.readFinished)
         self.openLogFilesDialog()
         self.setupUI()
 
@@ -309,7 +310,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def openLogFilesDialog(self):
         # self.setGeometry(50,50,640,480)
-        self.read_thread.signal.connect(self.readFinished)
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         options |= QtCore.Qt.WindowStaysOnTopHint

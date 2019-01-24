@@ -356,7 +356,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.1""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.2""")
 
     def combo_onActivated(self):
         # print("combo1: ",text)

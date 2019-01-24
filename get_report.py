@@ -19,7 +19,7 @@ if len(sys.argv) > 1:
         for file in tmp_files:
             if splitext(file)[1] == ".log":
                 filenames.append(file)
-        output_fname = filenames+"\\"+ output_fname
+        output_fname = mypath+"\\"+ output_fname
 else:
     mypath = "diagnosis\\log"
     tmp_files = [join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f))]

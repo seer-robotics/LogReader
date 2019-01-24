@@ -8,6 +8,7 @@ class ExtendedComboBox(QComboBox):
 
         self.setFocusPolicy(Qt.StrongFocus)
         self.setEditable(True)
+        self.setInsertPolicy(QComboBox.NoInsert)
 
         # add a filter model to filter matching items
         self.pFilterModel = QSortFilterProxyModel(self)

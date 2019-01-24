@@ -1,3 +1,4 @@
+print("LOGGUI START...")
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import (
@@ -5,7 +6,9 @@ from matplotlib.backends.backend_qt5agg import (
 from PyQt5 import QtCore, QtWidgets,QtGui
 from PyQt5.QtCore import QThread, pyqtSignal
 from matplotlib.figure import Figure
-from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
+from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, Manual 
+from loglib import StopPoints, SlowDownPoints, SensorFuser
+from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
 from loglib import findrange
 from datetime import datetime, timedelta
 import sys
@@ -47,6 +50,10 @@ class ReadThread(QThread):
         self.laserOdo = LaserOdometer()
         self.send = Send()
         self.get = Get()
+        self.manual = Manual()
+        self.stop = StopPoints()
+        self.slowdown = SlowDownPoints()
+        self.sensorfuser = SensorFuser()
         self.laser = Laser(1000.0)
         self.err = ErrorLine()
         self.war = WarningLine()
@@ -57,8 +64,8 @@ class ReadThread(QThread):
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
-            log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo,
-            self.send, self.get, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
+            log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo, self.stop, self.slowdown, self.sensorfuser,
+            self.send, self.get, self.manual, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
             if old_imu_flag:
@@ -66,8 +73,8 @@ class ReadThread(QThread):
                 print('The unit of gx, gy, gz in file is rad/s.')
             else:
                 print('The org unit of gx, gy, gz in IMU is LSB/s.')
-            tmax = max(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
-            tmin = min(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
+            tmax = max(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
+            tmin = min(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
             dt = tmax - tmin
             self.tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
             #save Error
@@ -102,8 +109,13 @@ class ReadThread(QThread):
                      "odo.vx":self.odo.vx(),"odo.vy":self.odo.vy(),"odo.vw":self.odo.vw(),"odo.steer_angle":self.odo.steer_angle(),
                      "odo.encode0":self.odo.encode0(),"odo.encode1":self.odo.encode1(),"odo.encode2":self.odo.encode2(),"odo.encode3":self.odo.encode3(),
                      "laserOdo.ts":self.laserOdo.ts(),"laserOdo.x":self.laserOdo.x(),"laserOdo.y":self.laserOdo.y(),"laserOdo.angle":self.laserOdo.angle(),
+                     "laser.ts":self.laser.ts(),
+                     "sensorfuser.local":self.sensorfuser.localnum(),"sensorfuser.global":self.sensorfuser.globalnum(),
+                     "stop.x":self.stop.x(),"stop.y":self.stop.y(),"stop.type":self.stop.type(), "stop.id":self.stop.id(), "stop.dist": self.stop.dist(),
+                     "slowdown.x":self.slowdown.x(),"slowdown.y":self.slowdown.y(),"slowdown.type":self.slowdown.type(), "slowdown.id":self.slowdown.id(), "slowdown.dist": self.slowdown.dist(),
                      "send.vx":self.send.vx(),"send.vy":self.send.vy(),"send.vw":self.send.vw(),"send.steer_angle":self.send.steer_angle(),
                      "send.max_vx":self.send.max_vx(),"send.max_vw":self.send.max_vw(),
+                     "manual.vx": self.manual.vx(), "manual.vy": self.manual.vy(), "manual.vw":self.manual.vw(), "manual.steer_angle": self.manual.steer_angle(),
                      "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(), "get.steer_angle":self.get.steer_angle(),
                      "get.max_vx":self.get.max_vx(),"get.max_vw":self.get.max_vw(),
                      "battery.percentage": self.battery.percentage(), "battery.current": self.battery.current(), "battery.voltage": self.battery.voltage(),
@@ -318,10 +330,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if self.filenames:
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
-            self.statusBar().showMessage('Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames]))
+            print('Loading', len(self.filenames), 'Files:')
+            for (ind, f) in enumerate(self.filenames):
+                print(ind+1, ':', f)
+            tmpstr = 'Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames])
+            self.statusBar().showMessage(tmpstr)
 
     def readFinished(self, result):
-        print("Current: {0}.".format(result))  # Show the output to the user
+        print('Finished')
         self.statusBar().showMessage('Finished')
         max_line = 1000
         if len(self.read_thread.fatal.t()) > max_line:

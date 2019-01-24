@@ -400,6 +400,120 @@ class Controller:
     def electric(self):
         return self.data[9], self.data[0]
 
+class StopPoints:
+    """ 停止障碍物信息 
+    data[0]: t
+    data[1]: x  
+    data[2]: y
+    data[3]: type
+    data[4]: id
+    data[5]: dist
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[StopPoints\]\[(.*?)\]')
+        self.data = [[] for _ in range(10)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 5:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3]))
+                self.data[5].append(float(values[4]))
+            else:
+                print("Error in StopPoints parse: ", datas)
+            return True
+        return False
+
+    def t(self):
+        return self.data[0]
+    def x(self):
+        return self.data[1], self.data[0]
+    def y(self):
+        return self.data[2], self.data[0]
+    def type(self):
+        return self.data[3], self.data[0]
+    def id(self):
+        return self.data[4], self.data[0]
+    def dist(self):
+        return self.data[5], self.data[0]
+
+class SlowDownPoints:
+    """ 停止障碍物信息 
+    data[0]: t
+    data[1]: x  
+    data[2]: y
+    data[3]: type
+    data[4]: id
+    data[5]: dist
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[SlowDownPoints\]\[(.*?)\]')
+        self.data = [[] for _ in range(10)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 5:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3]))
+                self.data[5].append(float(values[4]))
+            else:
+                print("Error in StopPoints parse: ", datas)
+            return True
+        return False
+
+    def t(self):
+        return self.data[0]
+    def x(self):
+        return self.data[1], self.data[0]
+    def y(self):
+        return self.data[2], self.data[0]
+    def type(self):
+        return self.data[3], self.data[0]
+    def id(self):
+        return self.data[4], self.data[0]
+    def dist(self):
+        return self.data[5], self.data[0]
+
+class SensorFuser:
+    """ 停止障碍物信息 
+    data[0]: t
+    data[1]: localnum  
+    data[2]: globalnum 
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].*\[SensorFuserPoints\]\[(.*?)\]')
+        self.data = [[] for _ in range(10)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 2:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+            else:
+                print("Error in SensorFuser parse: ", datas)
+            return True
+        return False
+
+    def t(self):
+        return self.data[0]
+    def localnum(self):
+        return self.data[1], self.data[0]
+    def globalnum(self):
+        return self.data[2], self.data[0]
+
 class Send:
     """  发送的速度数据
     data[0]: t
@@ -482,6 +596,39 @@ class Get:
     def max_vw(self):
         return self.data[6], self.data[0]
 
+class Manual:
+    """  手动的速度数据
+    data[0]: t
+    data[1]: vx m/s
+    data[2]: vy m/s
+    data[3]: vw rad/s
+    data[4]: steer_angle rad
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].* \[Manual\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\]')
+        self.data = [[] for _ in range(7)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            self.data[1].append(float(datas[1]))
+            self.data[2].append(float(datas[2]))
+            self.data[3].append(float(datas[3]))
+            self.data[4].append(float(datas[4]))
+            return True
+        return False
+    def t(self):
+        return self.data[0]
+    def vx(self):
+        return self.data[1], self.data[0]
+    def vy(self):
+        return self.data[2], self.data[0]
+    def vw(self):
+        return self.data[3], self.data[0]
+    def steer_angle(self):
+        return self.data[4], self.data[0]
+
 class Laser:
     """  激光雷达的数据
     data[0]: t
@@ -526,7 +673,7 @@ class Laser:
     def t(self):
         return self.data[0]
     def ts(self):
-        return self.data[1]
+        return self.data[1], self.data[0]
     def angle(self):
         return self.data[2], self.data[0]
     def dist(self):

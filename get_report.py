@@ -4,9 +4,12 @@ from os import listdir
 from os.path import isfile, join, isdir, splitext
 from termcolor import colored
 from colorama import init
+from datetime import datetime
 
 init()
 filenames = []
+ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+output_fname = "Report_" + str(ts).replace(':','-').replace(' ','_') + ".txt"
 if len(sys.argv) > 1:
     filenames = sys.argv[1:]
     if len(filenames) == 1 and isdir(filenames[0]):
@@ -16,11 +19,16 @@ if len(sys.argv) > 1:
         for file in tmp_files:
             if splitext(file)[1] == ".log":
                 filenames.append(file)
-
+        output_fname = filenames+"\\"+ output_fname
 else:
     mypath = "diagnosis\\log"
-    filenames = [join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f))]
-fid = open("Report.txt", "w") 
+    tmp_files = [join(mypath,f) for f in listdir(mypath) if isfile(join(mypath, f))]
+    filenames = []
+    for file in tmp_files:
+        if splitext(file)[1] == ".log":
+            filenames.append(file)
+    output_fname = mypath+"\\"+ output_fname
+fid = open(output_fname, "w") 
 for filename in filenames:
     log = ReadLog([filename])
     err = ErrorLine()
@@ -70,5 +78,5 @@ for filename in filenames:
     for data in notice.content()[0]:
         print(data, file = fid)
 fid.close()
-print("Detail information is in the", colored("Report.txt",  'yellow', 'on_red', ['bold']), "\nFINISHED!!!")
+print("Detail information is in the", colored(output_fname,  'yellow', 'on_red', ['bold']), "\nFINISHED!!!")
 ch = sys.stdin.read(1)

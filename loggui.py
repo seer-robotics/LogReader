@@ -129,11 +129,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.finishReadFlag = False
+        self.filenames = []
         self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[]} 
         self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
-        self.openLogFilesDialog()
         self.setupUI()
 
     def setupUI(self):

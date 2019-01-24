@@ -48,7 +48,8 @@ class ReadLog:
                         continue
                 line_num += 1
                 for data in argv:
-                    data.parse(line)
+                    if data.parse(line):
+                        break
 
 class MCLoc:
     """  融合后的激光定位
@@ -70,6 +71,8 @@ class MCLoc:
             self.data[2].append(float(datas[2])/1000.0)
             self.data[3].append(float(datas[3]))
             self.data[4].append(float(datas[4]))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def x(self):
@@ -135,6 +138,8 @@ class IMU:
                 self.data[13].append(float(values[12]))
             else:
                 print("Error in IMU parse: ", datas)
+            return True
+        return False
 
     def old2newGyro(self):
         self.data[8] = [v/math.pi*180.0*16.4 for v in self.data[8]]
@@ -220,6 +225,8 @@ class Odometer:
                                     print("Error in Odometer parse: ", datas)
             else:
                 print("Error in Odometer parse: ", datas)
+            return True
+        return False
 
 
     def t(self):
@@ -277,6 +284,8 @@ class LaserOdometer:
                 self.data[4].append(float(values[3])/math.pi*180.0)
             else:
                 print("Error in LaserOdometer parse: ", datas)
+            return True
+        return False
     def t(self):
         return self.data[0]
     def ts(self):
@@ -316,6 +325,8 @@ class Battery:
                 self.data[6].append(float(values[5]))
             else:
                 print("Error in Battery parse: ", datas)
+            return True
+        return False
     def t(self):
         return self.data[0]
     def percentage(self):
@@ -365,6 +376,8 @@ class Controller:
                 self.data[9].append(float(values[8] == "true"))
             else:
                 print("Error in Controller parse: ", datas)
+            return True
+        return False
 
     def t(self):
         return self.data[0]
@@ -411,6 +424,8 @@ class Send:
             self.data[4].append(float(datas[4]))
             self.data[5].append(float(datas[5]))
             self.data[6].append(float(datas[6]))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def vx(self):
@@ -450,6 +465,8 @@ class Get:
             self.data[4].append(float(datas[4]))
             self.data[5].append(float(datas[5]))
             self.data[6].append(float(datas[6]))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def vx(self):
@@ -504,6 +521,8 @@ class Laser:
             x , y = polar2xy(angle, dist)
             self.data[4].append(x)
             self.data[5].append(y)
+            return True
+        return False
     def t(self):
         return self.data[0]
     def ts(self):
@@ -537,6 +556,7 @@ class ErrorLine:
             if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
+            return True
         else:
             out = self.general_regex.match(line)
             if out:
@@ -546,6 +566,8 @@ class ErrorLine:
                 if not new_num in self.data[2]:
                     self.data[2].append(new_num)                
                     self.data[3].append('unKnown Error')
+                return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):
@@ -575,6 +597,7 @@ class WarningLine:
             if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
+            return True
         else:
             out = self.general_regex.match(line)
             if out:
@@ -584,6 +607,8 @@ class WarningLine:
                 if not new_num in self.data[2]:
                     self.data[2].append(new_num)
                     self.data[3].append('unKnown Warning')
+                return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):
@@ -613,6 +638,8 @@ class FatalLine:
             if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):
@@ -641,6 +668,8 @@ class NoticeLine:
             if not new_num in self.data[2]:
                 self.data[2].append(new_num)
                 self.data[3].append(out.group(3))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):
@@ -663,6 +692,8 @@ class TaskStart:
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):
@@ -681,6 +712,8 @@ class TaskFinish:
         if out:
             self.data[0].append(rbktimetodate(out.group(1)))
             self.data[1].append(out.group(0))
+            return True
+        return False
     def t(self):
         return self.data[0]
     def content(self):

@@ -10,6 +10,7 @@ from loglib import findrange
 from datetime import datetime, timedelta
 import sys
 from numpy import searchsorted
+from ExtendedComboBox import ExtendedComboBox
 
 
 
@@ -164,7 +165,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         for i in range(0,cur_fig_num):
             label = QtWidgets.QLabel("图片"+str(i+1),self)
             label.adjustSize()
-            combo = QtWidgets.QComboBox(self)
+            combo = ExtendedComboBox(self)
             combo.resize(10,10)
             combo.activated.connect(self.combo_onActivated)
             self.labels.append(label)
@@ -386,7 +387,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         for i in range(0,new_fig_num):
             label = QtWidgets.QLabel("图片"+str(i+1),self)
             label.adjustSize()
-            combo = QtWidgets.QComboBox(self)
+            combo = ExtendedComboBox(self)
             combo.resize(10,10)
             combo.activated.connect(self.combo_onActivated)
             self.labels.append(label)
@@ -397,10 +398,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.info.setReadOnly(True)
         self.info.setFixedHeight(50)
         self.grid.addWidget(self.info,2,0,1,50)
-        # self.label_info = QtWidgets.QLabel("",self)
-        # self.label_info.setStyleSheet("background-color: white;")
-        # self.label_info.setWordWrap(True)
-        # self.grid.addWidget(self.label_info,2,0,1,50)
         if self.finishReadFlag:
             if self.read_thread.filenames:
                 keys = list(self.read_thread.data.keys())

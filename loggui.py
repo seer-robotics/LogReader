@@ -11,9 +11,10 @@ from loglib import StopPoints, SlowDownPoints, SensorFuser
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
 from loglib import findrange
 from datetime import datetime, timedelta
-import sys
+import os, sys
 from numpy import searchsorted
 from ExtendedComboBox import ExtendedComboBox
+from Widget import Widget
 
 
 
@@ -164,7 +165,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.help_menu.addAction('&About', self.about)
         self.menuBar().addMenu(self.help_menu)
 
-        self._main = QtWidgets.QWidget()
+        self._main = Widget()
+        self._main.dropped.connect(self.dragFiles)
         self.setCentralWidget(self._main)
         self.layout = QtWidgets.QVBoxLayout(self._main)
         #Add ComboBox
@@ -327,6 +329,21 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         options |= QtCore.Qt.WindowStaysOnTopHint
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log);;All Files (*)", options=options)
+        if self.filenames:
+            self.read_thread.filenames = self.filenames
+            self.read_thread.start()
+            print('Loading', len(self.filenames), 'Files:')
+            for (ind, f) in enumerate(self.filenames):
+                print(ind+1, ':', f)
+            tmpstr = 'Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames])
+            self.statusBar().showMessage(tmpstr)
+
+    def dragFiles(self, files):
+        self.filenames = []
+        for file in files:
+            if os.path.exists(file):
+                if os.path.splitext(file)[1] == ".log":
+                    self.filenames.append(file)
         if self.filenames:
             self.read_thread.filenames = self.filenames
             self.read_thread.start()

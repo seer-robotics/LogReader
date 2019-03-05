@@ -14,16 +14,20 @@
   * 支持两条曲线比较
   * 支持时间窗口选取
   * 支持定位(mcl), 里程(odo), 惯性传感器(imu), 下发速度(send), 获取速度(get)
-  * 支持fatal, error, warning, notice的同步显示, 并且输出到Report.txt中
   * Evaluate可以输入的参数:
     * 定位: mcl.x, mcl.y, mcl.theta, mcl.confidence
     * 惯性传感器: imu.yaw, imu.ax, imu.ay, imu.gz, imu.gx, imu.gy, imu.gz, imu.offx, imu.offy, imu.offz
-    * 里程: odo.x, odo.y, odo.theta, odo.stop,  odo.vx, odo.vy, odo.vw, odo.steer_angle
+    * 里程: odo.x, odo.y, odo.theta, odo.stop,  odo.vx, odo.vy, odo.vw, odo.steer_angle, odo.encode0, odo.encode1, odo.encode2, odo.encode3
     * 下发速度: send.vx, send.vy, send.vw, send.steer_angle, send.max_vx, send.max_vw
     * 获取速度：get.vx, get.vy, get.vw, get.steer_angle, get.max_vx, get.max_vw
+    * 激光里程: laserOdo.ts, laserOdo.x, laserOdo.y, laserOdo.angle
+    * 电池数据：battery.percentage, battery.current, battery.voltage, battery.ischarging, battery.temperature, battery.cycle
+    * 控制器数据: controller.tmp, controller.humi, controller.emc, controller.brake, controller.driveremc, controller.autocharge, controller.electric
+    * 阻挡障碍物信息: stop.x, stop.y, stop.type, stop.id, stop.dist
+    * 减速障碍物信息: slowdown.x, slowdown.y, slowdown.type, slowdown.id, slowdown.dist
+    * 传感器融合信息: sensorfuser.localnum, sensorfuser.globalnum
+    * 手动的速度数据: manual.vx, manual.vy, manual.vw, steer_angle
+    * 激光雷达的数据: laser.ts
 * 图形界面截图
 
-![screen shot2](screen_shot2.PNG)
-
-
-![screen shot3](screen_shot3.PNG)
+![screen shot](screen_shot.PNG)

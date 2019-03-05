@@ -401,7 +401,7 @@ class Controller:
         return self.data[9], self.data[0]
 
 class StopPoints:
-    """ 停止障碍物信息 
+    """ 阻挡障碍物信息 
     data[0]: t
     data[1]: x  
     data[2]: y
@@ -443,7 +443,7 @@ class StopPoints:
         return self.data[5], self.data[0]
 
 class SlowDownPoints:
-    """ 停止障碍物信息 
+    """ 减速障碍物信息 
     data[0]: t
     data[1]: x  
     data[2]: y
@@ -485,7 +485,7 @@ class SlowDownPoints:
         return self.data[5], self.data[0]
 
 class SensorFuser:
-    """ 停止障碍物信息 
+    """ 传感器融合信息
     data[0]: t
     data[1]: localnum  
     data[2]: globalnum 

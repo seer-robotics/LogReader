@@ -596,6 +596,48 @@ class Get:
     def max_vw(self):
         return self.data[6], self.data[0]
 
+class Speed2DSP:
+    """  手动的速度数据
+    data[0]: t
+    data[1]: vx m/s
+    data[2]: vy m/s
+    data[3]: vw rad/s
+    data[4]: steer_angle rad
+    data[5]: spin_speed rad
+    """
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].* \[Speed2DSP\]\[(.*?)\]')
+        self.data = [[] for _ in range(6)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 5:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3]))
+                self.data[5].append(float(values[4]))
+            else:
+                print("Error in Speed2DSP parse: ", datas)
+            return True
+        return False
+    def t(self):
+        return self.data[0]
+    def vx(self):
+        return self.data[1], self.data[0]
+    def vy(self):
+        return self.data[2], self.data[0]
+    def vw(self):
+        return self.data[3], self.data[0]
+    def steer_angle(self):
+        return self.data[4], self.data[0]
+    def spin_speed(self):
+        return self.data[5], self.data[0]
+
+
 class Manual:
     """  手动的速度数据
     data[0]: t
@@ -606,7 +648,7 @@ class Manual:
     """
     def __init__(self):
         self.regex = re.compile('\[(.*?)\].* \[Manual\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\]')
-        self.data = [[] for _ in range(7)]
+        self.data = [[] for _ in range(5)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
@@ -628,6 +670,35 @@ class Manual:
         return self.data[3], self.data[0]
     def steer_angle(self):
         return self.data[4], self.data[0]
+
+class Fork:
+    """  货叉的数据
+    data[0]: t
+    data[1]: height 货叉当前高度
+    data[2]: height_in_place 货叉是否到位
+    """ 
+    def __init__(self):
+        self.regex = re.compile('\[(.*?)\].* \[Fork\]\[(.*?)\]')
+        self.data = [[] for _ in range(3)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            self.data[0].append(rbktimetodate(datas[0]))
+            values = datas[1].split('|')
+            if len(values) == 2:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]== "true"))
+            else:
+                print("Error in Fork parse: ", datas)
+            return True
+        return False
+    def t(self):
+        return self.data[0]
+    def height(self):
+        return self.data[1], self.data[0]
+    def height_in_place(self):
+        return self.data[2], self.data[0]
 
 class Laser:
     """  激光雷达的数据

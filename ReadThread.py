@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, Manual 
-from loglib import StopPoints, SlowDownPoints, SensorFuser
+from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, Manual, Speed2DSP
+from loglib import StopPoints, SlowDownPoints, SensorFuser, Fork
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
 from datetime import timedelta
 
@@ -38,6 +38,8 @@ class ReadThread(QThread):
         self.send = Send()
         self.get = Get()
         self.manual = Manual()
+        self.speedDsp = Speed2DSP()
+        self.fork = Fork()
         self.stop = StopPoints()
         self.slowdown = SlowDownPoints()
         self.sensorfuser = SensorFuser()
@@ -52,7 +54,7 @@ class ReadThread(QThread):
         if self.filenames:
             log = ReadLog(self.filenames)
             log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo, self.stop, self.slowdown, self.sensorfuser,
-            self.send, self.get, self.manual, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
+            self.send, self.get, self.manual, self.speedDsp, self.fork, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
             if old_imu_flag:
@@ -105,6 +107,8 @@ class ReadThread(QThread):
                      "manual.vx": self.manual.vx(), "manual.vy": self.manual.vy(), "manual.vw":self.manual.vw(), "manual.steer_angle": self.manual.steer_angle(),
                      "get.vx":self.get.vx(),"get.vy":self.get.vy(),"get.vw":self.get.vw(), "get.steer_angle":self.get.steer_angle(),
                      "get.max_vx":self.get.max_vx(),"get.max_vw":self.get.max_vw(),
+                     "dsp.vx":self.speedDsp.vx(),"dsp.vy":self.speedDsp.vy(),"dsp.vw":self.speedDsp.vw(),"dsp.steer_angle":self.speedDsp.steer_angle(),"dsp.spin_speed":self.speedDsp.spin_speed(),
+                     "fork.height":self.fork.height(),"fork.height_in_place":self.fork.height_in_place(),
                      "battery.percentage": self.battery.percentage(), "battery.current": self.battery.current(), "battery.voltage": self.battery.voltage(),
                      "battery.ischarging": self.battery.ischarging(), "battery.temperature": self.battery.temperature(), "battery.cycle": self.battery.cycle(),
                      "controller.temp": self.controller.temp(), "controller.humi": self.controller.humi(), "controller.voltage":self.controller.voltage(),

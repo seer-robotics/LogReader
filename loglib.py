@@ -936,6 +936,53 @@ class TaskFinish:
         return self.data[0]
     def content(self):
         return self.data[1], self.data[0]
+
+class Memory:
+    """  内存信息
+    t[0]: 
+    t[1]:
+    t[2]:
+    t[3]:
+    t[4]:
+    t[5]:
+    data[0]: used_sys
+    data[1]: free_sys
+    data[2]: rbk_phy
+    data[3]: rbk_vir
+    data[4]: rbk_max_phy
+    data[5]: rbk_max_vir
+    """
+    def __init__(self):
+        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory: (.*?) GB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory: (.*?) GB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage: (.*?) MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage: (.*?) MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage: (.*?) MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage: (.*?) MB\]")]
+        self.time = [[] for _ in range(6)]
+        self.data = [[] for _ in range(6)]
+    def parse(self, line):
+        for iter in range(0,6):
+            out = self.regex[iter].match(line)
+            if out:
+                self.time[iter].append(rbktimetodate(out.group(1)))
+                self.data[iter].append(float(out.group(2)))
+                return True
+        return False
+    def t(self):
+        return self.time[0]
+    def used_sys(self):
+        return self.data[0], self.time[0]
+    def free_sys(self):
+        return self.data[1], self.time[1]
+    def rbk_phy(self):
+        return self.data[2], self.time[2]
+    def rbk_vir(self):
+        return self.data[3], self.time[3]
+    def rbk_max_phy(self):
+        return self.data[4], self.time[4]
+    def rbk_max_vir(self):
+        return self.data[5], self.time[5]
 # if __name__ == '__main__':
 #     import matplotlib.pyplot as plt
 #     from matplotlib.widgets import Slider,RadioButtons

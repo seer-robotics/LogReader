@@ -2,7 +2,9 @@ from PyQt5.QtCore import QThread, pyqtSignal
 from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, Manual, Speed2DSP
 from loglib import StopPoints, SlowDownPoints, SensorFuser, Fork
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
+from loglib import Memory
 from datetime import timedelta
+from datetime import datetime
 
 def decide_old_imu(gx,gy,gz):
     for v in gx:
@@ -50,11 +52,13 @@ class ReadThread(QThread):
         self.notice = NoticeLine()
         self.taskstart = TaskStart()
         self.taskfinish = TaskFinish()
+        self.memory = Memory()
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
             log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo, self.stop, self.slowdown, self.sensorfuser,
-            self.send, self.get, self.manual, self.speedDsp, self.fork, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish)
+            self.send, self.get, self.manual, self.speedDsp, self.fork, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish,
+            self.memory)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])
             if old_imu_flag:
@@ -62,12 +66,14 @@ class ReadThread(QThread):
                 print('The unit of gx, gy, gz in file is rad/s.')
             else:
                 print('The org unit of gx, gy, gz in IMU is LSB/s.')
-            tmax = max(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
-            tmin = min(self.mcl.t() + self.odo.t() + self.send.t() + self.get.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t())
+            tmax = max(self.mcl.t() + self.odo.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t())
+            tmin = min(self.mcl.t() + self.odo.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t())
             dt = tmax - tmin
             self.tlist = [tmin + timedelta(microseconds=x) for x in range(0, int(dt.total_seconds()*1e6+1000),1000)]
             #save Error
-            fid = open("Report.txt", "w") 
+            ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            output_fname = "Report_" + str(ts).replace(':','-').replace(' ','_') + ".txt"
+            fid = open(output_fname,"w") 
             print("="*20, file = fid)
             print("Files: ", self.filenames, file = fid)
             print(len(self.fatal.content()[0]), " FATALs, ", len(self.err.content()[0]), " ERRORs, ", 
@@ -113,5 +119,7 @@ class ReadThread(QThread):
                      "battery.ischarging": self.battery.ischarging(), "battery.temperature": self.battery.temperature(), "battery.cycle": self.battery.cycle(),
                      "controller.temp": self.controller.temp(), "controller.humi": self.controller.humi(), "controller.voltage":self.controller.voltage(),
                      "controller.emc": self.controller.emc(),"controller.brake":self.controller.brake(),"controller.driveremc":self.controller.driveremc(),
-                     "controller.manualcharge": self.controller.manualcharge(),"controller.autocharge": self.controller.autocharge(), "controller.electric": self.controller.electric()}
+                     "controller.manualcharge": self.controller.manualcharge(),"controller.autocharge": self.controller.autocharge(), "controller.electric": self.controller.electric(),
+                     "memory.used_sys":self.memory.used_sys(), "memory.free_sys":self.memory.free_sys(), "memory.rbk_phy": self.memory.rbk_phy(),
+                     "memory.rbk_vir":self.memory.rbk_vir(),"memory.rbk_max_phy":self.memory.rbk_max_phy(),"memory.rbk_max_vir":self.memory.rbk_max_vir()}
         self.signal.emit(self.filenames)

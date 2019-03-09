@@ -620,6 +620,12 @@ class Speed2DSP:
                 self.data[3].append(float(values[2]))
                 self.data[4].append(float(values[3]))
                 self.data[5].append(float(values[4]))
+            elif len(values) == 4:
+                self.data[1].append(float(values[0]))
+                self.data[2].append(float(values[1]))
+                self.data[3].append(float(values[2]))
+                self.data[4].append(float(values[3]))
+                self.data[5].append(0.0)
             else:
                 print("Error in Speed2DSP parse: ", datas)
             return True
@@ -953,12 +959,12 @@ class Memory:
     data[5]: rbk_max_vir
     """
     def __init__(self):
-        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory: (.*?) GB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory: (.*?) GB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage: (.*?) MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage: (.*?) MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage: (.*?) MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage: (.*?) MB\]")]
+        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *GB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory *: *(.*?) *GB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *MB\]")]
         self.time = [[] for _ in range(6)]
         self.data = [[] for _ in range(6)]
     def parse(self, line):

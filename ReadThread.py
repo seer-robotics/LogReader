@@ -5,6 +5,7 @@ from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, Laser
 from loglib import Memory
 from datetime import timedelta
 from datetime import datetime
+import os
 
 def decide_old_imu(gx,gy,gz):
     for v in gx:
@@ -73,6 +74,8 @@ class ReadThread(QThread):
             #save Error
             ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             output_fname = "Report_" + str(ts).replace(':','-').replace(' ','_') + ".txt"
+            path = os.path.dirname(self.filenames[0])
+            output_fname = path + "\\" + output_fname
             fid = open(output_fname,"w") 
             print("="*20, file = fid)
             print("Files: ", self.filenames, file = fid)

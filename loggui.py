@@ -92,8 +92,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         NavigationToolbar.home = self.new_home
         NavigationToolbar.forward = self.new_forward
         NavigationToolbar.back = self.new_back
-        toolbar = NavigationToolbar(self.static_canvas, self)
-        self.layout.addWidget(toolbar)
+        self.addToolBar(NavigationToolbar(self.static_canvas, self))
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)

@@ -58,10 +58,12 @@ class MCLoc:
     data[2]: y m
     data[3]: theta degree
     data[4]: confidence
+    data[5]: cur_t
+    data[6]: ts
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[Location\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\|0\|0\|0\|0\]")
-        self.data = [[] for _ in range(5)]
+        self.regex = re.compile("\[(.*?)\].*\[Location\]\[(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|(.*?)\|0\|0\]")
+        self.data = [[] for _ in range(7)]
     def parse(self, line):
         out = self.regex.match(line)
         if out:
@@ -71,6 +73,8 @@ class MCLoc:
             self.data[2].append(float(datas[2])/1000.0)
             self.data[3].append(float(datas[3]))
             self.data[4].append(float(datas[4]))
+            self.data[5].append(float(datas[5]))
+            self.data[6].append(float(datas[6]))
             return True
         return False
     def t(self):
@@ -83,6 +87,10 @@ class MCLoc:
         return self.data[3], self.data[0]
     def confidence(self):
         return self.data[4], self.data[0]
+    def cur_t(self):
+        return self.data[5], self.data[0]
+    def ts(self):
+        return self.data[6], self.data[0]
 
 class IMU:
     """  陀螺仪数据

@@ -96,6 +96,7 @@ class ReadThread(QThread):
             fid.close()
         #creat dic
         self.data = {"mcl.x":self.mcl.x(),"mcl.y":self.mcl.y(),"mcl.theta":self.mcl.theta(), "mcl.confidence":self.mcl.confidence(),
+                     "mcl.cur_t":self.mcl.cur_t(), "mcl.ts":self.mcl.ts(),
                      "imu.yaw":self.imu.yaw(),"imu.pitch": self.imu.pitch(), "imu.roll": self.imu.roll(), "imu.ts":self.imu.ts(),
                      "imu.ax":self.imu.ax(),"imu.ay":self.imu.ay(),"imu.az":self.imu.az(),
                      "imu.gx":self.imu.gx(),"imu.gy":self.imu.gy(),"imu.gz":self.imu.gz(),

@@ -17,7 +17,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.finishReadFlag = False
         self.filenames = []
-        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[]} 
+        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[], "service":[]} 
         self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
@@ -106,6 +106,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_notice = QtWidgets.QCheckBox('NOTICE',self)
         self.check_tstart = QtWidgets.QCheckBox('TASK START',self)
         self.check_tfinish = QtWidgets.QCheckBox('TASK FINISHED',self)
+        self.check_service = QtWidgets.QCheckBox('SERVICE',self)
         self.hbox.addWidget(self.check_all)
         self.hbox.addWidget(self.check_fatal)
         self.hbox.addWidget(self.check_err)
@@ -113,6 +114,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.hbox.addWidget(self.check_notice)
         self.hbox.addWidget(self.check_tstart)
         self.hbox.addWidget(self.check_tfinish)
+        self.hbox.addWidget(self.check_service)
         self.hbox.setAlignment(QtCore.Qt.AlignLeft)
         self.layout.addLayout(self.hbox)
         self.check_fatal.stateChanged.connect(self.changeCheckBox)
@@ -121,6 +123,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_notice.stateChanged.connect(self.changeCheckBox)
         self.check_tstart.stateChanged.connect(self.changeCheckBox)
         self.check_tfinish.stateChanged.connect(self.changeCheckBox)
+        self.check_service.stateChanged.connect(self.changeCheckBox)
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
 
@@ -134,44 +137,75 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 if self.read_thread.fatal.t() and self.check_fatal.isChecked():
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
                     dt_min = min(vdt)
-                    contents = [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    content = '\n'.join(contents)
                 if self.read_thread.err.t() and self.check_err.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        contents = [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                        content = '\n'.join(contents)
                 if self.read_thread.war.t() and self.check_war.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        contents = [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                        content = '\n'.join(contents)
                 if self.read_thread.notice.t() and self.check_notice.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        contents = [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                        content = '\n'.join(contents)
                 if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        contents = [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                        content = '\n'.join(contents)
                 if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
                     vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
                     tmp_dt = min(vdt)
                     if tmp_dt < dt_min:
                         dt_min = tmp_dt
-                        contents = [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                        content = '\n'.join(contents)
+                if self.read_thread.service.t() and self.check_service.isChecked(): 
+                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
+                    tmp_dt = min(vdt)
+                    if tmp_dt < dt_min:
+                        dt_min = tmp_dt
+
                 if dt_min < 10:
+                    contents = []
+                    if self.read_thread.fatal.t() and self.check_fatal.isChecked():
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.err.t() and self.check_err.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.war.t() and self.check_war.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.notice.t() and self.check_notice.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    if self.read_thread.service.t() and self.check_service.isChecked(): 
+                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
+                        tmp_dt = min(vdt)
+                        if abs(tmp_dt - dt_min) < 2e-2:
+                            contents = contents + [self.read_thread.service.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+                    content = '\n'.join(contents)
                     self.info.setText(content)
                 else:
                     self.info.setText("")
@@ -275,7 +309,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.4""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.5""")
 
     def combo_onActivated(self):
         # print("combo1: ",text)
@@ -352,43 +386,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         line_num = 0
         legend_info = []
         fnum, ernum, wnum, nnum = [], [], [], [] 
-        tsnum, tfnum = [],[]
-        tsl, tfl = None,None
-        for tmp in self.read_thread.fatal.t():
-            fl= ax.axvline(tmp, linestyle='-',color = 'm')
-            # fl, = ax.plot((tmp,tmp),[-1e50, 1e50],'m-')
-            fnum.append(line_num)
-            line_num = line_num + 1
-        if fl:
-            legend_info.append(fl)
-            legend_info.append('fatal')
-        for tmp in self.read_thread.err.t():
-            el= ax.axvline(tmp, linestyle = '-.', color='r')
-            # el, = ax.plot((tmp,tmp),[-1e50, 1e50],'r-.')
-            ernum.append(line_num)
-            line_num = line_num + 1
-        if el:
-            legend_info.append(el)
-            legend_info.append('error')
-        for tmp in self.read_thread.war.t():
-            wl = ax.axvline(tmp, linestyle = '--', color = 'y')
-            # wl, = ax.plot((tmp,tmp),[-1e50, 1e50],'y--')
-            wnum.append(line_num)
-            line_num = line_num + 1
-        if wl:
-            legend_info.append(wl)
-            legend_info.append('warning')
-        for tmp in self.read_thread.notice.t():
-            nl = ax.axvline(tmp, linestyle = ':', color = 'g')
-            # nl, = ax.plot((tmp,tmp),[-1e50, 1e50],'g:')
-            nnum.append(line_num)
-            line_num = line_num + 1
-        if nl:
-            legend_info.append(nl)
-            legend_info.append('notice')
+        tsnum, tfnum, tsenum = [],[], []
+        tsl, tfl, tse = None, None, None
         for tmp in self.read_thread.taskstart.t():
             tsl = ax.axvline(tmp, linestyle = '-', color = 'b')
-            # tsl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b')
             tsnum.append(line_num)
             line_num = line_num + 1
         if tsl:
@@ -396,12 +397,46 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             legend_info.append('task start')
         for tmp in self.read_thread.taskfinish.t():
             tfl = ax.axvline(tmp, linestyle = '--', color = 'b')
-            # tfl, = ax.plot((tmp,tmp),[-1e50, 1e50],'b--')
             tfnum.append(line_num)
             line_num = line_num + 1
         if tfl:
             legend_info.append(tfl)
             legend_info.append('task finish')
+        for tmp in self.read_thread.service.t():
+            tse = ax.axvline(tmp, linestyle = '-', color = 'k')
+            tsenum.append(line_num)
+            line_num = line_num + 1
+        if tse:
+            legend_info.append(tse)
+            legend_info.append('service')
+        for tmp in self.read_thread.fatal.t():
+            fl= ax.axvline(tmp, linestyle='-',color = 'm')
+            fnum.append(line_num)
+            line_num = line_num + 1
+        if fl:
+            legend_info.append(fl)
+            legend_info.append('fatal')
+        for tmp in self.read_thread.err.t():
+            el= ax.axvline(tmp, linestyle = '-.', color='r')
+            ernum.append(line_num)
+            line_num = line_num + 1
+        if el:
+            legend_info.append(el)
+            legend_info.append('error')
+        for tmp in self.read_thread.war.t():
+            wl = ax.axvline(tmp, linestyle = '--', color = 'y')
+            wnum.append(line_num)
+            line_num = line_num + 1
+        if wl:
+            legend_info.append(wl)
+            legend_info.append('warning')
+        for tmp in self.read_thread.notice.t():
+            nl = ax.axvline(tmp, linestyle = ':', color = 'g')
+            nnum.append(line_num)
+            line_num = line_num + 1
+        if nl:
+            legend_info.append(nl)
+            legend_info.append('notice')
         if legend_info:
             ax.legend(legend_info[0::2], legend_info[1::2], loc='upper right')
         self.lines_dict['fatal'] = fnum
@@ -410,6 +445,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.lines_dict['notice'] = nnum
         self.lines_dict['taskstart'] = tsnum
         self.lines_dict['taskfinish'] = tfnum
+        self.lines_dict['service'] = tsenum
         lines = ax.get_lines()
         for n in fnum:
             lines[n].set_visible(self.check_fatal.isChecked())
@@ -423,6 +459,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             lines[n].set_visible(self.check_tstart.isChecked())
         for n in tfnum:
             lines[n].set_visible(self.check_tfinish.isChecked())
+        for n in tsenum:
+            lines[n].set_visible(self.check_service.isChecked())
         
     def updateCheckInfoLine(self,key):
         for ax in self.axs:
@@ -438,10 +476,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def changeCheckBox(self):
         if self.check_err.isChecked() and self.check_fatal.isChecked() and self.check_notice.isChecked() and \
-        self.check_war.isChecked() and self.check_tstart.isChecked() and self.check_tfinish.isChecked():
+        self.check_war.isChecked() and self.check_tstart.isChecked() and self.check_tfinish.isChecked() and \
+        self.check_service.isChecked():
             self.check_all.setCheckState(QtCore.Qt.Checked)
         elif self.check_err.isChecked() or self.check_fatal.isChecked() or self.check_notice.isChecked() or \
-        self.check_war.isChecked() or self.check_tstart.isChecked() and self.check_tfinish.isChecked():
+        self.check_war.isChecked() or self.check_tstart.isChecked() and self.check_tfinish.isChecked() or \
+        self.check_service.isChecked():
             self.check_all.setTristate()
             self.check_all.setCheckState(QtCore.Qt.PartiallyChecked)
         else:
@@ -461,6 +501,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.updateCheckInfoLine('taskstart')
         elif cur_check is self.check_tfinish:
             self.updateCheckInfoLine('taskfinish')
+        elif cur_check is self.check_service:
+            self.updateCheckInfoLine('service')
 
     def changeCheckBoxAll(self):
         if self.check_all.checkState() == QtCore.Qt.Checked:
@@ -470,6 +512,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_notice.setChecked(True)
             self.check_tstart.setChecked(True)
             self.check_tfinish.setChecked(True)
+            self.check_service.setChecked(True)
         elif self.check_all.checkState() == QtCore.Qt.Unchecked:
             self.check_fatal.setChecked(False)
             self.check_err.setChecked(False)
@@ -477,6 +520,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_notice.setChecked(False)
             self.check_tstart.setChecked(False)
             self.check_tfinish.setChecked(False)
+            self.check_service.setChecked(False)
 
 if __name__ == "__main__":
     qapp = QtWidgets.QApplication(sys.argv)

@@ -1,7 +1,7 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from loglib import MCLoc, IMU, Odometer, Battery, Controller, Send, Get, Laser, Manual, Speed2DSP
 from loglib import StopPoints, SlowDownPoints, SensorFuser, Fork
-from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish
+from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish, Service
 from loglib import Memory
 from datetime import timedelta
 from datetime import datetime
@@ -53,12 +53,14 @@ class ReadThread(QThread):
         self.notice = NoticeLine()
         self.taskstart = TaskStart()
         self.taskfinish = TaskFinish()
+        self.service = Service()
         self.memory = Memory()
         self.tlist = []
         if self.filenames:
             log = ReadLog(self.filenames)
             log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo, self.stop, self.slowdown, self.sensorfuser,
-            self.send, self.get, self.manual, self.speedDsp, self.fork, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish,
+            self.send, self.get, self.manual, self.speedDsp, self.fork, self.laser,
+            self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service,
             self.memory)
             #analyze data
             old_imu_flag = decide_old_imu(self.imu.gx()[0], self.imu.gy()[0], self.imu.gz()[0])

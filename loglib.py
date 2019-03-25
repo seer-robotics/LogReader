@@ -951,6 +951,26 @@ class TaskFinish:
     def content(self):
         return self.data[1], self.data[0]
 
+class Service:
+    """  服务信息
+    data[0]: t
+    data[1]: 服务内容
+    """
+    def __init__(self):
+        self.regex = re.compile("\[(.*?)\].*\[Service\].*")
+        self.data = [[] for _ in range(2)]
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            self.data[0].append(rbktimetodate(out.group(1)))
+            self.data[1].append(out.group(0))
+            return True
+        return False
+    def t(self):
+        return self.data[0]
+    def content(self):
+        return self.data[1], self.data[0]
+
 class Memory:
     """  内存信息
     t[0]: 

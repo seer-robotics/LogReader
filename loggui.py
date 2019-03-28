@@ -11,6 +11,7 @@ from numpy import searchsorted
 from ExtendedComboBox import ExtendedComboBox
 from Widget import Widget
 from ReadThread import ReadThread
+from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish, Service
 
 class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -295,6 +296,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if len(self.read_thread.taskfinish.t()) > max_line:
             print("TASKFINISH are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskfinish.t()))
             self.read_thread.taskfinish = TaskFinish()
+        if len(self.read_thread.service.t()) > max_line:
+            print("SERVICE are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.service.t()))
+            self.read_thread.service = Service()
         self.finishReadFlag = True
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:

@@ -10,7 +10,7 @@ import os, sys
 from numpy import searchsorted
 from ExtendedComboBox import ExtendedComboBox
 from Widget import Widget
-from ReadThread import ReadThread
+from ReadThread import ReadThread, Fdir2Flink
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish, Service
 
 class ApplicationWindow(QtWidgets.QMainWindow):
@@ -112,6 +112,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.log_info = QtWidgets.QTextBrowser(self)
         self.log_info.setReadOnly(True)
         self.log_info.setMinimumHeight(10)
+        self.log_info.setOpenLinks(False)
+        self.log_info.anchorClicked.connect(self.openFileUrl)
         # self.layout.addWidget(self.log_info)
 
         #消息框，绘图，Log窗口尺寸可变
@@ -289,6 +291,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             ax.set_xlim(xmin,xmax)
         self.static_canvas.figure.canvas.draw()
 
+    def openFileUrl(self, flink):
+        QtGui.QDesktopServices.openUrl(flink)
     def openLogFilesDialog(self):
         # self.setGeometry(50,50,640,480)
         options = QtWidgets.QFileDialog.Options()
@@ -303,7 +307,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
                 print(ind+1, ':', f)
-                self.log_info.append(str(ind+1)+':'+f)
+                flink = Fdir2Flink(f)
+                self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
 
     def dragFiles(self, files):
@@ -320,11 +325,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
                 print(ind+1, ':', f)
-                self.log_info.append(str(ind+1)+':'+f)
+                flink = Fdir2Flink(f)
+                self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
 
     def readFinished(self, result):
-        self.log_info.append(self.read_thread.log)
+        for tmps in self.read_thread.log:
+            self.log_info.append(tmps)
         print('Finished')
         self.log_info.append('Finished')
         max_line = 1000

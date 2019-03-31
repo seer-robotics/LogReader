@@ -19,6 +19,10 @@ def decide_old_imu(gx,gy,gz):
             return True
     return False
 
+def Fdir2Flink(f):
+    flink = " <a href='file:///" + f + "'>"+f+"</a>"
+    return flink
+
 class ReadThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
 
@@ -56,7 +60,7 @@ class ReadThread(QThread):
         self.service = Service()
         self.memory = Memory()
         self.tlist = []
-        self.log = '' 
+        self.log =  []
         if self.filenames:
             log = ReadLog(self.filenames)
             log.parse(self.mcl, self.imu, self.odo, self.battery, self.controller, self.laserOdo, self.stop, self.slowdown, self.sensorfuser,
@@ -68,10 +72,10 @@ class ReadThread(QThread):
             if old_imu_flag:
                 self.imu.old2newGyro()
                 print('The unit of gx, gy, gz in file is rad/s.')
-                self.log +='The unit of gx, gy, gz in file is rad/s.\n' 
+                self.log.append('The unit of gx, gy, gz in file is rad/s.') 
             else:
                 print('The org unit of gx, gy, gz in IMU is LSB/s.')
-                self.log += 'The org unit of gx, gy, gz in IMU is LSB/s.\n'
+                self.log.append('The org unit of gx, gy, gz in IMU is LSB/s.')
             tmax = max(self.mcl.t() + self.odo.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t())
             tmin = min(self.mcl.t() + self.odo.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t())
             dt = tmax - tmin
@@ -82,13 +86,14 @@ class ReadThread(QThread):
             tmax = max(self.mcl.t() + self.odo.t() + self.manual.t() + self.sensorfuser.t() + self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t())
             path = os.path.dirname(self.filenames[0])
             output_fname = path + "/" + output_fname
-            self.log += "Report File: " + output_fname + '\n'
+            self.log.append("Report File:" + Fdir2Flink(output_fname))
             fid = open(output_fname,"w") 
             print("="*20, file = fid)
             print("Files: ", self.filenames, file = fid)
             print(len(self.fatal.content()[0]), " FATALs, ", len(self.err.content()[0]), " ERRORs, ", 
                     len(self.war.content()[0]), " WARNINGs, ", len(self.notice.content()[0]), " NOTICEs", file = fid)
-            self.log += str(len(self.fatal.content()[0])) + " FATALs, " + str(len(self.err.content()[0])) + " ERRORs, " + str(len(self.war.content()[0])) + " WARNINGs, " + str(len(self.notice.content()[0])) + " NOTICEs"
+            self.log.append(str(len(self.fatal.content()[0])) + " FATALs, " + str(len(self.err.content()[0])) + 
+                " ERRORs, " + str(len(self.war.content()[0])) + " WARNINGs, " + str(len(self.notice.content()[0])) + " NOTICEs")
             print("FATALs:", file = fid)
             for data in self.fatal.content()[0]:
                 print(data, file = fid)

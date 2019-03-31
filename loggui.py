@@ -26,7 +26,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def setupUI(self):
         """初始化窗口结构""" 
-        self.setGeometry(50,50,800,800)
+        self.setGeometry(50,50,800,900)
         self.max_fig_num = 6 
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Open', self.openLogFilesDialog,
@@ -75,28 +75,56 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.grid.addWidget(combo,1,i*2+1)
         self.layout.addLayout(self.grid)
 
+
         #消息框
         # self.label_info = QtWidgets.QLabel("",self)
         # self.label_info.setStyleSheet("background-color: white;")
         # self.label_info.setWordWrap(True)
         self.info = QtWidgets.QTextBrowser(self)
         self.info.setReadOnly(True)
-        self.info.setFixedHeight(50)
-        self.grid.addWidget(self.info,2,0,1,50)
+        self.info.setMinimumHeight(5)
+        # self.layout.addWidget(self.info)
 
         #图形化结构
-        self.static_canvas = FigureCanvas(Figure(figsize=(100,100)))
-        self.layout.addWidget(self.static_canvas)
+        self.fig_height = 2.5
+        self.static_canvas = FigureCanvas(Figure(figsize=(10,self.fig_height*cur_fig_num)))
+        self.static_canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.fig_widget = Widget()
+        self.fig_layout = QtWidgets.QVBoxLayout(self.fig_widget)
+        self.fig_layout.addWidget(self.static_canvas)
+        self.scroll = QtWidgets.QScrollArea(self.fig_widget)
+        self.scroll.setWidget(self.static_canvas)
+        self.scroll.setWidgetResizable(True)
+        # self.layout.addWidget(self.scroll)
         self.old_home = NavigationToolbar.home
         self.old_forward = NavigationToolbar.forward
         self.old_back = NavigationToolbar.back
         NavigationToolbar.home = self.new_home
         NavigationToolbar.forward = self.new_forward
         NavigationToolbar.back = self.new_back
-        self.addToolBar(NavigationToolbar(self.static_canvas, self))
+        self.addToolBar(NavigationToolbar(self.static_canvas, self._main))
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
+        self.static_canvas.mpl_connect('button_press_event', self.mouse_press)
+
+        #Log
+        self.log_info = QtWidgets.QTextBrowser(self)
+        self.log_info.setReadOnly(True)
+        self.log_info.setMinimumHeight(10)
+        # self.layout.addWidget(self.log_info)
+
+        #消息框，绘图，Log窗口尺寸可变
+        splitter1 = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter1.addWidget(self.info)
+        splitter1.addWidget(self.scroll)
+        splitter1.setSizes([1,100])
+
+        splitter2 = QtWidgets.QSplitter(QtCore.Qt.Vertical)
+        splitter2.addWidget(splitter1)
+        splitter2.addWidget(self.log_info)
+        splitter2.setSizes([100,1])
+        self.layout.addWidget(splitter2)
 
         #选择消息框
         self.hbox = QtWidgets.QHBoxLayout()
@@ -128,88 +156,105 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
 
+    def get_content(self, mouse_time):
+        content = ""
+        dt_min = 1e10
+        if self.read_thread.fatal.t() and self.check_fatal.isChecked():
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
+            dt_min = min(vdt)
+        if self.read_thread.err.t() and self.check_err.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+        if self.read_thread.war.t() and self.check_war.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+        if self.read_thread.notice.t() and self.check_notice.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+        if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+        if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+        if self.read_thread.service.t() and self.check_service.isChecked(): 
+            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
+            tmp_dt = min(vdt)
+            if tmp_dt < dt_min:
+                dt_min = tmp_dt
+
+        if dt_min < 10:
+            contents = []
+            if self.read_thread.fatal.t() and self.check_fatal.isChecked():
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.err.t() and self.check_err.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.war.t() and self.check_war.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.notice.t() and self.check_notice.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            if self.read_thread.service.t() and self.check_service.isChecked(): 
+                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
+                tmp_dt = min(vdt)
+                if abs(tmp_dt - dt_min) < 2e-2:
+                    contents = contents + [self.read_thread.service.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
+            content = '\n'.join(contents)
+        return content
+    def mouse_press(self, event):
+        # print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
+        #   ('double' if event.dblclick else 'single', event.button,
+        #    event.x, event.y, event.xdata, event.ydata))
+        if event.inaxes and self.finishReadFlag:
+            mouse_time = event.xdata * 86400 - 62135712000
+            if mouse_time > 1e6:
+                mouse_time = datetime.fromtimestamp(mouse_time)
+                if event.button == 1:
+                    content = 't, '  + event.inaxes.get_ylabel() + ' : ' + str(mouse_time) + ',' +str(event.ydata)
+                    self.log_info.append(content)
+                else:
+                    content = self.get_content(mouse_time)
+                    self.log_info.append(content[:-1])
+
+        
     def mouse_move(self, event):
         if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
-                content = []
-                dt_min = 1e10
-                if self.read_thread.fatal.t() and self.check_fatal.isChecked():
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
-                    dt_min = min(vdt)
-                if self.read_thread.err.t() and self.check_err.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-                if self.read_thread.war.t() and self.check_war.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-                if self.read_thread.notice.t() and self.check_notice.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-                if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-                if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-                if self.read_thread.service.t() and self.check_service.isChecked(): 
-                    vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
-                    tmp_dt = min(vdt)
-                    if tmp_dt < dt_min:
-                        dt_min = tmp_dt
-
-                if dt_min < 10:
-                    contents = []
-                    if self.read_thread.fatal.t() and self.check_fatal.isChecked():
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.err.t() and self.check_err.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.war.t() and self.check_war.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.notice.t() and self.check_notice.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    if self.read_thread.service.t() and self.check_service.isChecked(): 
-                        vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
-                        tmp_dt = min(vdt)
-                        if abs(tmp_dt - dt_min) < 2e-2:
-                            contents = contents + [self.read_thread.service.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-                    content = '\n'.join(contents)
-                    self.info.setText(content)
-                else:
-                    self.info.setText("")
+                content = self.get_content(mouse_time)
+                self.info.setText(content)
             else:
                 self.info.setText("")
         elif not self.finishReadFlag:
@@ -251,13 +296,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         options |= QtCore.Qt.WindowStaysOnTopHint
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log);;All Files (*)", options=options)
         if self.filenames:
+            self.finishReadFlag = False
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
-            print('Loading', len(self.filenames), 'Files:')
+            print('Loading ', len(self.filenames), ' Files:')
+            self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
                 print(ind+1, ':', f)
-            tmpstr = 'Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames])
-            self.statusBar().showMessage(tmpstr)
+                self.log_info.append(str(ind+1)+':'+f)
+            self.setWindowTitle('Loading')
 
     def dragFiles(self, files):
         self.filenames = []
@@ -266,38 +313,48 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 if os.path.splitext(file)[1] == ".log":
                     self.filenames.append(file)
         if self.filenames:
+            self.finishReadFlag = False
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
             print('Loading', len(self.filenames), 'Files:')
+            self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
                 print(ind+1, ':', f)
-            tmpstr = 'Loading......: {0}'.format([f.split('/')[-1] for f in self.filenames])
-            self.statusBar().showMessage(tmpstr)
+                self.log_info.append(str(ind+1)+':'+f)
+            self.setWindowTitle('Loading')
 
     def readFinished(self, result):
+        self.log_info.append(self.read_thread.log)
         print('Finished')
-        self.statusBar().showMessage('Finished')
+        self.log_info.append('Finished')
         max_line = 1000
         if len(self.read_thread.fatal.t()) > max_line:
             print("FATALs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.fatal.t()))
+            self.log_info.append("FATALs are too much to be ploted. Max Number is "+ str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
             self.read_thread.fatal = FatalLine()
         if len(self.read_thread.err.t()) > max_line:
             print("ERRORs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.err.t()))
+            self.log_info.append("ERRORs are too much to be ploted. Max Number is " + str(max_line)+". Current Number is "+str(len(self.read_thread.err.t())))
             self.read_thread.err = ErrorLine()
         if len(self.read_thread.war.t()) > max_line:
             print("WARNINGs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.war.t()))
+            self.log_info.append("WARNINGs are too much to be ploted. Max Number is " + str(max_line) +  ". Current Number is " + str(len(self.read_thread.war.t())))
             self.read_thread.war = WarningLine()
         if len(self.read_thread.notice.t()) > max_line:
             print("NOTICEs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.notice.t()))
+            self.log_info.append("NOTICEs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.notice.t())))
             self.read_thread.notice = NoticeLine()
         if len(self.read_thread.taskstart.t()) > max_line:
             print("TASKSTART are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskstart.t()))
+            self.log_info.append("TASKSTART are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskstart.t())))
             self.read_thread.taskstart = TaskStart()
         if len(self.read_thread.taskfinish.t()) > max_line:
             print("TASKFINISH are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskfinish.t()))
+            self.log_info.append("TASKFINISH are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskfinish.t())))
             self.read_thread.taskfinish = TaskFinish()
         if len(self.read_thread.service.t()) > max_line:
             print("SERVICE are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.service.t()))
+            self.log_info.append("SERVICE are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.service.t())))
             self.read_thread.service = Service()
         self.finishReadFlag = True
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
@@ -313,7 +370,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.6""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.7""")
 
     def combo_onActivated(self):
         # print("combo1: ",text)
@@ -329,8 +386,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         xmin, xmax = self.axs[0].get_xlim()
         for ax in self.axs:
             self.static_canvas.figure.delaxes(ax)
+        self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
         self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
         self.static_canvas.figure.canvas.draw()
+        self.scroll.setWidgetResizable(True)
         for i in reversed(range(2, self.grid.count())): 
             self.grid.itemAt(i).widget().deleteLater()
         for i in range(0, new_fig_num):
@@ -351,10 +410,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.combos.append(combo)
             self.grid.addWidget(label,1,i*2)
             self.grid.addWidget(combo,1,i*2+1)
-        self.info = QtWidgets.QTextBrowser(self)
-        self.info.setReadOnly(True)
-        self.info.setFixedHeight(50)
-        self.grid.addWidget(self.info,2,0,1,50)
+        # self.info = QtWidgets.QTextBrowser(self)
+        # self.info.setReadOnly(True)
+        # self.info.setFixedHeight(50)
+        # self.grid.addWidget(self.info,2,0,1,50)
         if self.finishReadFlag:
             if self.read_thread.filenames:
                 keys = list(self.read_thread.data.keys())

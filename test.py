@@ -137,7 +137,7 @@ if len(laser.x()[0]) > 0:
     l2, = plt.plot(laser.angle()[0][0], laser.dist()[0][0], '.')
     axcolor = 'lightgoldenrodyellow'  # slider的颜色
     om1= plt.axes([0.1, 0.08, 0.8, 0.02], facecolor=axcolor) # 第一slider的位置
-    som1 = Slider(om1, r'Time', 0, len(laser.ts())-1, valinit=0, valfmt='%i') #产生第二slider
+    som1 = Slider(om1, r'Time', 0, len(laser.ts()[0])-1, valinit=0, valfmt='%i') #产生第二slider
     def update(val):
         s1 = int(som1.val)
         l1.set_xdata(laser.x()[0][s1])

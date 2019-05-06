@@ -121,7 +121,7 @@ class ReadThread(QThread):
                      "odo.vx":self.odo.vx(),"odo.vy":self.odo.vy(),"odo.vw":self.odo.vw(),"odo.steer_angle":self.odo.steer_angle(),
                      "odo.encode0":self.odo.encode0(),"odo.encode1":self.odo.encode1(),"odo.encode2":self.odo.encode2(),"odo.encode3":self.odo.encode3(),
                      "laserOdo.ts":self.laserOdo.ts(),"laserOdo.x":self.laserOdo.x(),"laserOdo.y":self.laserOdo.y(),"laserOdo.angle":self.laserOdo.angle(),
-                     "laser.ts":self.laser.ts(),
+                     "laser.ts":self.laser.ts(), "laser.number":self.laser.number(),
                      "sensorfuser.local":self.sensorfuser.localnum(),"sensorfuser.global":self.sensorfuser.globalnum(),
                      "stop.x":self.stop.x(),"stop.y":self.stop.y(),"stop.type":self.stop.type(), "stop.id":self.stop.id(), "stop.dist": self.stop.dist(),
                      "slowdown.x":self.slowdown.x(),"slowdown.y":self.slowdown.y(),"slowdown.type":self.slowdown.type(), "slowdown.id":self.slowdown.id(), "slowdown.dist": self.slowdown.dist(),

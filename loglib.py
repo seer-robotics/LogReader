@@ -196,10 +196,10 @@ class Odometer:
     data[8]: vy m/s
     data[9]: vw rad/s
     data[10]: steer_angle rad
-    data[11]: steer_angle rad
-    data[12]: steer_angle rad
-    data[13]: steer_angle rad
-    data[14]: steer_angle rad
+    data[11]: encoder0
+    data[12]: encoder1
+    data[13]: encoder2
+    data[14]: encoder3
     """
     def __init__(self):
         self.regex = re.compile("\[(.*?)\].*\[Odometer\]\[(.*?)\]")
@@ -722,11 +722,12 @@ class Laser:
     data[3]: dist m
     data[4]: x m
     data[5]: y m
+    data[6]: number
     """
     def __init__(self, max_dist):
         """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
         self.regex = re.compile('\[(.*?)\].* \[Laser\]\[(.*?)\]')
-        self.data = [[] for _ in range(6)]
+        self.data = [[] for _ in range(7)]
         self.max_dist = max_dist
     def parse(self, line):
         out = self.regex.match(line)
@@ -753,6 +754,7 @@ class Laser:
             x , y = polar2xy(angle, dist)
             self.data[4].append(x)
             self.data[5].append(y)
+            self.data[6].append(len(x))
             return True
         return False
     def t(self):
@@ -767,6 +769,8 @@ class Laser:
         return self.data[4], self.data[0]
     def y(self):
         return self.data[5], self.data[0]
+    def number(self):
+        return self.data[6], self.data[0]
 
 class ErrorLine:
     """  错误信息

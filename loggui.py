@@ -1,4 +1,3 @@
-print("LOGGUI START...")
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib.backends.backend_qt5agg import (
@@ -11,7 +10,8 @@ from numpy import searchsorted
 from ExtendedComboBox import ExtendedComboBox
 from Widget import Widget
 from ReadThread import ReadThread, Fdir2Flink
-from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, LaserOdometer, TaskStart, TaskFinish, Service
+from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
+import logging
 
 class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -303,10 +303,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.finishReadFlag = False
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
-            print('Loading ', len(self.filenames), ' Files:')
+            logging.debug('Loading ' + str(len(self.filenames)) + ' Files:')
             self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
-                print(ind+1, ':', f)
+                logging.debug(str(ind+1)+':'+f)
                 flink = Fdir2Flink(f)
                 self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
@@ -321,10 +321,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.finishReadFlag = False
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
-            print('Loading', len(self.filenames), 'Files:')
+            logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
             self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
             for (ind, f) in enumerate(self.filenames):
-                print(ind+1, ':', f)
+                logging.debug(str(ind+1) + ':' + f)
                 flink = Fdir2Flink(f)
                 self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
@@ -332,35 +332,35 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def readFinished(self, result):
         for tmps in self.read_thread.log:
             self.log_info.append(tmps)
-        print('Finished')
+        logging.debug('read Finished')
         self.log_info.append('Finished')
         max_line = 1000
         if len(self.read_thread.fatal.t()) > max_line:
-            print("FATALs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.fatal.t()))
+            logging.warning("FATALs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
             self.log_info.append("FATALs are too much to be ploted. Max Number is "+ str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
             self.read_thread.fatal = FatalLine()
         if len(self.read_thread.err.t()) > max_line:
-            print("ERRORs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.err.t()))
+            logging.warning("ERRORs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.err.t())))
             self.log_info.append("ERRORs are too much to be ploted. Max Number is " + str(max_line)+". Current Number is "+str(len(self.read_thread.err.t())))
             self.read_thread.err = ErrorLine()
         if len(self.read_thread.war.t()) > max_line:
-            print("WARNINGs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.war.t()))
+            logging.warning("WARNINGs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.war.t())))
             self.log_info.append("WARNINGs are too much to be ploted. Max Number is " + str(max_line) +  ". Current Number is " + str(len(self.read_thread.war.t())))
             self.read_thread.war = WarningLine()
         if len(self.read_thread.notice.t()) > max_line:
-            print("NOTICEs are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.notice.t()))
+            logging.warning("NOTICEs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.notice.t())))
             self.log_info.append("NOTICEs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.notice.t())))
             self.read_thread.notice = NoticeLine()
         if len(self.read_thread.taskstart.t()) > max_line:
-            print("TASKSTART are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskstart.t()))
+            logging.warning("TASKSTART are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskstart.t())))
             self.log_info.append("TASKSTART are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskstart.t())))
             self.read_thread.taskstart = TaskStart()
         if len(self.read_thread.taskfinish.t()) > max_line:
-            print("TASKFINISH are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.taskfinish.t()))
+            logging.warning("TASKFINISH are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskfinish.t())))
             self.log_info.append("TASKFINISH are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskfinish.t())))
             self.read_thread.taskfinish = TaskFinish()
         if len(self.read_thread.service.t()) > max_line:
-            print("SERVICE are too much to be ploted. Max Number is ", max_line, ". Current Number is ", len(self.read_thread.service.t()))
+            logging.warning("SERVICE are too much to be ploted. Max Number is " + str(max_line) +". Current Number is " + str(len(self.read_thread.service.t())))
             self.log_info.append("SERVICE are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.service.t())))
             self.read_thread.service = Service()
         self.finishReadFlag = True
@@ -377,7 +377,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V1.1.7""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.0""")
 
     def combo_onActivated(self):
         # print("combo1: ",text)
@@ -593,6 +593,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_service.setChecked(False)
 
 if __name__ == "__main__":
+    ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    log_name = "log\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
+    logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d] %(message)s', level=logging.DEBUG)
     qapp = QtWidgets.QApplication(sys.argv)
     app = ApplicationWindow()
     app.show()

@@ -66,6 +66,7 @@ class Data:
         self.info = info['content']
         self.data = dict()
         self.data['t'] = []
+        self.parse_error = False
         for tmp in self.info:
             self.data[tmp['name']] =  []
     def parse(self, line):
@@ -89,7 +90,9 @@ class Data:
                     elif tmp['type'] == 'bool':
                         self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
             else:
-                logging.error("Error in " + self.type + " parse: " + line)
+                if not self.parse_error:
+                    logging.error("Error in " + self.type + " parse: " + line)
+                    self.parse_error = True
             return True
         return False
     def __getitem__(self,k):

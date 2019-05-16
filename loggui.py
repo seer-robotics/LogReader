@@ -5,6 +5,7 @@ from matplotlib.backends.backend_qt5agg import (
 from PyQt5 import QtCore, QtWidgets,QtGui
 from matplotlib.figure import Figure
 from datetime import datetime
+from datetime import timedelta
 import os, sys
 from numpy import searchsorted
 from ExtendedComboBox import ExtendedComboBox
@@ -12,6 +13,23 @@ from Widget import Widget
 from ReadThread import ReadThread, Fdir2Flink
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
 import logging
+
+class XYSelection:
+    def __init__(self, num = 1):
+        self.num = num 
+        self.groupBox = QtWidgets.QGroupBox('图片'+str(self.num))
+        self.x_label = QtWidgets.QLabel('Time')
+        self.y_label = QtWidgets.QLabel('Data')
+        self.x_combo = ExtendedComboBox()
+        self.y_combo = ExtendedComboBox()
+        x_form = QtWidgets.QFormLayout()
+        x_form.addRow(self.x_label,self.x_combo)
+        y_form = QtWidgets.QFormLayout()
+        y_form.addRow(self.y_label,self.y_combo)
+        vbox = QtWidgets.QVBoxLayout()
+        vbox.addLayout(y_form)
+        vbox.addLayout(x_form)
+        self.groupBox.setLayout(vbox)
 
 class ApplicationWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -57,24 +75,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self._main)
         self.layout = QtWidgets.QVBoxLayout(self._main)
         #Add ComboBox
-        self.grid = QtWidgets.QGridLayout()
-        for i in range(0, cur_fig_num):
-            self.grid.setColumnMinimumWidth(i*2,40)
-            self.grid.setColumnStretch(i*2+1,1)
-        self.labels = []
-        self.combos = []
+        self.xys = []
+        self.xy_hbox = QtWidgets.QHBoxLayout()
         for i in range(0,cur_fig_num):
-            label = QtWidgets.QLabel("图片"+str(i+1),self)
-            label.adjustSize()
-            combo = ExtendedComboBox(self)
-            combo.resize(10,10)
-            combo.activated.connect(self.combo_onActivated)
-            self.labels.append(label)
-            self.combos.append(combo)
-            self.grid.addWidget(label,1,i*2)
-            self.grid.addWidget(combo,1,i*2+1)
-        self.layout.addLayout(self.grid)
-
+            selection = XYSelection(i+1)
+            selection.y_combo.activated.connect(self.ycombo_onActivated)
+            selection.x_combo.activated.connect(self.xcombo_onActivated)
+            self.xys.append(selection)
+            self.xy_hbox.addWidget(selection.groupBox)
+        self.layout.addLayout(self.xy_hbox)
 
         #消息框
         # self.label_info = QtWidgets.QLabel("",self)
@@ -86,7 +95,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         # self.layout.addWidget(self.info)
 
         #图形化结构
-        self.fig_height = 2.5
+        self.fig_height = 2.0
         self.static_canvas = FigureCanvas(Figure(figsize=(10,self.fig_height*cur_fig_num)))
         self.static_canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.fig_widget = Widget()
@@ -103,6 +112,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         NavigationToolbar.forward = self.new_forward
         NavigationToolbar.back = self.new_back
         self.addToolBar(NavigationToolbar(self.static_canvas, self._main))
+        self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
@@ -264,8 +274,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
 
     def new_home(self, *args, **kwargs):
-        for ax, combo in zip(self.axs, self.combos):
-            text = combo.currentText()
+        for ax, xy in zip(self.axs, self.xys):
+            text = xy.y_combo.currentText()
             data = self.read_thread.data[text][0]
             if data:
                 max_range = max(max(data) - min(data), 1e-6)
@@ -368,10 +378,17 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
             keys = list(self.read_thread.data.keys())
-            for ax, combo in zip(self.axs, self.combos):
-                if combo.count() == 0:
-                    combo.addItems(keys)
-                self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), True)
+            for ax, xy in zip(self.axs, self.xys):
+                if xy.y_combo.count() == 0:
+                    xy.y_combo.addItems(keys) 
+                xy.x_combo.clear()
+                xy.x_combo.addItems(['t'])
+                group_name = xy.y_combo.currentText().split('.')[0]
+                if group_name in self.read_thread.content:
+                    if 'timestamp' in self.read_thread.content[group_name].data:
+                        xy.x_combo.addItems(['timestamp'])
+                self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
+                                str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 't', True)
 
     def fileQuit(self):
         self.close()
@@ -379,59 +396,128 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def about(self):
         QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.0""")
 
-    def combo_onActivated(self):
+    def ycombo_onActivated(self):
         # print("combo1: ",text)
         curcombo = self.sender()
-        index = self.combos.index(curcombo)
+        index = 0
+        for (ind, xy) in enumerate(self.xys):
+            if xy.y_combo == curcombo:
+                index = ind
+                break; 
         text = curcombo.currentText()
-        # print("index:", index, "sender:", self.sender()," text:", text)
+        current_x_index = self.xys[index].x_combo.currentIndex()
+        self.xys[index].x_combo.clear()
+        self.xys[index].x_combo.addItems(['t'])
+        group_name = text.split('.')[0]
+        if group_name in self.read_thread.content:
+            if 'timestamp' in self.read_thread.content[group_name].data:
+                self.xys[index].x_combo.addItems(['timestamp'])
+
         ax = self.axs[index]
-        self.drawdata(ax, self.read_thread.data[text], text, False)
+        if self.xys[index].x_combo.count() == 1 or current_x_index == 0:
+            logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 't')
+            self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text + ' v.s. ' + 't', False)
+        else:
+            logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 'timestamp')
+            org_t = self.read_thread.data[group_name + '.timestamp'][0]
+            t = []
+            try:
+                t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
+            except:
+                dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
+                t = [self.read_thread.data[text][1][0] + tmp for tmp in dt]
+            self.drawdata(ax, (self.read_thread.data[text][0], t), str(index + 1) + ' : ' + text + ' v.s. ' + 'timestamp', False)
+
+
+    def xcombo_onActivated(self):
+        # print("combo1: ",text)
+        curcombo = self.sender()
+        index = 0
+        for (ind, xy) in enumerate(self.xys):
+            if xy.x_combo == curcombo:
+                index = ind
+                break; 
+        text = curcombo.currentText()
+        ax = self.axs[index]
+        y_label = self.xys[index].y_combo.currentText()
+        logging.info('Fig.' + str(index+1) + ' : ' + y_label + ' ' + text)
+        if text == 't':
+            self.drawdata(ax, self.read_thread.data[y_label], str(index + 1) + ' : ' + y_label + ' v.s. ' + 't', False)
+        elif text == 'timestamp':
+            group_name = y_label.split('.')[0]
+            org_t = self.read_thread.data[group_name + '.timestamp'][0]
+            t = []
+            try:
+                t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
+            except:
+                dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
+                t = [self.read_thread.data[y_label][1][0] + tmp for tmp in dt]
+            self.drawdata(ax, (self.read_thread.data[y_label][0], t), str(index + 1) + ' : ' + y_label + ' v.s. ' + 'timestamp', False)
+
+
+        #print("text = ", text)
+        #print("index:", index, "sender:", self.sender()," text:", text)
+        # ax = self.axs[index]
+        # self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text, False)
 
     def fignum_changed(self,action):
         new_fig_num = int(action.text())
+        logging.info('fignum_changed to '+str(new_fig_num))
         xmin, xmax = self.axs[0].get_xlim()
         for ax in self.axs:
             self.static_canvas.figure.delaxes(ax)
+
+        self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
         self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
         self.static_canvas.figure.canvas.draw()
         self.scroll.setWidgetResizable(True)
-        for i in reversed(range(2, self.grid.count())): 
-            self.grid.itemAt(i).widget().deleteLater()
-        for i in range(0, new_fig_num):
-            self.grid.setColumnMinimumWidth(i*2,40)
-            self.grid.setColumnStretch(i*2+1,1)
-        combo_ind = [] 
-        for combo in self.combos:
-            combo_ind.append(combo.currentIndex())
-        self.labels = []
-        self.combos = []
+        for i in range(0, self.xy_hbox.count()): 
+            self.xy_hbox.itemAt(i).widget().deleteLater()
+        combo_y_ind = [] 
+        combo_x_ind = [] 
+        for xy in self.xys:
+            combo_y_ind.append(xy.y_combo.currentIndex())
+            combo_x_ind.append(xy.x_combo.currentIndex())
+        self.xys = []
         for i in range(0,new_fig_num):
-            label = QtWidgets.QLabel("图片"+str(i+1),self)
-            label.adjustSize()
-            combo = ExtendedComboBox(self)
-            combo.resize(10,10)
-            combo.activated.connect(self.combo_onActivated)
-            self.labels.append(label)
-            self.combos.append(combo)
-            self.grid.addWidget(label,1,i*2)
-            self.grid.addWidget(combo,1,i*2+1)
-        # self.info = QtWidgets.QTextBrowser(self)
-        # self.info.setReadOnly(True)
-        # self.info.setFixedHeight(50)
-        # self.grid.addWidget(self.info,2,0,1,50)
+            selection = XYSelection(i+1)
+            selection.y_combo.activated.connect(self.ycombo_onActivated)
+            selection.x_combo.activated.connect(self.xcombo_onActivated)
+            self.xys.append(selection)
+            self.xy_hbox.addWidget(selection.groupBox)
         if self.finishReadFlag:
             if self.read_thread.filenames:
                 keys = list(self.read_thread.data.keys())
                 count = 0
-                for ax, combo in zip(self.axs, self.combos):
-                    combo.addItems(keys)
-                    if count < len(combo_ind):
-                        combo.setCurrentIndex(combo_ind[count])
+                for ax, xy in zip(self.axs, self.xys):
+                    xy.y_combo.addItems(keys)
+                    if count < len(combo_y_ind):
+                        xy.y_combo.setCurrentIndex(combo_y_ind[count])
+                    xy.x_combo.addItems(['t'])
+                    group_name = xy.y_combo.currentText().split('.')[0]
+                    if group_name in self.read_thread.content:
+                        if 'timestamp' in self.read_thread.content[group_name].data:
+                            xy.x_combo.addItems(['timestamp'])
+                    if count < len(combo_x_ind):
+                        xy.x_combo.setCurrentIndex(combo_x_ind[count])
                     count = count + 1
                     ax.set_xlim(xmin, xmax)
-                    self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), False)
+                    #TO DO
+                    if xy.x_combo.currentText() == 't':
+                        self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
+                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 't', False)
+                    elif xy.x_combo.currentText() == 'timestamp':
+                        org_t = self.read_thread.data[group_name + '.timestamp'][0]
+                        t = []
+                        try:
+                            t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
+                        except:
+                            dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9))-org_t[0] for tmp_t in org_t]
+                            t = [self.read_thread.data[xy.y_combo.currentText()][1][0] + tmp for tmp in dt]
+                        data = (self.read_thread.data[xy.y_combo.currentText()][0], t)
+                        self.drawdata(ax, data,
+                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 'timestamp', False)
 
     def drawdata(self, ax, data, ylabel, resize = False):
         xmin,xmax =  ax.get_xlim()
@@ -538,9 +624,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             for num in self.lines_dict[key]:
                 vis = not lines[num].get_visible()
                 lines[num].set_visible(vis)
-        # for ax, combo in zip(self.axs, self.combos):
-        #     if combo.currentText():
-        #         self.drawdata(ax, self.read_thread.data[combo.currentText()],combo.currentText(), False)
         self.static_canvas.figure.canvas.draw()
 
 
@@ -595,7 +678,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 if __name__ == "__main__":
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     log_name = "log\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
-    logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d] %(message)s', level=logging.DEBUG)
+    logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d][%(funcName)s] %(message)s', level=logging.DEBUG)
     qapp = QtWidgets.QApplication(sys.argv)
     app = ApplicationWindow()
     app.show()

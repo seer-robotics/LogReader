@@ -438,6 +438,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
+            self.map_select_lines = []
             keys = list(self.read_thread.data.keys())
             for ax, xy in zip(self.axs, self.xys):
                 if xy.y_combo.count() == 0:

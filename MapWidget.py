@@ -11,6 +11,9 @@ import numpy as np
 import json as js
 import os
 from MyToolBar import MyToolBar, keepRatio
+from matplotlib.path import Path
+import matplotlib.patches as patches
+from matplotlib.textpath import TextPath
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -49,6 +52,14 @@ class Readmap(QThread):
         self.js = dict()
         self.map_x = []
         self.map_y = []
+        self.verts = []
+        self.points = []
+        self.codes = [ 
+            Path.MOVETO,
+            Path.CURVE4,
+            Path.CURVE4,
+            Path.CURVE4,
+            ]
     # run method gets called when we start the thread
     def run(self):
         fid = open(self.map_name)
@@ -56,6 +67,10 @@ class Readmap(QThread):
         fid.close()
         self.map_x = []
         self.map_y = []
+        self.verts = []
+        self.points = []
+        self.p_names = []
+        # print(self.js.keys())
         for pos in self.js['normalPosList']:
             if 'x' in pos:
                 self.map_x.append(float(pos['x']))
@@ -65,6 +80,27 @@ class Readmap(QThread):
                 self.map_y.append(float(pos['y']))
             else:
                 self.map_y.append(0.0)
+        if 'advancedCurveList' in self.js:
+            for line in self.js['advancedCurveList']:
+                x0,y0 = line['startPos']['pos']['x'], line['startPos']['pos']['y']
+                x1,y1 = line['controlPos1']['x'], line['controlPos1']['y']
+                x2,y2 = line['controlPos2']['x'], line['controlPos2']['y']
+                x3,y3 = line['endPos']['pos']['x'], line['endPos']['pos']['y']
+                self.verts.append([(x0,y0),(x1,y1),(x2,y2),(x3,y3)])
+        if 'advancedPointList' in self.js:
+            for pt in self.js['advancedPointList']:
+                x0 = None
+                y0 = None 
+                theta = None
+                if 'dir' in pt:
+                    x0,y0,theta = pt['pos']['x'], pt['pos']['y'], pt['dir']
+                else:
+                    x0,y0 = pt['pos']['x'], pt['pos']['y']
+                if  'ignoreDir' in pt:
+                    if pt['ignoreDir'] == True:
+                        theta = None
+                self.points.append([x0,y0,theta])
+                self.p_names.append([pt['instanceName']])
         self.signal.emit(self.map_name)
 
 
@@ -103,8 +139,6 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.map_data)
         self.ax.add_line(self.robot_data)
         self.ax.add_line(self.laser_data)
-        # self.ax.add_patch(self.laser_data)
-        # self.ax.add_patch(self.robot_data)
         MyToolBar.home = self.toolbarHome
         self.toolbar = MyToolBar(self.static_canvas, self)
         self.toolbar.fig_ratio = 1
@@ -132,7 +166,6 @@ class MapWidget(QtWidgets.QWidget):
         self.fig_layout.addWidget(self.logt_lable)
         self.fig_layout.addWidget(self.static_canvas)
         self.static_canvas.mpl_connect('resize_event', self.resize_fig)
-        # self.static_canvas.mpl_connect('draw_event', self.draw_check)
 
 
     def closeEvent(self,event):
@@ -160,41 +193,6 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.set_xlim(xmin,xmax)
         self.ax.set_ylim(ymin,ymax)
         self.static_canvas.figure.canvas.draw()
-
-    def draw_check(self, event):
-        if not self.check_draw_flag and len(self.draw_size) == 4:
-            self.check_draw_flag = True
-            (xmin, xmax) = self.ax.get_xlim()
-            (ymin, ymax) = self.ax.get_ylim()
-            ax_ratio = (xmax - xmin)/(ymax - ymin)
-            if abs(ax_ratio - self.fig_ratio) < 1e-6:
-                self.check_draw_flag = False
-                return
-            else:
-                spanx = xmax - xmin 
-                xmid = (xmax+xmin)/2
-                spany = ymax - ymin
-                ymid = (ymax+ymin)/2
-                if xmin > self.draw_size[0] or xmax < self.draw_size[1] or ymin > self.draw_size[2] or ymax < self.draw_size[3]:
-                    if ax_ratio > self.fig_ratio:
-                        ymax = ymid + spany*ax_ratio/self.fig_ratio/2
-                        ymin = ymid - spany*ax_ratio/self.fig_ratio/2
-                    elif ax_ratio < self.fig_ratio:
-                        xmax = xmid + spanx*self.fig_ratio/ax_ratio/2
-                        xmin = xmid - spanx*self.fig_ratio/ax_ratio/2
-                else:
-                    if ax_ratio < self.fig_ratio:
-                        ymax = ymid + spany*ax_ratio/self.fig_ratio/2
-                        ymin = ymid - spany*ax_ratio/self.fig_ratio/2
-                    elif ax_ratio > self.fig_ratio:
-                        xmax = xmid + spanx*self.fig_ratio/ax_ratio/2
-                        xmin = xmid - spanx*self.fig_ratio/ax_ratio/2
-
-
-            self.ax.set_xlim(xmin, xmax)
-            self.ax.set_ylim(ymin, ymax)
-            self.ax.draw(event.renderer)
-            self.check_draw_flag = False
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls:
@@ -258,6 +256,24 @@ class MapWidget(QtWidgets.QWidget):
             self.draw_size = [xmin, xmax, ymin ,ymax]
             self.ax.set_xlim(xmin, xmax)
             self.ax.set_ylim(ymin, ymax)
+            [p.remove() for p in reversed(self.ax.patches)]
+            [p.remove() for p in reversed(self.ax.texts)]
+            for vert in self.read_map.verts:
+                path = Path(vert, self.read_map.codes)
+                patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=1)
+                self.ax.add_patch(patch)
+            pr = 0.25
+            for (pt,name) in zip(self.read_map.points, self.read_map.p_names):
+                circle = patches.Circle((pt[0], pt[1]), pr, facecolor='orange',
+                edgecolor=(0, 0.8, 0.8), linewidth=3, alpha=0.5)
+                self.ax.add_patch(circle)
+                text_path = TextPath((pt[0],pt[1]), name[0], size = 0.2)
+                text_path = patches.PathPatch(text_path, ec="none", lw=3, fc="k")
+                self.ax.add_patch(text_path)
+                if pt[2] != None:
+                    arrow = patches.Arrow(pt[0],pt[1], pr * np.cos(pt[2]), pr*np.sin(pt[2]), pr)
+                    self.ax.add_patch(arrow)
+
             self.static_canvas.figure.canvas.draw()
 
     def readModelFinished(self, result):

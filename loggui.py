@@ -267,6 +267,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if 'LocationEachFrame' in self.read_thread.content:
             if self.read_thread.content['LocationEachFrame']['timestamp']:
                 if self.read_thread.laser.t:
+                    #最近的定位时间
+                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                    robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
+                                 self.read_thread.content['LocationEachFrame']['y'][loc_idx],
+                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
+
+                    #最近的激光时间
                     t = np.array(self.read_thread.laser.t())
                     laser_idx = (np.abs(t-mouse_time)).argmin()
                     org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
@@ -283,9 +291,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
                                  self.read_thread.content['LocationEachFrame']['y'][pos_idx],
                                  np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
-                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,
+                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos,
                                                      int(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]),
-                                                     self.read_thread.content['LocationEachFrame']['t'][pos_idx])
+                                                     int(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
 
 
 

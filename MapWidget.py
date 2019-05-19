@@ -118,7 +118,9 @@ class MapWidget(QtWidgets.QWidget):
                                         linestyle = '-', linewidth = 0.1, 
                                         color='r', alpha = 0.5)
         self.robot_data = lines.Line2D([],[], linestyle = '-', color='k')
+        self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_pos = []
+        self.robot_loc_pos = []
         self.laser_org_data = np.array([])
         self.check_draw_flag = False
         self.fig_ratio = 1.0
@@ -138,6 +140,7 @@ class MapWidget(QtWidgets.QWidget):
         self.ax= self.static_canvas.figure.subplots(1, 1)
         self.ax.add_line(self.map_data)
         self.ax.add_line(self.robot_data)
+        self.ax.add_line(self.robot_loc_data)
         self.ax.add_line(self.laser_data)
         MyToolBar.home = self.toolbarHome
         self.toolbar = MyToolBar(self.static_canvas, self)
@@ -152,11 +155,11 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.robot_lable.setFixedHeight(16.0)
         self.timestamp_lable = QtWidgets.QLabel(self)
-        self.timestamp_lable.setText('当前时间戳(TimeStamp)')
+        self.timestamp_lable.setText('最近激光时间戳')
         self.timestamp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.timestamp_lable.setFixedHeight(16.0)
         self.logt_lable = QtWidgets.QLabel(self)
-        self.logt_lable.setText('当前Log记录时间(t)')
+        self.logt_lable.setText('最近定位时间戳')
         self.logt_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.logt_lable.setFixedHeight(16.0)
         self.fig_layout.addWidget(self.toolbar)
@@ -289,19 +292,22 @@ class MapWidget(QtWidgets.QWidget):
                 else:
                     xmid = 0.5
                     ymid = 0.5
-                xdata = [tmp + xmid for tmp in xdata]
-                ydata = [tmp + ymid for tmp in ydata]
                 self.robot_pos = [xmid, ymid, 0.0]
+                self.robot_loc_pos = [xmid, ymid, 0.0]
             robot_shape = GetGlobalPos(robot_shape,self.robot_pos)
-            xdata = robot_shape[0]
-            ydata = robot_shape[1]
-            self.robot_data.set_xdata(xdata)
-            self.robot_data.set_ydata(ydata)
+            self.robot_data.set_xdata(robot_shape[0])
+            self.robot_data.set_ydata(robot_shape[1])
             if self.laser_org_data.any():
                 laser_data = GetGlobalPos(self.laser_org_data, self.read_model.laser)
             laser_data = GetGlobalPos(laser_data, self.robot_pos)
             self.laser_data.set_xdata(laser_data[0])
             self.laser_data.set_ydata(laser_data[1])
+
+            robot_shape = np.array([xdata, ydata])
+            robot_shape = GetGlobalPos(robot_shape,self.robot_loc_pos)
+            self.robot_loc_data.set_xdata(robot_shape[0])
+            self.robot_loc_data.set_ydata(robot_shape[1])
+
             if len(self.draw_size) != 4:
                 xmax = self.robot_pos[0] + 10
                 xmin = self.robot_pos[0] - 10
@@ -312,10 +318,11 @@ class MapWidget(QtWidgets.QWidget):
                 self.ax.set_ylim(ymin, ymax)
             self.static_canvas.figure.canvas.draw()
     
-    def updateRobotLaser(self, laser_org_data, robot_pos, timestamp, logt):
-        self.timestamp_lable.setText('当前时间戳(timestamp): '+str(timestamp))
-        self.logt_lable.setText('当前Log记录时间(t):'+str(logt))
+    def updateRobotLaser(self, laser_org_data, robot_pos, robot_loc_pos, laser_ts, loc_ts):
+        self.timestamp_lable.setText('最近激光时间戳: '+str(laser_ts))
+        self.logt_lable.setText('最近定位时间戳:'+str(loc_ts))
         self.robot_pos = robot_pos
+        self.robot_loc_pos = robot_loc_pos
         self.laser_org_data = laser_org_data
         if self.read_model.tail and self.read_model.head and self.read_model.width:
             xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
@@ -328,6 +335,12 @@ class MapWidget(QtWidgets.QWidget):
             laser_data = GetGlobalPos(laser_data,robot_pos)
             self.laser_data.set_xdata(laser_data[0])
             self.laser_data.set_ydata(laser_data[1])
+
+            robot_shape = np.array([xdata, ydata])
+            robot_shape = GetGlobalPos(robot_shape,robot_loc_pos)
+            self.robot_loc_data.set_xdata(robot_shape[0])
+            self.robot_loc_data.set_ydata(robot_shape[1])
+
             self.static_canvas.figure.canvas.draw()
 
 

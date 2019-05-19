@@ -38,6 +38,7 @@ class ReadThread(QThread):
         self.content = dict()
         self.data = dict()
         self.log =  []
+        self.tlist = []
         try:
             f = open('log_config.json')
             self.js = js.load(f)
@@ -76,8 +77,10 @@ class ReadThread(QThread):
             else:
                 logging.info('The org unit of gx, gy, gz in IMU is LSB/s.')
                 self.log.append('The org unit of gx, gy, gz in IMU is LSB/s.')
-            tmax = max(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
-            tmin = min(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
+            # tmax = max(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
+            # tmin = min(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
+            tmax = datetime.fromtimestamp(100000000) 
+            tmin = datetime.now()
             for k in self.content.keys():
                 tmax = max([tmax] + self.content[k]['t'])
                 tmin = min([tmin] + self.content[k]['t'])

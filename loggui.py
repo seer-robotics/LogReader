@@ -12,7 +12,9 @@ from ExtendedComboBox import ExtendedComboBox
 from Widget import Widget
 from ReadThread import ReadThread, Fdir2Flink
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
+from MapWidget import MapWidget, Readmap
 import logging
+import numpy as np
 
 class XYSelection:
     def __init__(self, num = 1):
@@ -41,6 +43,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
         self.setupUI()
+        self.map_select_flag = False
+        self.map_select_lines = []
+        self.mouse_pressed = False
+        self.map_widget = None
 
     def setupUI(self):
         """初始化窗口结构""" 
@@ -65,6 +71,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         group.setExclusive(True)
         group.triggered.connect(self.fignum_changed)
         self.menuBar().addMenu(self.fig_menu)
+
+        self.map_menu = QtWidgets.QMenu('&Map', self)
+        self.menuBar().addMenu(self.map_menu)
+        self.map_action = QtWidgets.QAction('&Open Map', self.map_menu, checkable = True)
+        self.map_action.setShortcut(QtCore.Qt.CTRL + QtCore.Qt.Key_M)
+        self.map_action.triggered.connect(self.openMap)
+        self.map_menu.addAction(self.map_action)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
         self.help_menu.addAction('&About', self.about)
@@ -96,7 +109,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
         #图形化结构
         self.fig_height = 2.0
-        self.static_canvas = FigureCanvas(Figure(figsize=(10,self.fig_height*cur_fig_num)))
+        self.static_canvas = FigureCanvas(Figure(figsize=(14,self.fig_height*cur_fig_num)))
         self.static_canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.fig_widget = Widget()
         self.fig_layout = QtWidgets.QVBoxLayout(self.fig_widget)
@@ -117,6 +130,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
         self.static_canvas.mpl_connect('button_press_event', self.mouse_press)
+        self.static_canvas.mpl_connect('button_release_event', self.mouse_release)
+        self.static_canvas.mpl_connect('pick_event', self.onpick)
 
         #Log
         self.log_info = QtWidgets.QTextBrowser(self)
@@ -167,7 +182,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_service.stateChanged.connect(self.changeCheckBox)
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
-
+    
     def get_content(self, mouse_time):
         content = ""
         dt_min = 1e10
@@ -244,10 +259,41 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     contents = contents + [self.read_thread.service.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
             content = '\n'.join(contents)
         return content
+
+    def updateMap(self, mouse_time):
+        for ln in self.map_select_lines:
+            ln.set_xdata([mouse_time,mouse_time])
+        self.static_canvas.figure.canvas.draw()
+        if 'LocationEachFrame' in self.read_thread.content:
+            if self.read_thread.content['LocationEachFrame']['timestamp']:
+                if self.read_thread.laser.t:
+                    t = np.array(self.read_thread.laser.t())
+                    laser_idx = (np.abs(t-mouse_time)).argmin()
+                    org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
+                    laser_x = [None] * len(org_point) * 2
+                    laser_x[::2] = self.read_thread.laser.x()[0][laser_idx]
+                    laser_x[1::2] = org_point
+                    laser_y = [None] * len(org_point) * 2
+                    laser_y[::2] = self.read_thread.laser.y()[0][laser_idx]
+                    laser_y[1::2] = org_point
+                    laser_poitns = np.array([laser_x, laser_y])
+                    ts = self.read_thread.laser.ts()[0][laser_idx]
+                    pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
+                    pos_idx = (np.abs(pos_ts - ts)).argmin()
+                    robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
+                                 self.read_thread.content['LocationEachFrame']['y'][pos_idx],
+                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
+                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,
+                                                     int(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]),
+                                                     self.read_thread.content['LocationEachFrame']['t'][pos_idx])
+
+
+
     def mouse_press(self, event):
         # print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
         #   ('double' if event.dblclick else 'single', event.button,
         #    event.x, event.y, event.xdata, event.ydata))
+        self.mouse_pressed = True
         if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
@@ -258,6 +304,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 else:
                     content = self.get_content(mouse_time)
                     self.log_info.append(content[:-1])
+                if self.map_select_flag:
+                    self.updateMap(mouse_time)
+
 
         
     def mouse_move(self, event):
@@ -267,11 +316,22 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 content = self.get_content(mouse_time)
                 self.info.setText(content)
+                if self.map_select_flag:
+                    self.updateMap(mouse_time)
             else:
                 self.info.setText("")
         elif not self.finishReadFlag:
             self.info.setText("")
 
+    def mouse_release(self, event):
+        self.mouse_pressed = False
+        self.map_select_flag = False
+
+    def onpick(self, event):
+        if self.map_action.isChecked():
+            self.map_select_flag = True
+        else:
+            self.map_select_flag = False
 
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
@@ -303,6 +363,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def openFileUrl(self, flink):
         QtGui.QDesktopServices.openUrl(flink)
+
     def openLogFilesDialog(self):
         # self.setGeometry(50,50,640,480)
         options = QtWidgets.QFileDialog.Options()
@@ -388,7 +449,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     if 'timestamp' in self.read_thread.content[group_name].data:
                         xy.x_combo.addItems(['timestamp'])
                 self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
-                                str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 't', True)
+                                str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), True)
+            self.updateMapSelectLine()
+            self.openMap(self.map_action.isChecked())
+
 
     def fileQuit(self):
         self.close()
@@ -416,17 +480,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         ax = self.axs[index]
         if self.xys[index].x_combo.count() == 1 or current_x_index == 0:
             logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 't')
-            self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text + ' v.s. ' + 't', False)
+            self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text, False)
         else:
             logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 'timestamp')
             org_t = self.read_thread.data[group_name + '.timestamp'][0]
             t = []
-            try:
-                t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
-            except:
-                dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
-                t = [self.read_thread.data[text][1][0] + tmp for tmp in dt]
-            self.drawdata(ax, (self.read_thread.data[text][0], t), str(index + 1) + ' : ' + text + ' v.s. ' + 'timestamp', False)
+            dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
+            t = [self.read_thread.data[text][1][0] + tmp for tmp in dt]
+            self.drawdata(ax, (self.read_thread.data[text][0], t), str(index + 1) + ' : ' + text, False)
 
 
     def xcombo_onActivated(self):
@@ -442,17 +503,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         y_label = self.xys[index].y_combo.currentText()
         logging.info('Fig.' + str(index+1) + ' : ' + y_label + ' ' + text)
         if text == 't':
-            self.drawdata(ax, self.read_thread.data[y_label], str(index + 1) + ' : ' + y_label + ' v.s. ' + 't', False)
+            self.drawdata(ax, self.read_thread.data[y_label], str(index + 1) + ' : ' + y_label, False)
         elif text == 'timestamp':
             group_name = y_label.split('.')[0]
             org_t = self.read_thread.data[group_name + '.timestamp'][0]
             t = []
-            try:
-                t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
-            except:
-                dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
-                t = [self.read_thread.data[y_label][1][0] + tmp for tmp in dt]
-            self.drawdata(ax, (self.read_thread.data[y_label][0], t), str(index + 1) + ' : ' + y_label + ' v.s. ' + 'timestamp', False)
+            dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
+            t = [self.read_thread.data[y_label][1][0] + tmp for tmp in dt]
+            self.drawdata(ax, (self.read_thread.data[y_label][0], t), str(index + 1) + ' : ' + y_label, False)
 
 
         #print("text = ", text)
@@ -488,6 +546,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.xy_hbox.addWidget(selection.groupBox)
         if self.finishReadFlag:
             if self.read_thread.filenames:
+                self.map_select_lines = []
                 keys = list(self.read_thread.data.keys())
                 count = 0
                 for ax, xy in zip(self.axs, self.xys):
@@ -506,18 +565,17 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     #TO DO
                     if xy.x_combo.currentText() == 't':
                         self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
-                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 't', False)
+                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), False)
                     elif xy.x_combo.currentText() == 'timestamp':
                         org_t = self.read_thread.data[group_name + '.timestamp'][0]
                         t = []
-                        try:
-                            t = [datetime.fromtimestamp(tmp/1e9) for tmp in org_t]
-                        except:
-                            dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9))-org_t[0] for tmp_t in org_t]
-                            t = [self.read_thread.data[xy.y_combo.currentText()][1][0] + tmp for tmp in dt]
+                        dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9))-org_t[0] for tmp_t in org_t]
+                        t = [self.read_thread.data[xy.y_combo.currentText()][1][0] + tmp for tmp in dt]
                         data = (self.read_thread.data[xy.y_combo.currentText()][0], t)
                         self.drawdata(ax, data,
-                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText() + ' v.s. ' + 'timestamp', False)
+                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), False)
+                self.updateMapSelectLine()
+
 
     def drawdata(self, ax, data, ylabel, resize = False):
         xmin,xmax =  ax.get_xlim()
@@ -533,6 +591,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             ax.set_xlim(xmin, xmax)
         ax.set_ylabel(ylabel)
         ax.grid()
+        ind = np.where(self.axs == ax)[0][0]
+        if self.map_select_lines:
+            ax.add_line(self.map_select_lines[ind])
         self.static_canvas.figure.canvas.draw()
 
     def drawFEWN(self,ax):
@@ -544,50 +605,52 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         fnum, ernum, wnum, nnum = [], [], [], [] 
         tsnum, tfnum, tsenum = [],[], []
         tsl, tfl, tse = None, None, None
+        lw = 1.5
+        ap = 0.8
         for tmp in self.read_thread.taskstart.t():
-            tsl = ax.axvline(tmp, linestyle = '-', color = 'b')
+            tsl = ax.axvline(tmp, linestyle = '-', color = 'b', linewidth = lw, alpha = ap)
             tsnum.append(line_num)
             line_num = line_num + 1
         if tsl:
             legend_info.append(tsl)
             legend_info.append('task start')
         for tmp in self.read_thread.taskfinish.t():
-            tfl = ax.axvline(tmp, linestyle = '--', color = 'b')
+            tfl = ax.axvline(tmp, linestyle = '--', color = 'b', linewidth = lw, alpha = ap)
             tfnum.append(line_num)
             line_num = line_num + 1
         if tfl:
             legend_info.append(tfl)
             legend_info.append('task finish')
         for tmp in self.read_thread.service.t():
-            tse = ax.axvline(tmp, linestyle = '-', color = 'k')
+            tse = ax.axvline(tmp, linestyle = '-', color = 'k', linewidth = lw, alpha = ap)
             tsenum.append(line_num)
             line_num = line_num + 1
         if tse:
             legend_info.append(tse)
             legend_info.append('service')
         for tmp in self.read_thread.fatal.t():
-            fl= ax.axvline(tmp, linestyle='-',color = 'm')
+            fl= ax.axvline(tmp, linestyle='-',color = 'm', linewidth = lw, alpha = ap)
             fnum.append(line_num)
             line_num = line_num + 1
         if fl:
             legend_info.append(fl)
             legend_info.append('fatal')
         for tmp in self.read_thread.err.t():
-            el= ax.axvline(tmp, linestyle = '-.', color='r')
+            el= ax.axvline(tmp, linestyle = '-.', color='r', linewidth = lw, alpha = ap)
             ernum.append(line_num)
             line_num = line_num + 1
         if el:
             legend_info.append(el)
             legend_info.append('error')
         for tmp in self.read_thread.war.t():
-            wl = ax.axvline(tmp, linestyle = '--', color = 'y')
+            wl = ax.axvline(tmp, linestyle = '--', color = 'y', linewidth = lw, alpha = ap)
             wnum.append(line_num)
             line_num = line_num + 1
         if wl:
             legend_info.append(wl)
             legend_info.append('warning')
         for tmp in self.read_thread.notice.t():
-            nl = ax.axvline(tmp, linestyle = ':', color = 'g')
+            nl = ax.axvline(tmp, linestyle = ':', color = 'g', linewidth = lw, alpha = ap)
             nnum.append(line_num)
             line_num = line_num + 1
         if nl:
@@ -674,6 +737,60 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.check_tstart.setChecked(False)
             self.check_tfinish.setChecked(False)
             self.check_service.setChecked(False)
+
+    def openMap(self, checked):
+        if checked:
+            if not self.map_widget:
+                self.map_widget = MapWidget()
+                self.map_widget.hiddened.connect(self.mapClosed)
+            self.map_widget.show()
+            (xmin,xmax) = self.axs[0].get_xlim()
+            tmid = (xmin+xmax)/2.0 
+            if len(self.map_select_lines) < 1:
+                for ax in self.axs:
+                    wl = ax.axvline(tmid, color = 'c', linewidth = 10, alpha = 0.5, picker = 10)
+                    self.map_select_lines.append(wl) 
+            else:
+                for ln in self.map_select_lines:
+                    ln.set_visible(True)
+                    ln.set_xdata([tmid, tmid])
+            mouse_time = tmid * 86400 - 62135712000
+            if mouse_time > 1e6:
+                mouse_time = datetime.fromtimestamp(mouse_time)
+                self.updateMap(mouse_time)
+        else:
+            if self.map_widget:
+                self.map_widget.hide()
+                for ln in self.map_select_lines:
+                    ln.set_visible(False)
+        self.static_canvas.figure.canvas.draw()
+
+    def updateMapSelectLine(self):
+        if self.map_action.isChecked():
+            logging.debug('map_select_lines.size = ' + str(len(self.map_select_lines)))
+            (xmin,xmax) = self.axs[0].get_xlim()
+            if self.map_select_lines:
+                self.map_select_lines = []
+            tmid = (xmin+xmax)/2.0 
+            for ax in self.axs:
+                wl = ax.axvline(tmid, color = 'c', linewidth = 10, alpha = 0.5, picker = 10)
+                self.map_select_lines.append(wl) 
+            self.static_canvas.figure.canvas.draw()
+
+
+    
+    def mapClosed(self,info):
+        self.map_widget.hide()
+        for ln in self.map_select_lines:
+            ln.set_visible(False)
+        self.map_action.setChecked(False)
+        self.openMap(False)
+    
+    def closeEvent(self, event):
+        if self.map_widget:
+            self.map_widget.close()
+        self.close()
+
 
 if __name__ == "__main__":
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")

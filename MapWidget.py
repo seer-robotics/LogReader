@@ -14,6 +14,7 @@ from MyToolBar import MyToolBar, keepRatio
 from matplotlib.path import Path
 import matplotlib.patches as patches
 from matplotlib.textpath import TextPath
+import math
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -53,13 +54,19 @@ class Readmap(QThread):
         self.map_x = []
         self.map_y = []
         self.verts = []
+        self.circles = []
         self.points = []
-        self.codes = [ 
+        self.straights = []
+        self.bezier_codes = [ 
             Path.MOVETO,
             Path.CURVE4,
             Path.CURVE4,
             Path.CURVE4,
             ]
+        self.straight_codes = [
+            Path.MOVETO,
+            Path.LINETO ,
+        ]
     # run method gets called when we start the thread
     def run(self):
         fid = open(self.map_name)
@@ -68,6 +75,8 @@ class Readmap(QThread):
         self.map_x = []
         self.map_y = []
         self.verts = []
+        self.circles = []
+        self.straights = []
         self.points = []
         self.p_names = []
         # print(self.js.keys())
@@ -82,11 +91,39 @@ class Readmap(QThread):
                 self.map_y.append(0.0)
         if 'advancedCurveList' in self.js:
             for line in self.js['advancedCurveList']:
-                x0,y0 = line['startPos']['pos']['x'], line['startPos']['pos']['y']
-                x1,y1 = line['controlPos1']['x'], line['controlPos1']['y']
-                x2,y2 = line['controlPos2']['x'], line['controlPos2']['y']
-                x3,y3 = line['endPos']['pos']['x'], line['endPos']['pos']['y']
-                self.verts.append([(x0,y0),(x1,y1),(x2,y2),(x3,y3)])
+                if line['className'] == 'BezierPath':
+                    x0,y0 = line['startPos']['pos']['x'], line['startPos']['pos']['y']
+                    x1,y1 = line['controlPos1']['x'], line['controlPos1']['y']
+                    x2,y2 = line['controlPos2']['x'], line['controlPos2']['y']
+                    x3,y3 = line['endPos']['pos']['x'], line['endPos']['pos']['y']
+                    self.verts.append([(x0,y0),(x1,y1),(x2,y2),(x3,y3)])
+                elif line['className'] == 'ArcPath':
+                    x1, y1 = line['startPos']['pos']['x'],line['startPos']['pos']['y']
+                    x2, y2 = line['controlPos1']['x'],line['controlPos1']['y']
+                    x3, y3 = line['endPos']['pos']['x'],line['endPos']['pos']['y']
+                    A = x1*(y2-y3) - y1*(x2-x3)+x2*y3-x3*y2
+                    B = (x1*x1 + y1*y1)*(y3-y2)+(x2*x2+y2*y2)*(y1-y3)+(x3*x3+y3*y3)*(y2-y1)
+                    C = (x1*x1 + y1*y1)*(x2-x3)+(x2*x2+y2*y2)*(x3-x1)+(x3*x3+y3*y3)*(x1-x2)
+                    D = (x1*x1 + y1*y1)*(x3*y2-x2*y3)+(x2*x2+y2*y2)*(x1*y3-x3*y1)+(x3*x3+y3*y3)*(x2*y1-x1*y2)
+                    if abs(A) > 1e-12:
+                        x = -B/2/A
+                        y = -C/2/A
+                        r = math.sqrt((B*B+C*C-4*A*D)/(4*A*A))
+                        theta1 = math.atan2(y1-y,x1-x)
+                        theta3 = math.atan2(y3-y,x3-x)
+                        v1 = np.array([x2-x1,y2-y1])
+                        v2 = np.array([x3-x2,y3-y2])
+                        flag = float(np.cross(v1,v2))
+                        if flag >= 0:
+                            self.circles.append([x, y, r, np.rad2deg(theta1), np.rad2deg(theta3)])
+                        else:
+                            self.circles.append([x, y, r, np.rad2deg(theta3), np.rad2deg(theta1)])
+                    else:
+                        self.straights.append([(x1,y1),(x3,y3)])
+                elif line['className'] == 'StraightPath':
+                    x1, y1 = line['startPos']['pos']['x'],line['startPos']['pos']['y']
+                    x2, y2 = line['endPos']['pos']['x'],line['endPos']['pos']['y']
+                    self.straights.append([(x1,y1),(x2,y2)])
         if 'advancedPointList' in self.js:
             for pt in self.js['advancedPointList']:
                 x0 = None
@@ -262,7 +299,14 @@ class MapWidget(QtWidgets.QWidget):
             [p.remove() for p in reversed(self.ax.patches)]
             [p.remove() for p in reversed(self.ax.texts)]
             for vert in self.read_map.verts:
-                path = Path(vert, self.read_map.codes)
+                path = Path(vert, self.read_map.bezier_codes)
+                patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=1)
+                self.ax.add_patch(patch)
+            for circle in self.read_map.circles:
+                wedge = patches.Arc([circle[0], circle[1]], circle[2]*2, circle[2]*2, 0, circle[3], circle[4], facecolor = 'none', ec="orange", lw = 1)
+                self.ax.add_patch(wedge)
+            for vert in self.read_map.straights:
+                path = Path(vert, self.read_map.straight_codes)
                 patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=1)
                 self.ax.add_patch(patch)
             pr = 0.25
@@ -320,7 +364,7 @@ class MapWidget(QtWidgets.QWidget):
     
     def updateRobotLaser(self, laser_org_data, robot_pos, robot_loc_pos, laser_ts, loc_ts):
         self.timestamp_lable.setText('最近激光时间戳: '+str(laser_ts))
-        self.logt_lable.setText('最近定位时间戳:'+str(loc_ts))
+        self.logt_lable.setText('最近定位时间戳: '+str(loc_ts))
         self.robot_pos = robot_pos
         self.robot_loc_pos = robot_loc_pos
         self.laser_org_data = laser_org_data

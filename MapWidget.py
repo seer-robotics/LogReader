@@ -23,6 +23,24 @@ def GetGlobalPos(p2b, b2g):
     y = y + b2g[1]
     return np.array([x, y])
 
+class Readcp (QThread):
+    signal = pyqtSignal('PyQt_PyObject')
+    def __init__(self):
+        QThread.__init__(self)
+        self.cp_name = ''
+        self.js = dict()
+        self.laser = []
+    # run method gets called when we start the thread
+    def run(self):
+        fid = open(self.cp_name)
+        self.js = js.load(fid)
+        fid.close()
+        self.laser = []
+        self.laser = [ float(self.js['laser']['index'][0]['x']),
+                       float(self.js['laser']['index'][0]['y']),
+                       np.deg2rad(float(self.js['laser']['index'][0]['r']))]
+        self.signal.emit(self.cp_name)
+
 class Readmodel(QThread):
     signal = pyqtSignal('PyQt_PyObject')
     def __init__(self):
@@ -35,9 +53,13 @@ class Readmodel(QThread):
         self.laser = [] #x,y,r
     # run method gets called when we start the thread
     def run(self):
-        fid = open(self.map_name)
+        fid = open(self.model_name)
         self.js = js.load(fid)
         fid.close()
+        self.head = None
+        self.tail = None 
+        self.width = None
+        self.laser = [] #x,y,r
         self.head = float(self.js['chassis']['head'])
         self.tail = float(self.js['chassis']['tail'])
         self.width = float(self.js['chassis']['width'])
@@ -149,6 +171,7 @@ class MapWidget(QtWidgets.QWidget):
         self.setWindowTitle('MapViewer')
         self.map_names = []
         self.model_names = []
+        self.cp_names = []
         self.draw_size = [] #xmin xmax ymin ymax
         self.map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0)
         self.laser_data = lines.Line2D([],[], marker = 'o', markersize = 2.0, 
@@ -158,6 +181,7 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_pos = []
         self.robot_loc_pos = []
+        self.laser_pos = []
         self.laser_org_data = np.array([])
         self.check_draw_flag = False
         self.fig_ratio = 1.0
@@ -167,6 +191,8 @@ class MapWidget(QtWidgets.QWidget):
         self.read_map.signal.connect(self.readMapFinished)
         self.read_model = Readmodel()
         self.read_model.signal.connect(self.readModelFinished)
+        self.read_cp = Readcp()
+        self.read_cp.signal.connect(self.readCPFinished)
         self.setupUI()
 
     def setupUI(self):
@@ -191,6 +217,10 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_lable.setText('2. 机器人模型(*.model)文件拖入窗口')
         self.robot_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.robot_lable.setFixedHeight(16.0)
+        self.cp_lable = QtWidgets.QLabel(self)
+        self.cp_lable.setText('3. (可选)机器人标定(*.cp)文件拖入窗口')
+        self.cp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.cp_lable.setFixedHeight(16.0)
         self.timestamp_lable = QtWidgets.QLabel(self)
         self.timestamp_lable.setText('最近激光时间戳')
         self.timestamp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
@@ -202,6 +232,7 @@ class MapWidget(QtWidgets.QWidget):
         self.fig_layout.addWidget(self.toolbar)
         self.fig_layout.addWidget(self.file_lable)
         self.fig_layout.addWidget(self.robot_lable)
+        self.fig_layout.addWidget(self.cp_lable)
         self.fig_layout.addWidget(self.timestamp_lable)
         self.fig_layout.addWidget(self.logt_lable)
         self.fig_layout.addWidget(self.static_canvas)
@@ -261,22 +292,27 @@ class MapWidget(QtWidgets.QWidget):
     def dragFiles(self,files):
         self.map_names = []
         self.model_names = []
+        self.cp_names = []
         for file in files:
             if os.path.exists(file):
                 if os.path.splitext(file)[1] == ".smap":
                     self.map_names.append(file)
-                if os.path.splitext(file)[1] == ".model":
+                elif os.path.splitext(file)[1] == ".model":
                     self.model_names.append(file)
+                elif os.path.splitext(file)[1] == ".cp":
+                    self.cp_names.append(file)
         if self.map_names:
             self.read_map.map_name = self.map_names[0]
-            self.setWindowTitle('MapViewer: ' + self.read_map.map_name.split('/')[-1])
             self.file_lable.hide()
             self.read_map.start()
         if self.model_names:
-            self.read_model.map_name = self.model_names[0]
-            self.robot_lable.setText('2. 机器人: ' + self.read_model.map_name)
+            self.read_model.model_name = self.model_names[0]
             self.robot_lable.hide()
             self.read_model.start()
+        if self.cp_names:
+            self.read_cp.cp_name = self.cp_names[0]
+            self.robot_lable.hide()
+            self.read_cp.start()
 
 
     def readMapFinished(self, result):
@@ -328,7 +364,8 @@ class MapWidget(QtWidgets.QWidget):
             xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
             ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
             robot_shape = np.array([xdata, ydata])
-            laser_data = [self.read_model.laser[0], self.read_model.laser[1]]
+            self.laser_pos = self.read_model.laser
+            laser_data = [self.laser_pos[0], self.laser_pos[1]]
             if not self.robot_pos:
                 if len(self.draw_size) == 4:
                     xmid = (self.draw_size[0] + self.draw_size[1])/2
@@ -342,7 +379,7 @@ class MapWidget(QtWidgets.QWidget):
             self.robot_data.set_xdata(robot_shape[0])
             self.robot_data.set_ydata(robot_shape[1])
             if self.laser_org_data.any():
-                laser_data = GetGlobalPos(self.laser_org_data, self.read_model.laser)
+                laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos)
             laser_data = GetGlobalPos(laser_data, self.robot_pos)
             self.laser_data.set_xdata(laser_data[0])
             self.laser_data.set_ydata(laser_data[1])
@@ -362,6 +399,21 @@ class MapWidget(QtWidgets.QWidget):
                 self.ax.set_ylim(ymin, ymax)
             self.static_canvas.figure.canvas.draw()
     
+
+    def readCPFinished(self, result):
+        if self.read_model.laser:
+            if self.read_cp.laser:
+                self.laser_pos[0] = self.read_model.laser[0] + self.read_cp.laser[0]
+                self.laser_pos[1] = self.read_model.laser[1] + self.read_cp.laser[1]
+                self.laser_pos[2] = self.read_model.laser[2] + self.read_cp.laser[2]
+                laser_data = [self.laser_pos[0], self.laser_pos[1]]
+                if self.laser_org_data.any():
+                    laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos)
+                laser_data = GetGlobalPos(laser_data, self.robot_pos)
+                self.laser_data.set_xdata(laser_data[0])
+                self.laser_data.set_ydata(laser_data[1])
+                self.static_canvas.figure.canvas.draw()
+
     def updateRobotLaser(self, laser_org_data, robot_pos, robot_loc_pos, laser_ts, loc_ts):
         self.timestamp_lable.setText('最近激光时间戳: '+str(laser_ts))
         self.logt_lable.setText('最近定位时间戳: '+str(loc_ts))
@@ -375,7 +427,7 @@ class MapWidget(QtWidgets.QWidget):
             robot_shape = GetGlobalPos(robot_shape,robot_pos)
             self.robot_data.set_xdata(robot_shape[0])
             self.robot_data.set_ydata(robot_shape[1])
-            laser_data = GetGlobalPos(laser_org_data, self.read_model.laser)
+            laser_data = GetGlobalPos(laser_org_data, self.laser_pos)
             laser_data = GetGlobalPos(laser_data,robot_pos)
             self.laser_data.set_xdata(laser_data[0])
             self.laser_data.set_ydata(laser_data[1])

@@ -75,7 +75,7 @@ class Data:
             datas = out.groups()
             self.data['t'].append(rbktimetodate(datas[0]))
             values = datas[1].split('|')
-            if len(values) == len(self.info):
+            if len(values) >= len(self.info):
                 for tmp in self.info:
                     if tmp['type'] == 'double' or tmp['type'] == 'int64':
                         self.data[tmp['name']].append(float(values[int(tmp['index'])]))
@@ -89,6 +89,11 @@ class Data:
                         self.data[tmp['name']].append(float(values[int(tmp['index'])]))
                     elif tmp['type'] == 'bool':
                         self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
+                    if len(values) > len(self.info):
+                        if not self.parse_error:
+                            logging.warn("Error in " + self.type + " parse: " + line)
+                            self.parse_error = True
+
             else:
                 if not self.parse_error:
                     logging.error("Error in " + self.type + " parse: " + line)

@@ -117,6 +117,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.scroll = QtWidgets.QScrollArea(self.fig_widget)
         self.scroll.setWidget(self.static_canvas)
         self.scroll.setWidgetResizable(True)
+        self.scroll.keyPressEvent = self.keyPressEvent
         # self.layout.addWidget(self.scroll)
         self.old_home = NavigationToolbar.home
         self.old_forward = NavigationToolbar.forward
@@ -291,11 +292,33 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
                                  self.read_thread.content['LocationEachFrame']['y'][pos_idx],
                                  np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
-                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos,
-                                                     int(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]),
-                                                     int(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
+                    laser_info = (str(self.read_thread.content['LocationEachFrame']['t'][pos_idx]) 
+                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]))
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
+                    loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
+                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
+                    
+                    obs_pos = []
+                    obs_info = ''
+                    stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
+                    if len(stop_ts) > 0:
+                        stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
+                        dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
+                        if abs(dt) < 0.5:
+                            obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
+                            obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
+                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
+                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
 
-
+                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
 
     def mouse_press(self, event):
         # print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
@@ -340,6 +363,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_select_flag = True
         else:
             self.map_select_flag = False
+
+    def keyPressEvent(self,event):
+        if self.map_action.isChecked():
+            if len(self.map_select_lines) > 1:
+                if (event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D
+                    or event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right):
+                    cur_t = self.map_select_lines[0].get_xdata()[0]
+                    t = []
+                    if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
+                        t = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                    else:
+                        t = np.array(self.read_thread.laser.t())
+                    loc_idx = (np.abs(t-cur_t)).argmin()
+                    if event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_A:
+                        if loc_idx > 0:
+                            loc_idx = loc_idx - 1
+                    elif event.key() == QtCore.Qt.Key_Right or  event.key() == QtCore.Qt.Key_D:
+                        if loc_idx < (len(t)-1):
+                            loc_idx = loc_idx + 1
+                    self.updateMap(t[loc_idx])
+                # for ln in self.map_select_lines:
 
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
@@ -752,6 +796,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if not self.map_widget:
                 self.map_widget = MapWidget()
                 self.map_widget.hiddened.connect(self.mapClosed)
+                self.map_widget.keyPressEvent = self.keyPressEvent
             self.map_widget.show()
             (xmin,xmax) = self.axs[0].get_xlim()
             tmid = (xmin+xmax)/2.0 

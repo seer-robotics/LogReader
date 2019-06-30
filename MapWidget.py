@@ -114,10 +114,30 @@ class Readmap(QThread):
         if 'advancedCurveList' in self.js:
             for line in self.js['advancedCurveList']:
                 if line['className'] == 'BezierPath':
-                    x0,y0 = line['startPos']['pos']['x'], line['startPos']['pos']['y']
-                    x1,y1 = line['controlPos1']['x'], line['controlPos1']['y']
-                    x2,y2 = line['controlPos2']['x'], line['controlPos2']['y']
-                    x3,y3 = line['endPos']['pos']['x'], line['endPos']['pos']['y']
+                    x0 = 0
+                    y0 = 0
+                    x1 = 0
+                    y1 = 0
+                    x2 = 0
+                    y2 = 0
+                    x3 = 0
+                    y3 = 0
+                    if 'x' in line['startPos']['pos']:
+                        x0 = line['startPos']['pos']['x']
+                    if 'y' in line['startPos']['pos']:
+                        y0 = line['startPos']['pos']['y']
+                    if 'x' in line['controlPos1']:
+                        x1 = line['controlPos1']['x']
+                    if 'y' in line['controlPos1']:
+                        y1 = line['controlPos1']['y']
+                    if 'x' in line['controlPos2']:
+                        x2 = line['controlPos2']['x']
+                    if 'y' in line['controlPos2']:
+                        y2 = line['controlPos2']['y']
+                    if 'x' in line['endPos']['pos']:
+                        x3 = line['endPos']['pos']['x']
+                    if 'y' in line['endPos']['pos']:
+                        y3 = line['endPos']['pos']['y']
                     self.verts.append([(x0,y0),(x1,y1),(x2,y2),(x3,y3)])
                 elif line['className'] == 'ArcPath':
                     x1, y1 = line['startPos']['pos']['x'],line['startPos']['pos']['y']
@@ -148,13 +168,15 @@ class Readmap(QThread):
                     self.straights.append([(x1,y1),(x2,y2)])
         if 'advancedPointList' in self.js:
             for pt in self.js['advancedPointList']:
-                x0 = None
-                y0 = None 
-                theta = None
-                if 'dir' in pt:
-                    x0,y0,theta = pt['pos']['x'], pt['pos']['y'], pt['dir']
-                else:
-                    x0,y0 = pt['pos']['x'], pt['pos']['y']
+                x0 = 0
+                y0 = 0 
+                theta = 0
+                if 'x' in pt['pos']:
+                    x0 = pt['pos']['x']
+                if 'y' in pt['pos']:
+                    y0 = pt['pos']['y']
+                if 'dir' in pt['pos']:
+                    theta = pt['pos']['dir']
                 if  'ignoreDir' in pt:
                     if pt['ignoreDir'] == True:
                         theta = None

@@ -204,6 +204,7 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_loc_data_c0 = lines.Line2D([],[], linestyle = '--', linewidth = 2, color='gray')
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='r')
+        self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
 
         self.robot_pos = []
         self.robot_loc_pos = []
@@ -234,6 +235,7 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.robot_loc_data_c0)
         self.ax.add_line(self.laser_data)
         self.ax.add_line(self.obs_points)
+        self.ax.add_line(self.trajectory)
         MyToolBar.home = self.toolbarHome
         self.toolbar = MyToolBar(self.static_canvas, self)
         self.toolbar.fig_ratio = 1
@@ -444,6 +446,8 @@ class MapWidget(QtWidgets.QWidget):
             self.static_canvas.figure.canvas.draw()
     
 
+    
+
     def readCPFinished(self, result):
         if self.read_model.laser:
             if self.read_cp.laser:
@@ -457,6 +461,19 @@ class MapWidget(QtWidgets.QWidget):
                 self.laser_data.set_xdata(laser_data[0])
                 self.laser_data.set_ydata(laser_data[1])
                 self.static_canvas.figure.canvas.draw()
+
+    def readtrajectory(self, x, y):
+        self.trajectory.set_xdata(x)
+        self.trajectory.set_ydata(y)
+        if len(self.draw_size) != 4:
+                xmax = max(x) + 10 
+                xmin = min(x) - 10
+                ymax = max(y) + 10
+                ymin = min(y) - 10
+                self.draw_size = [xmin,xmax, ymin, ymax]
+                self.ax.set_xlim(xmin, xmax)
+                self.ax.set_ylim(ymin, ymax)
+        self.static_canvas.figure.canvas.draw()
 
     def updateRobotLaser(self, laser_org_data, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info):
         self.timestamp_lable.setText('实框定位: '+ laser_info)

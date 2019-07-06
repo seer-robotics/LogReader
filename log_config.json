@@ -57,8 +57,7 @@
       { "index": 8, "name": "vel_rotate", "type": "double" },
       { "index": 9, "name": "steer_angle", "type": "double" },
       { "index": 10, "name": "spin_angle", "type": "double" },
-      { "index": 11, "name": "encoder0", "type": "double" },
-      { "index": 12, "name": "encoder1", "type": "double" }
+      { "index": 11, "name": "encoder0", "type": "double" }
     ]
   },
   "SensorFuserPoints":{

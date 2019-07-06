@@ -511,7 +511,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.0""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.2""")
 
     def ycombo_onActivated(self):
         # print("combo1: ",text)
@@ -812,6 +812,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 self.updateMap(mouse_time)
+            if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
+                self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'], self.read_thread.content['LocationEachFrame']['y'])
+            else :
+                self.map_widget.readtrajectory(self.read_thread.content['Location']['x'], self.read_thread.content['Location']['y'])
+
         else:
             if self.map_widget:
                 self.map_widget.hide()
@@ -848,6 +853,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
 if __name__ == "__main__":
     ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    
+    if not os.path.exists('log'):
+        os.mkdir('log')
     log_name = "log\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
     logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d][%(funcName)s] %(message)s', level=logging.DEBUG)
     qapp = QtWidgets.QApplication(sys.argv)

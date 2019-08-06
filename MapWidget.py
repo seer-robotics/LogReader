@@ -140,9 +140,24 @@ class Readmap(QThread):
                         y3 = line['endPos']['pos']['y']
                     self.verts.append([(x0,y0),(x1,y1),(x2,y2),(x3,y3)])
                 elif line['className'] == 'ArcPath':
-                    x1, y1 = line['startPos']['pos']['x'],line['startPos']['pos']['y']
-                    x2, y2 = line['controlPos1']['x'],line['controlPos1']['y']
-                    x3, y3 = line['endPos']['pos']['x'],line['endPos']['pos']['y']
+                    x1 = 0
+                    y1 = 0
+                    x2 = 0
+                    y2 = 0
+                    x3 = 0
+                    y3 = 0
+                    if 'x' in line['startPos']['pos']:
+                        x1 = line['startPos']['pos']['x']
+                    if 'y' in line['startPos']['pos']:
+                        y1 = line['startPos']['pos']['y']
+                    if 'x' in line['controlPos1']:
+                        x2 = line['controlPos1']['x']
+                    if 'y' in line['controlPos1']:
+                        y2 = line['controlPos1']['y']
+                    if 'x' in line['endPos']['pos']:
+                        x3 = line['endPos']['pos']['x']
+                    if 'y' in line['endPos']['pos']:
+                        y3 = line['endPos']['pos']['y']
                     A = x1*(y2-y3) - y1*(x2-x3)+x2*y3-x3*y2
                     B = (x1*x1 + y1*y1)*(y3-y2)+(x2*x2+y2*y2)*(y1-y3)+(x3*x3+y3*y3)*(y2-y1)
                     C = (x1*x1 + y1*y1)*(x2-x3)+(x2*x2+y2*y2)*(x3-x1)+(x3*x3+y3*y3)*(x1-x2)
@@ -163,8 +178,18 @@ class Readmap(QThread):
                     else:
                         self.straights.append([(x1,y1),(x3,y3)])
                 elif line['className'] == 'StraightPath':
-                    x1, y1 = line['startPos']['pos']['x'],line['startPos']['pos']['y']
-                    x2, y2 = line['endPos']['pos']['x'],line['endPos']['pos']['y']
+                    x1 = 0
+                    y1 = 0
+                    x2 = 0
+                    y2 = 0
+                    if 'x' in line['startPos']['pos']:
+                        x1 = line['startPos']['pos']['x']
+                    if 'y' in line['startPos']['pos']:
+                        y1 = line['startPos']['pos']['y']
+                    if 'x' in line['endPos']['pos']:
+                        x2 = line['endPos']['pos']['x']
+                    if 'y' in line['endPos']['pos']:
+                        y2 = line['endPos']['pos']['y']
                     self.straights.append([(x1,y1),(x2,y2)])
         if 'advancedPointList' in self.js:
             for pt in self.js['advancedPointList']:

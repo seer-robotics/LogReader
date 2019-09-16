@@ -57,6 +57,7 @@ class ReadThread(QThread):
         except FileNotFoundError:
             logging.error('Failed to open log_config.json')
             self.log.append('Failed to open log_config.json')
+        self.content = dict()
         for k in list(self.js):
             self.content[k] = Data(self.js[k]) 
         self.laser = Laser(1000.0)
@@ -126,6 +127,7 @@ class ReadThread(QThread):
         #creat dic
         self.data = {"memory.used_sys":self.memory.used_sys(), "memory.free_sys":self.memory.free_sys(), "memory.rbk_phy": self.memory.rbk_phy(),
                      "memory.rbk_vir":self.memory.rbk_vir(),"memory.rbk_max_phy":self.memory.rbk_max_phy(),"memory.rbk_max_vir":self.memory.rbk_max_vir(),
+                     "memory.cpu":self.memory.rbk_cpu(),
                      "laser.ts":self.laser.ts(), "laser.number":self.laser.number()}
         for k in self.content.keys():
             for name in self.content[k].data.keys():

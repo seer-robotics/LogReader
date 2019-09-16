@@ -385,6 +385,7 @@ class Memory:
     data[3]: rbk_vir
     data[4]: rbk_max_phy
     data[5]: rbk_max_vir
+    data[6]: cpu_usage
     """
     def __init__(self):
         self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *GB\]"),
@@ -392,11 +393,12 @@ class Memory:
                     re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *MB\]"),
                     re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *MB\]"),
                     re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *MB\]")]
-        self.time = [[] for _ in range(6)]
-        self.data = [[] for _ in range(6)]
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *MB\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit CPU usage *: *(.*?)%\]")]
+        self.time = [[] for _ in range(7)]
+        self.data = [[] for _ in range(7)]
     def parse(self, line):
-        for iter in range(0,6):
+        for iter in range(0,7):
             out = self.regex[iter].match(line)
             if out:
                 self.time[iter].append(rbktimetodate(out.group(1)))
@@ -417,3 +419,5 @@ class Memory:
         return self.data[4], self.time[4]
     def rbk_max_vir(self):
         return self.data[5], self.time[5]
+    def rbk_cpu(self):
+        return self.data[6], self.time[6]

@@ -502,8 +502,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_select_lines = []
             keys = list(self.read_thread.data.keys())
             for ax, xy in zip(self.axs, self.xys):
-                if xy.y_combo.count() == 0:
-                    xy.y_combo.addItems(keys) 
+                xy.y_combo.clear()
+                xy.y_combo.addItems(keys) 
                 xy.x_combo.clear()
                 xy.x_combo.addItems(['t'])
                 group_name = xy.y_combo.currentText().split('.')[0]

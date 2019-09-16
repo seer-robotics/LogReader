@@ -15,6 +15,7 @@ from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskS
 from MapWidget import MapWidget, Readmap
 import logging
 import numpy as np
+import traceback
 
 class XYSelection:
     def __init__(self, num = 1):
@@ -262,68 +263,70 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         return content
 
     def updateMap(self, mouse_time):
-        for ln in self.map_select_lines:
-            ln.set_xdata([mouse_time,mouse_time])
-        self.static_canvas.figure.canvas.draw()
-        if 'LocationEachFrame' in self.read_thread.content:
-            if self.read_thread.content['LocationEachFrame']['timestamp']:
-                if self.read_thread.laser.t:
-                    #最近的定位时间
-                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
-                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
-                    robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
-                                 self.read_thread.content['LocationEachFrame']['y'][loc_idx],
-                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
+        try:
+            for ln in self.map_select_lines:
+                ln.set_xdata([mouse_time,mouse_time])
+            self.static_canvas.figure.canvas.draw()
+            if 'LocationEachFrame' in self.read_thread.content:
+                if self.read_thread.content['LocationEachFrame']['timestamp']:
+                    if self.read_thread.laser.t:
+                        #最近的定位时间
+                        loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                        loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                        robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
+                                    self.read_thread.content['LocationEachFrame']['y'][loc_idx],
+                                    np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
 
-                    #最近的激光时间
-                    t = np.array(self.read_thread.laser.t())
-                    laser_idx = (np.abs(t-mouse_time)).argmin()
-                    org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
-                    laser_x = [None] * len(org_point) * 2
-                    laser_x[::2] = self.read_thread.laser.x()[0][laser_idx]
-                    laser_x[1::2] = org_point
-                    laser_y = [None] * len(org_point) * 2
-                    laser_y[::2] = self.read_thread.laser.y()[0][laser_idx]
-                    laser_y[1::2] = org_point
-                    laser_poitns = np.array([laser_x, laser_y])
-                    ts = self.read_thread.laser.ts()[0][laser_idx]
-                    pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
-                    pos_idx = (np.abs(pos_ts - ts)).argmin()
-                    robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
-                                 self.read_thread.content['LocationEachFrame']['y'][pos_idx],
-                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
-                    laser_info = (str(self.read_thread.content['LocationEachFrame']['t'][pos_idx]) 
-                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]))
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
-                    loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
-                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
-                    
-                    obs_pos = []
-                    obs_info = ''
-                    stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
-                    if len(stop_ts) > 0:
-                        stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
-                        dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
-                        if abs(dt) < 0.5:
-                            obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
-                            obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
-                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
-                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
+                        #最近的激光时间
+                        t = np.array(self.read_thread.laser.t())
+                        if len(t) < 1:
+                            return
+                        laser_idx = (np.abs(t-mouse_time)).argmin()
+                        org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
+                        laser_x = [None] * len(org_point) * 2
+                        laser_x[::2] = self.read_thread.laser.x()[0][laser_idx]
+                        laser_x[1::2] = org_point
+                        laser_y = [None] * len(org_point) * 2
+                        laser_y[::2] = self.read_thread.laser.y()[0][laser_idx]
+                        laser_y[1::2] = org_point
+                        laser_poitns = np.array([laser_x, laser_y])
+                        ts = self.read_thread.laser.ts()[0][laser_idx]
+                        pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
+                        pos_idx = (np.abs(pos_ts - ts)).argmin()
+                        robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
+                                    self.read_thread.content['LocationEachFrame']['y'][pos_idx],
+                                    np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
+                        laser_info = (str(self.read_thread.content['LocationEachFrame']['t'][pos_idx]) 
+                                            + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]))
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
+                        loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
+                                            + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
+                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
+                        
+                        obs_pos = []
+                        obs_info = ''
+                        stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
+                        if len(stop_ts) > 0:
+                            stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
+                            dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
+                            if abs(dt) < 0.5:
+                                obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
+                                obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
+                                            + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
+                                            + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
+                                            + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
+                                            + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
+                                            + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
 
-                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
+                        self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
+        except:
+            logging.error(traceback.format_exc())
 
     def mouse_press(self, event):
-        # print('%s click: button=%d, x=%d, y=%d, xdata=%f, ydata=%f' %
-        #   ('double' if event.dblclick else 'single', event.button,
-        #    event.x, event.y, event.xdata, event.ydata))
         self.mouse_pressed = True
         if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
@@ -338,8 +341,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 if self.map_select_flag:
                     self.updateMap(mouse_time)
 
-
-        
     def mouse_move(self, event):
         if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
@@ -435,22 +436,30 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.setWindowTitle('Loading')
 
     def dragFiles(self, files):
-        self.filenames = []
-        for file in files:
-            if os.path.exists(file):
-                if os.path.splitext(file)[1] == ".log":
-                    self.filenames.append(file)
-        if self.filenames:
-            self.finishReadFlag = False
-            self.read_thread.filenames = self.filenames
-            self.read_thread.start()
-            logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
-            self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
-            for (ind, f) in enumerate(self.filenames):
-                logging.debug(str(ind+1) + ':' + f)
-                flink = Fdir2Flink(f)
-                self.log_info.append(str(ind+1)+':'+flink)
-            self.setWindowTitle('Loading')
+        try:
+            flag_first_in = True
+            for file in files:
+                if os.path.exists(file):
+                    if os.path.splitext(file)[1] == ".log":
+                        if flag_first_in:
+                            self.filenames = []
+                            flag_first_in = False
+                        self.filenames.append(file)
+                    elif os.path.split(file)[1] == ".json":
+                        logging.debug('Update log_config.json')
+            if self.filenames:
+                self.finishReadFlag = False
+                self.read_thread.filenames = self.filenames
+                self.read_thread.start()
+                logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
+                self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
+                for (ind, f) in enumerate(self.filenames):
+                    logging.debug(str(ind+1) + ':' + f)
+                    flink = Fdir2Flink(f)
+                    self.log_info.append(str(ind+1)+':'+flink)
+                self.setWindowTitle('Loading')
+        except:
+            logging.error(traceback.format_exc())
 
     def readFinished(self, result):
         for tmps in self.read_thread.log:
@@ -511,10 +520,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.2""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.3""")
 
     def ycombo_onActivated(self):
-        # print("combo1: ",text)
         curcombo = self.sender()
         index = 0
         for (ind, xy) in enumerate(self.xys):
@@ -544,7 +552,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
 
     def xcombo_onActivated(self):
-        # print("combo1: ",text)
         curcombo = self.sender()
         index = 0
         for (ind, xy) in enumerate(self.xys):
@@ -565,11 +572,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             t = [self.read_thread.data[y_label][1][0] + tmp for tmp in dt]
             self.drawdata(ax, (self.read_thread.data[y_label][0], t), str(index + 1) + ' : ' + y_label, False)
 
-
-        #print("text = ", text)
-        #print("index:", index, "sender:", self.sender()," text:", text)
-        # ax = self.axs[index]
-        # self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text, False)
 
     def fignum_changed(self,action):
         new_fig_num = int(action.text())
@@ -812,10 +814,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 self.updateMap(mouse_time)
-            if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
-                self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'], self.read_thread.content['LocationEachFrame']['y'])
-            else :
-                self.map_widget.readtrajectory(self.read_thread.content['Location']['x'], self.read_thread.content['Location']['y'])
+            if 'LocationEachFrame' in self.read_thread.content:
+                if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
+                    self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'], self.read_thread.content['LocationEachFrame']['y'])
+                else :
+                    if 'Location' in self.read_thread.content:
+                        self.map_widget.readtrajectory(self.read_thread.content['Location']['x'], self.read_thread.content['Location']['y'])
 
         else:
             if self.map_widget:
@@ -856,9 +860,25 @@ if __name__ == "__main__":
     
     if not os.path.exists('log'):
         os.mkdir('log')
-    log_name = "log\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
+    log_name = "log\\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
     logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d][%(funcName)s] %(message)s', level=logging.DEBUG)
-    qapp = QtWidgets.QApplication(sys.argv)
-    app = ApplicationWindow()
-    app.show()
-    qapp.exec_()
+
+    # Back up the reference to the exceptionhook
+    sys._excepthook = sys.excepthook
+    def my_exception_hook(exctype, value, traceback):
+        # Print the error and traceback
+        logging.error(str(exctype) + str(value) + str(traceback))
+        # Call the normal Exception hook after
+        sys._excepthook(exctype, value, traceback)
+        sys.exit(1)
+    # Set the exception hook to our wrapping function
+    sys.excepthook = my_exception_hook
+
+    try:
+        qapp = QtWidgets.QApplication(sys.argv)
+        app = ApplicationWindow()
+        app.show()
+        sys.exit(qapp.exec_())
+    except:
+        logging.error(traceback.format_exc())
+

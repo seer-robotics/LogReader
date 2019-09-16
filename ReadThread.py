@@ -7,6 +7,7 @@ import os
 import json as js
 import logging
 import math
+import time
 
 def decide_old_imu(gx,gy,gz):
     for v in gx:
@@ -50,6 +51,12 @@ class ReadThread(QThread):
     def run(self):
         """读取log"""
         #初始化log数据
+        try:
+            f = open('log_config.json')
+            self.js = js.load(f)
+        except FileNotFoundError:
+            logging.error('Failed to open log_config.json')
+            self.log.append('Failed to open log_config.json')
         for k in list(self.js):
             self.content[k] = Data(self.js[k]) 
         self.laser = Laser(1000.0)
@@ -62,9 +69,13 @@ class ReadThread(QThread):
         self.service = Service()
         self.memory = Memory()
         self.tlist = []
+        self.log =  []
         if self.filenames:
             log = ReadLog(self.filenames)
+            time_start=time.time()
             log.parse(self.content, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service, self.memory)
+            time_end=time.time()
+            self.log.append('read time cost: ' + str(time_end-time_start))
             #analyze content
             if 'IMU' in self.js:
                 old_imu_flag = decide_old_imu(self.content['IMU']['gx'], self.content['IMU']['gy'], self.content['IMU']['gz'])

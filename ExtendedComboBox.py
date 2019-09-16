@@ -30,6 +30,8 @@ class ExtendedComboBox(QComboBox):
     def on_completer_activated(self, text):
         if text:
             index = self.findText(text)
+            if index < 0:
+                index = self.currentIndex()
             self.setCurrentIndex(index)
             self.activated[str].emit(self.itemText(index))
 

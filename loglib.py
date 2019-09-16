@@ -50,11 +50,16 @@ class ReadLog:
                         print("Line ",line_num+1, " is skipped due to decoding failure!", " ", line)
                         continue
                 line_num += 1
+                break_flag = False
                 for data in argv:
                     if type(data).__name__ == 'dict':
                         for k in data.keys():
                             if data[k].parse(line):
+                                break_flag = True
                                 break
+                        if break_flag:
+                            break_flag = False
+                            break
                     elif data.parse(line):
                         break
 

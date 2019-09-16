@@ -15,6 +15,7 @@ from matplotlib.path import Path
 import matplotlib.patches as patches
 from matplotlib.textpath import TextPath
 import math
+import logging
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -60,11 +61,48 @@ class Readmodel(QThread):
         self.tail = None 
         self.width = None
         self.laser = [] #x,y,r
-        self.head = float(self.js['chassis']['head'])
-        self.tail = float(self.js['chassis']['tail'])
-        self.width = float(self.js['chassis']['width'])
-        laser0 = self.js['laser']['index'][0]
-        self.laser = [float(laser0['x']),float(laser0['y']),np.deg2rad(float(laser0['r']))]
+        if 'chassis' in self.js:
+            self.head = float(self.js['chassis']['head'])
+            self.tail = float(self.js['chassis']['tail'])
+            self.width = float(self.js['chassis']['width'])
+            laser0 = self.js['laser']['index'][0]
+            self.laser = [float(laser0['x']),float(laser0['y']),np.deg2rad(float(laser0['r']))]
+        elif 'deviceTypes' in self.js:
+            for device in self.js['deviceTypes']:
+                if device['name'] == 'chassis':
+                    for param in device['devices'][0]['deviceParams']:
+                        if param['key'] == 'shape':
+                            for childparam in param['comboParam']['childParams']:
+                                if childparam['key'] == 'rectangle':
+                                    if param['comboParam']['childKey'] == childparam['key']:
+                                        for p in childparam['params']:
+                                            if p['key'] == 'width':
+                                                self.width = p['doubleValue']
+                                            elif p['key'] == 'head':
+                                                self.head = p['doubleValue']
+                                            elif p['key'] == 'tail':
+                                                self.tail = p['doubleValue']
+                                elif childparam['key'] == 'circle':
+                                    if param['comboParam']['childKey'] == childparam['key']:
+                                        for p in childparam['params']:
+                                            if p['key'] == 'radius':
+                                                self.width = p['doubleValue']
+                                                self.head = self.width
+                                                self.tail = self.width
+                elif device['name'] == 'laser':
+                    x, y, r = 0, 0, 0
+                    for param in device['devices'][0]['deviceParams']:
+                        if param['key'] == 'basic':
+                            for p in param['arrayParam']['params']:
+                                if p['key'] == 'x':
+                                    x = p['doubleValue']
+                                elif p['key'] == 'y':
+                                    y = p['doubleValue']
+                                elif p['key'] == 'yaw':
+                                    r = p['doubleValue']
+                    self.laser = [float(x),float(y),np.deg2rad(r)]
+        else:
+            logging.error('Cannot Open robot.model: ' + self.model_name)
         self.signal.emit(self.model_name)
 
 class Readmap(QThread):

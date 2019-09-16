@@ -863,16 +863,11 @@ if __name__ == "__main__":
     log_name = "log\\loggui_" + str(ts).replace(':','-').replace(' ','_') + ".log"
     logging.basicConfig(filename = log_name,format='[%(asctime)s][%(levelname)s][%(filename)s:%(lineno)d][%(funcName)s] %(message)s', level=logging.DEBUG)
 
-    # Back up the reference to the exceptionhook
-    sys._excepthook = sys.excepthook
-    def my_exception_hook(exctype, value, traceback):
+    def excepthook(type_, value, traceback_):
         # Print the error and traceback
-        logging.error(str(exctype) + str(value) + str(traceback))
-        # Call the normal Exception hook after
-        sys._excepthook(exctype, value, traceback)
-        sys.exit(1)
-    # Set the exception hook to our wrapping function
-    sys.excepthook = my_exception_hook
+        logging.error(traceback.format_exception(type_, value, traceback_))
+        QtCore.qFatal('')
+    sys.excepthook = excepthook
 
     try:
         qapp = QtWidgets.QApplication(sys.argv)

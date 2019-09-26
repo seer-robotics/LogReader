@@ -263,68 +263,83 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         return content
 
     def updateMap(self, mouse_time):
-        try:
-            for ln in self.map_select_lines:
-                ln.set_xdata([mouse_time,mouse_time])
-            self.static_canvas.figure.canvas.draw()
-            if 'LocationEachFrame' in self.read_thread.content:
-                if self.read_thread.content['LocationEachFrame']['timestamp']:
-                    if self.read_thread.laser.t:
-                        #最近的定位时间
-                        loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
-                        loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
-                        robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
-                                    self.read_thread.content['LocationEachFrame']['y'][loc_idx],
-                                    np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
+        for ln in self.map_select_lines:
+            ln.set_xdata([mouse_time,mouse_time])
+        self.static_canvas.figure.canvas.draw()
+        if 'LocationEachFrame' in self.read_thread.content:
+            if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
+                loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'][0:loc_idx], self.read_thread.content['LocationEachFrame']['y'][0:loc_idx],
+                                               self.read_thread.content['LocationEachFrame']['x'][loc_idx::], self.read_thread.content['LocationEachFrame']['y'][loc_idx::],
+                                               self.read_thread.content['LocationEachFrame']['x'][loc_idx], self.read_thread.content['LocationEachFrame']['y'][loc_idx], 
+                                               np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
+        else :
+            if 'Location' in self.read_thread.content:
+                loc_ts = np.array(self.read_thread.content['Location']['t'])
+                loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                self.map_widget.readtrajectory(self.read_thread.content['Location']['x'][0:loc_idx], self.read_thread.content['Location']['y'][0:loc_idx],
+                                               self.read_thread.content['Location']['x'][loc_idx::], self.read_thread.content['Location']['y'][loc_idx::],
+                                               self.read_thread.content['Location']['x'][loc_idx], self.read_thread.content['Location']['y'][loc_idx], 
+                                               np.deg2rad(self.read_thread.content['Location']['theta'][loc_idx]))
+        if 'LocationEachFrame' in self.read_thread.content:
+            if self.read_thread.content['LocationEachFrame']['timestamp']:
+                if self.read_thread.laser.t:
+                    #最近的定位时间
+                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                    robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
+                                self.read_thread.content['LocationEachFrame']['y'][loc_idx],
+                                np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
 
-                        #最近的激光时间
-                        t = np.array(self.read_thread.laser.t())
-                        if len(t) < 1:
-                            return
-                        laser_idx = (np.abs(t-mouse_time)).argmin()
-                        org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
-                        laser_x = [None] * len(org_point) * 2
-                        laser_x[::2] = self.read_thread.laser.x()[0][laser_idx]
-                        laser_x[1::2] = org_point
-                        laser_y = [None] * len(org_point) * 2
-                        laser_y[::2] = self.read_thread.laser.y()[0][laser_idx]
-                        laser_y[1::2] = org_point
-                        laser_poitns = np.array([laser_x, laser_y])
-                        ts = self.read_thread.laser.ts()[0][laser_idx]
-                        pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
-                        pos_idx = (np.abs(pos_ts - ts)).argmin()
-                        robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
-                                    self.read_thread.content['LocationEachFrame']['y'][pos_idx],
-                                    np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
-                        laser_info = (str(self.read_thread.content['LocationEachFrame']['t'][pos_idx]) 
-                                            + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]))
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
-                        loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
-                                            + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
-                                            + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
-                        
-                        obs_pos = []
-                        obs_info = ''
-                        stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
-                        if len(stop_ts) > 0:
-                            stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
-                            dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
-                            if abs(dt) < 0.5:
-                                obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
-                                obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
-                                            + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
-                                            + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
-                                            + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
-                                            + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
-                                            + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
+                    #最近的激光时间
+                    t = np.array(self.read_thread.laser.t())
+                    if len(t) < 1:
+                        return
+                    laser_idx = (np.abs(t-mouse_time)).argmin()
+                    org_point = [0 for _ in range(len(self.read_thread.laser.x()[0][laser_idx]))]
+                    laser_x = [None] * len(org_point) * 2
+                    laser_x[::2] = self.read_thread.laser.x()[0][laser_idx]
+                    laser_x[1::2] = org_point
+                    laser_y = [None] * len(org_point) * 2
+                    laser_y[::2] = self.read_thread.laser.y()[0][laser_idx]
+                    laser_y[1::2] = org_point
+                    laser_poitns = np.array([laser_x, laser_y])
+                    ts = self.read_thread.laser.ts()[0][laser_idx]
+                    pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
+                    pos_idx = (np.abs(pos_ts - ts)).argmin()
+                    robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
+                                self.read_thread.content['LocationEachFrame']['y'][pos_idx],
+                                np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
+                    laser_info = (str(self.read_thread.content['LocationEachFrame']['t'][pos_idx]) 
+                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][pos_idx]))
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
+                    loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
+                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
+                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
+                    
+                    obs_pos = []
+                    obs_info = ''
+                    stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
+                    if len(stop_ts) > 0:
+                        stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
+                        dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
+                        if abs(dt) < 0.5:
+                            obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
+                            obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
+                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
+                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
+                                        + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
 
-                        self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
-        except:
-            logging.error(traceback.format_exc())
+                    self.map_widget.updateRobotLaser(laser_poitns,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
+        self.map_widget.redraw()
+
 
     def mouse_press(self, event):
         self.mouse_pressed = True
@@ -389,11 +404,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
             text = xy.y_combo.currentText()
-            data = self.read_thread.data[text][0]
-            if data:
-                max_range = max(max(data) - min(data), 1e-6)
-                ax.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
-                ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
+            if text in self.read_thread.data:
+                data = self.read_thread.data[text][0]
+                if data:
+                    max_range = max(max(data) - min(data), 1e-6)
+                    ax.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
+                    ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         self.static_canvas.figure.canvas.draw()
 
     def new_forward(self, *args, **kwargs):
@@ -814,12 +830,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 self.updateMap(mouse_time)
-            if 'LocationEachFrame' in self.read_thread.content:
-                if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
-                    self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'], self.read_thread.content['LocationEachFrame']['y'])
-                else :
-                    if 'Location' in self.read_thread.content:
-                        self.map_widget.readtrajectory(self.read_thread.content['Location']['x'], self.read_thread.content['Location']['y'])
 
         else:
             if self.map_widget:
@@ -865,6 +875,7 @@ if __name__ == "__main__":
 
     def excepthook(type_, value, traceback_):
         # Print the error and traceback
+        traceback.print_exception(type_, value, traceback_) 
         logging.error(traceback.format_exception(type_, value, traceback_))
         QtCore.qFatal('')
     sys.excepthook = excepthook

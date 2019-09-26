@@ -266,8 +266,13 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_data_c0 = lines.Line2D([],[], linestyle = '-', linewidth = 2, color='k')
         self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_loc_data_c0 = lines.Line2D([],[], linestyle = '--', linewidth = 2, color='gray')
-        self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='r')
+        self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
+        self.trajectory_next = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='mediumpurple')
+        self.cur_arrow = patches.FancyArrow(0, 0, 0.2, 0,
+                                            length_includes_head=True,# 增加的长度包含箭头部分
+                                            head_width=0.05, head_length=0.08, fc='r', ec='b')
+        self.org_arrow_xy = self.cur_arrow.get_xy().copy()
 
         self.robot_pos = []
         self.robot_loc_pos = []
@@ -299,6 +304,8 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.laser_data)
         self.ax.add_line(self.obs_points)
         self.ax.add_line(self.trajectory)
+        self.ax.add_line(self.trajectory_next)
+        self.ax.add_patch(self.cur_arrow)
         MyToolBar.home = self.toolbarHome
         self.toolbar = MyToolBar(self.static_canvas, self)
         self.toolbar.fig_ratio = 1
@@ -442,7 +449,7 @@ class MapWidget(QtWidgets.QWidget):
                 self.ax.add_patch(wedge)
             for vert in self.read_map.straights:
                 path = Path(vert, self.read_map.straight_codes)
-                patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=1)
+                patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=2)
                 self.ax.add_patch(patch)
             pr = 0.25
             for (pt,name) in zip(self.read_map.points, self.read_map.p_names):
@@ -525,9 +532,17 @@ class MapWidget(QtWidgets.QWidget):
                 self.laser_data.set_ydata(laser_data[1])
                 self.static_canvas.figure.canvas.draw()
 
-    def readtrajectory(self, x, y):
+    def readtrajectory(self, x, y, xn, yn, x0, y0, r0):
         self.trajectory.set_xdata(x)
         self.trajectory.set_ydata(y)
+        self.trajectory_next.set_xdata(xn)
+        self.trajectory_next.set_ydata(yn)
+        data = self.org_arrow_xy.copy()
+        tmp_data = data.copy()
+        data[:,0]= tmp_data[:,0] * np.cos(r0) - tmp_data[:,1] * np.sin(r0)
+        data[:,1] = tmp_data[:,0] * np.sin(r0) + tmp_data[:,1] * np.cos(r0)
+        data = data + [x0, y0]
+        self.cur_arrow.set_xy(data)
         if len(self.draw_size) != 4:
                 xmax = max(x) + 10 
                 xmin = min(x) - 10
@@ -536,7 +551,6 @@ class MapWidget(QtWidgets.QWidget):
                 self.draw_size = [xmin,xmax, ymin, ymax]
                 self.ax.set_xlim(xmin, xmax)
                 self.ax.set_ylim(ymin, ymax)
-        self.static_canvas.figure.canvas.draw()
 
     def updateRobotLaser(self, laser_org_data, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info):
         self.timestamp_lable.setText('实框定位: '+ laser_info)
@@ -583,8 +597,8 @@ class MapWidget(QtWidgets.QWidget):
             else:
                 self.obs_points.set_xdata([])
                 self.obs_points.set_ydata([])
-
-            self.static_canvas.figure.canvas.draw()
+    def redraw(self):
+        self.static_canvas.figure.canvas.draw()
 
 
 if __name__ == '__main__':

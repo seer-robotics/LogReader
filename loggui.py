@@ -452,31 +452,31 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.setWindowTitle('Loading')
 
     def dragFiles(self, files):
-        try:
-            flag_first_in = True
-            for file in files:
-                if os.path.exists(file):
-                    if os.path.splitext(file)[1] == ".log":
-                        if flag_first_in:
-                            self.filenames = []
-                            flag_first_in = False
-                        self.filenames.append(file)
-                    elif os.path.split(file)[1] == ".json":
-                        logging.debug('Update log_config.json')
-            if self.filenames:
-                self.finishReadFlag = False
-                self.read_thread.filenames = self.filenames
-                self.read_thread.start()
-                logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
-                self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
-                for (ind, f) in enumerate(self.filenames):
-                    logging.debug(str(ind+1) + ':' + f)
-                    flink = Fdir2Flink(f)
-                    self.log_info.append(str(ind+1)+':'+flink)
-                self.setWindowTitle('Loading')
-        except:
-            logging.error(traceback.format_exc())
-
+        flag_first_in = True
+        for file in files:
+            if os.path.exists(file):
+                if os.path.splitext(file)[1] == ".log":
+                    if flag_first_in:
+                        self.filenames = []
+                        flag_first_in = False
+                    self.filenames.append(file)
+                elif os.path.splitext(file)[1] == ".json":
+                    logging.debug('Update log_config.json')
+                    self.read_thread.log_config = file
+                else: 
+                    logging.debug('fail to load {}'.format(file))
+                    return
+        if self.filenames:
+            self.finishReadFlag = False
+            self.read_thread.filenames = self.filenames
+            self.read_thread.start()
+            logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
+            self.log_info.append('Loading '+str(len(self.filenames)) + ' Files:')
+            for (ind, f) in enumerate(self.filenames):
+                logging.debug(str(ind+1) + ':' + f)
+                flink = Fdir2Flink(f)
+                self.log_info.append(str(ind+1)+':'+flink)
+            self.setWindowTitle('Loading')
     def readFinished(self, result):
         for tmps in self.read_thread.log:
             self.log_info.append(tmps)
@@ -536,7 +536,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.4""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.5""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

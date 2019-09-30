@@ -35,6 +35,7 @@ class ReadThread(QThread):
     def __init__(self):
         QThread.__init__(self)
         self.filenames = []
+        self.log_config = "log_config.json"
         self.js = dict()
         self.content = dict()
         self.data = dict()
@@ -52,11 +53,14 @@ class ReadThread(QThread):
         """读取log"""
         #初始化log数据
         try:
-            f = open('log_config.json')
+            f = open(self.log_config)
             self.js = js.load(f)
+            f.close()
+            logging.error("Load {}".format(self.log_config))
+            self.log.append("Load {}".format(self.log_config))
         except FileNotFoundError:
-            logging.error('Failed to open log_config.json')
-            self.log.append('Failed to open log_config.json')
+            logging.error("Failed to open {}".format(self.log_config))
+            self.log.append("Failed to open {}".format(self.log_config))
         self.content = dict()
         for k in list(self.js):
             self.content[k] = Data(self.js[k]) 

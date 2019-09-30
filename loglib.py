@@ -68,7 +68,7 @@ class ReadLog:
 class Data:
     def __init__(self, info):
         self.type = info['type']
-        self.regex = re.compile("\[(.*?)\].*\["+self.type+"\]\[(.*?)\]")
+        self.regex = re.compile("\[(.*?)\]\[.*\].*\["+self.type+"\]\[(.*?)\]")
         self.info = info['content']
         self.data = dict()
         self.data['t'] = []
@@ -79,27 +79,31 @@ class Data:
         out = self.regex.match(line)
         if out:
             datas = out.groups()
-            self.data['t'].append(rbktimetodate(datas[0]))
             values = datas[1].split('|')
             if len(values) >= len(self.info):
+                self.data['t'].append(rbktimetodate(datas[0]))
                 for tmp in self.info:
-                    if tmp['type'] == 'double' or tmp['type'] == 'int64':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])]))
-                    elif tmp['type'] == 'mm':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])])/1000.0)
-                    elif tmp['type'] == 'cm':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])])/100.0)
-                    elif tmp['type'] == 'rad':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])])/math.pi * 180.0)
-                    elif tmp['type'] == 'm':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])]))
-                    elif tmp['type'] == 'bool':
-                        self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
-                    if len(values) > len(self.info):
+                    if 'type' in tmp and 'index' in tmp and 'name' in tmp:
+                        if tmp['type'] == 'double' or tmp['type'] == 'int64':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                        elif tmp['type'] == 'mm':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/1000.0)
+                        elif tmp['type'] == 'cm':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/100.0)
+                        elif tmp['type'] == 'rad':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/math.pi * 180.0)
+                        elif tmp['type'] == 'm':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                        elif tmp['type'] == 'bool':
+                            self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
+                        if len(values) > len(self.info):
+                            if not self.parse_error:
+                                logging.warn("Error in " + self.type + " parse: " + line)
+                                self.parse_error = True
+                    else:
                         if not self.parse_error:
-                            logging.warn("Error in " + self.type + " parse: " + line)
+                            logging.error("Error in {} {} ".format(self.type, tmp.keys()))
                             self.parse_error = True
-
             else:
                 if not self.parse_error:
                     logging.error("Error in " + self.type + " parse: " + line)

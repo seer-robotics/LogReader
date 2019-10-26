@@ -238,8 +238,8 @@ class Readmap(QThread):
                     x0 = pt['pos']['x']
                 if 'y' in pt['pos']:
                     y0 = pt['pos']['y']
-                if 'dir' in pt['pos']:
-                    theta = pt['pos']['dir']
+                if 'dir' in pt:
+                    theta = pt['dir']
                 if  'ignoreDir' in pt:
                     if pt['ignoreDir'] == True:
                         theta = None

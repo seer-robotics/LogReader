@@ -80,10 +80,10 @@ class Data:
         if out:
             datas = out.groups()
             values = datas[1].split('|')
-            if len(values) >= len(self.info):
-                self.data['t'].append(rbktimetodate(datas[0]))
-                for tmp in self.info:
-                    if 'type' in tmp and 'index' in tmp and 'name' in tmp:
+            self.data['t'].append(rbktimetodate(datas[0]))
+            for tmp in self.info:
+                if 'type' in tmp and 'index' in tmp and 'name' in tmp:
+                    if tmp['index'] < len(values):
                         if tmp['type'] == 'double' or tmp['type'] == 'int64':
                             self.data[tmp['name']].append(float(values[int(tmp['index'])]))
                         elif tmp['type'] == 'mm':
@@ -96,18 +96,10 @@ class Data:
                             self.data[tmp['name']].append(float(values[int(tmp['index'])]))
                         elif tmp['type'] == 'bool':
                             self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
-                        if len(values) > len(self.info):
-                            if not self.parse_error:
-                                logging.warn("Error in " + self.type + " parse: " + line)
-                                self.parse_error = True
-                    else:
-                        if not self.parse_error:
-                            logging.error("Error in {} {} ".format(self.type, tmp.keys()))
-                            self.parse_error = True
-            else:
-                if not self.parse_error:
-                    logging.error("Error in " + self.type + " parse: " + line)
-                    self.parse_error = True
+                else:
+                    if not self.parse_error:
+                        logging.error("Error in {} {} ".format(self.type, tmp.keys()))
+                        self.parse_error = True
             return True
         return False
     def __getitem__(self,k):

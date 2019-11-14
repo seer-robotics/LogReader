@@ -269,9 +269,11 @@ class MapWidget(QtWidgets.QWidget):
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
         self.trajectory_next = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='mediumpurple')
-        self.cur_arrow = patches.FancyArrow(0, 0, 0.2, 0,
+        self.cur_arrow = patches.FancyArrow(0, 0, 0.5, 0,
                                             length_includes_head=True,# 增加的长度包含箭头部分
-                                            head_width=0.05, head_length=0.08, fc='r', ec='b')
+                                            width=0.05,
+                                            head_width=0.1, head_length=0.16, fc='r', ec='b')
+        self.cur_arrow.set_zorder(100)
         self.org_arrow_xy = self.cur_arrow.get_xy().copy()
 
         self.robot_pos = []
@@ -440,6 +442,7 @@ class MapWidget(QtWidgets.QWidget):
             self.ax.set_ylim(ymin, ymax)
             [p.remove() for p in reversed(self.ax.patches)]
             [p.remove() for p in reversed(self.ax.texts)]
+            self.ax.add_patch(self.cur_arrow) #add robot arrow again
             for vert in self.read_map.verts:
                 path = Path(vert, self.read_map.bezier_codes)
                 patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=1)

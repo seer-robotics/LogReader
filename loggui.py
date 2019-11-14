@@ -112,6 +112,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.fig_height = 2.0
         self.static_canvas = FigureCanvas(Figure(figsize=(14,self.fig_height*cur_fig_num)))
         self.static_canvas.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.static_canvas_ORG_resizeEvent = self.static_canvas.resizeEvent
+        self.static_canvas.resizeEvent = self.static_canvas_resizeEvent
         self.fig_widget = Widget()
         self.fig_layout = QtWidgets.QVBoxLayout(self.fig_widget)
         self.fig_layout.addWidget(self.static_canvas)
@@ -127,7 +129,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         NavigationToolbar.forward = self.new_forward
         NavigationToolbar.back = self.new_back
         self.addToolBar(NavigationToolbar(self.static_canvas, self._main))
-        self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
+        # self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
@@ -185,6 +187,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
     
+    def static_canvas_resizeEvent(self, event):
+        self.static_canvas_ORG_resizeEvent(event)
+        w = event.size().width()
+        font_width = 80.0
+        self.static_canvas.figure.subplots_adjust(left = (font_width/(w*1.0)), right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
+
     def get_content(self, mouse_time):
         content = ""
         dt_min = 1e10
@@ -596,7 +604,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         for ax in self.axs:
             self.static_canvas.figure.delaxes(ax)
 
-        self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
+        # self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
         self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
         self.static_canvas.figure.canvas.draw()

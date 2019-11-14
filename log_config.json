@@ -56,8 +56,11 @@
       { "index": 7, "name": "vel_y", "type": "double" },
       { "index": 8, "name": "vel_rotate", "type": "double" },
       { "index": 9, "name": "steer_angle", "type": "double" },
-      { "index": 10, "name": "spin_angle", "type": "double" },
-      { "index": 11, "name": "encoder0", "type": "double" }
+      { "index": 10, "name": "spin_angle", "type": "rad" },
+      { "index": 11, "name": "encode0", "type": "double" },
+      { "index": 12, "name": "encode1", "type": "double" },
+      { "index": 13, "name": "encode2", "type": "double" },
+      { "index": 14, "name": "encode3", "type": "double" }
     ]
   },
   "SensorFuserPoints":{
@@ -142,13 +145,6 @@
       { "index": 8, "name": "electric", "type": "bool" }
     ]
   },
-  "Fork": {
-    "type": "Fork",
-    "content": [
-      { "index": 0, "name": "height", "type": "double" },
-      { "index": 1, "name": "height_in_place", "type": "bool" }
-    ]
-  },
   "StopPoints": {
     "type": "StopPoints",
     "content": [
@@ -167,6 +163,61 @@
       { "index": 2, "name": "category", "type": "int64" },
       { "index": 3, "name": "ultra_id", "type": "int64" },
       { "index": 4, "name": "dist", "type": "double" }
+    ]
+  },
+  "LQR": {
+    "type": "LQR",
+    "content": [
+      { "index": 0, "name": "dir_d2g", "type": "double" },
+      { "index": 1, "name": "dsa", "type": "double" },
+      { "index": 2, "name": "dga", "type": "double" },
+      { "index": 3, "name": "d2g", "type": "double" },
+      { "index": 4, "name": "ind", "type": "double" },
+      { "index": 5, "name": "state", "type": "double" },
+      { "index": 6, "name": "psize", "type": "double" },
+      { "index": 7, "name": "gv", "type": "double" }
+    ]
+  },
+  "DoubleSteer": {
+    "type": "DoubleSteer",
+    "content": [
+      { "index": 0, "name": "vxb", "type": "double" },
+      { "index": 1, "name": "vyb", "type": "double" },
+      { "index": 2, "name": "vwb", "type": "double" },
+      { "index": 3, "name": "out_vf", "type": "double" },
+      { "index": 4, "name": "out_vr", "type": "double" },
+      { "index": 5, "name": "out_delta_f", "type": "rad" },
+      { "index": 6, "name": "out_delta_r", "type": "rad" },
+      { "index": 7, "name": "last_steerv0", "type": "double" },
+      { "index": 8, "name": "last_steerv1", "type": "double" },
+      { "index": 9, "name": "last_steer0", "type": "rad" },
+      { "index": 10, "name": "last_steer1", "type": "rad" }
+    ]
+  },
+  "PGV":{
+    "type": "PGV",
+    "content": [
+      {"index": 0, "name": "x", "type":"double"},
+      {"index": 1, "name": "y", "type":"double"},
+      {"index": 2, "name": "theta", "type": "rad"}
+    ]
+  },
+  "GoPahCharge":{
+    "type": "GoPahCharge",
+    "content": [
+      {"index": 0, "name": "path_size", "type":"double"},
+      {"index": 1, "name": "ischarge", "type":"bool"},
+      {"index": 2, "name": "m_move_status", "type": "double"}
+    ]
+  },
+  "OdoSpin": {
+    "type": "OdoSpin",
+    "content": [
+      { "index": 0, "name": "cur_global_spin_angle", "type": "double" },
+      { "index": 1, "name": "global_spin_angle", "type": "double" },
+      { "index": 2, "name": "total_angle", "type": "double" },
+      { "index": 3, "name": "spin_dir", "type": "int64" },
+      { "index": 4, "name": "wbest", "type": "double" }
     ]
   }
 }

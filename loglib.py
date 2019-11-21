@@ -85,17 +85,35 @@ class Data:
                 if 'type' in tmp and 'index' in tmp and 'name' in tmp:
                     if tmp['index'] < len(values):
                         if tmp['type'] == 'double' or tmp['type'] == 'int64':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                            except:
+                                self.data[tmp['name']].append(0.0)
                         elif tmp['type'] == 'mm':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/1000.0)
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])])/1000.0)
+                            except:
+                                self.data[tmp['name']].append(0.0)
                         elif tmp['type'] == 'cm':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/100.0)
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])])/100.0)
+                            except:
+                                self.data[tmp['name']].append(0.0)
                         elif tmp['type'] == 'rad':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])])/math.pi * 180.0)
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])])/math.pi * 180.0)
+                            except:
+                                self.data[tmp['name']].append(0.0)
                         elif tmp['type'] == 'm':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])]))
+                            except:
+                                self.data[tmp['name']].append(0.0)
                         elif tmp['type'] == 'bool':
-                            self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
+                            try:
+                                self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
+                            except:
+                                self.data[tmp['name']].append(0.0)
                 else:
                     if not self.parse_error:
                         logging.error("Error in {} {} ".format(self.type, tmp.keys()))

@@ -131,8 +131,7 @@ class ReadThread(QThread):
         #creat dic
         self.data = {"memory.used_sys":self.memory.used_sys(), "memory.free_sys":self.memory.free_sys(), "memory.rbk_phy": self.memory.rbk_phy(),
                      "memory.rbk_vir":self.memory.rbk_vir(),"memory.rbk_max_phy":self.memory.rbk_max_phy(),"memory.rbk_max_vir":self.memory.rbk_max_vir(),
-                     "memory.cpu":self.memory.rbk_cpu(),
-                     "laser.ts":self.laser.ts(), "laser.number":self.laser.number()}
+                     "memory.cpu":self.memory.rbk_cpu()}
         for k in self.content.keys():
             for name in self.content[k].data.keys():
                 if name != 't':
@@ -141,4 +140,7 @@ class ReadThread(QThread):
             self.data["IMU.org_gx"] = ([i+j for (i,j) in zip(self.content['IMU']['gx'],self.content['IMU']['offx'])], self.content['IMU']['t'])
             self.data["IMU.org_gy"] = ([i+j for (i,j) in zip(self.content['IMU']['gy'],self.content['IMU']['offy'])], self.content['IMU']['t'])
             self.data["IMU.org_gz"] = ([i+j for (i,j) in zip(self.content['IMU']['gz'],self.content['IMU']['offz'])], self.content['IMU']['t'])
+        for k in self.laser.datas.keys():
+            self.data["laser"+str(k)+'.'+"ts"] = self.laser.ts(k)
+            self.data["laser"+str(k)+'.'+"mumber"] = self.laser.number(k)
         self.signal.emit(self.filenames)

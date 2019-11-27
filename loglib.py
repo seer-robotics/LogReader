@@ -137,16 +137,22 @@ class Laser:
     """
     def __init__(self, max_dist):
         """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
-        self.regex = re.compile('\[(.*?)\].* \[Laser\]\[(.*?)\]')
-        self.data = [[] for _ in range(7)]
+        self.regex = re.compile('\[(.*?)\].* \[Laser:? ?(\d*?)\]\[(.*?)\]')
+        #self.data = [[] for _ in range(7)]
+        self.datas = dict()
         self.max_dist = max_dist
     def parse(self, line):
         out = self.regex.match(line)
         if out:
             datas = out.groups()
-            self.data[0].append(rbktimetodate(datas[0]))
-            tmp_datas = datas[1].split('|')
-            self.data[1].append(float(tmp_datas[0]))
+            laser_id = 0
+            if datas[1] != "":
+                laser_id =  int(datas[1])
+            if laser_id not in self.datas:
+                self.datas[laser_id] = [[] for _ in range(7)]
+            self.datas[laser_id][0].append(rbktimetodate(datas[0]))
+            tmp_datas = datas[2].split('|')
+            self.datas[laser_id][1].append(float(tmp_datas[0]))
             #min_angle = float(tmp_datas[1])
             #max_angle = float(tmp_datas[2])
             #step_angle = float(tmp_datas[3])
@@ -160,28 +166,89 @@ class Laser:
                     tmp_d.append(d)
             angle = tmp_a 
             dist = tmp_d
-            self.data[2].append(angle)
-            self.data[3].append(dist)
+            self.datas[laser_id][2].append(angle)
+            self.datas[laser_id][3].append(dist)
             x , y = polar2xy(angle, dist)
-            self.data[4].append(x)
-            self.data[5].append(y)
-            self.data[6].append(len(x))
+            self.datas[laser_id][4].append(x)
+            self.datas[laser_id][5].append(y)
+            self.datas[laser_id][6].append(len(x))
             return True
         return False
-    def t(self):
-        return self.data[0]
-    def ts(self):
-        return self.data[1], self.data[0]
-    def angle(self):
-        return self.data[2], self.data[0]
-    def dist(self):
-        return self.data[3], self.data[0]
-    def x(self):
-        return self.data[4], self.data[0]
-    def y(self):
-        return self.data[5], self.data[0]
-    def number(self):
-        return self.data[6], self.data[0]
+    def t(self, laser_index):
+        return self.datas[laser_index][0]
+    def ts(self, laser_index):
+        return self.datas[laser_index][1], self.datas[laser_index][0]
+    def angle(self, laser_index):
+        return self.datas[laser_index][2], self.datas[laser_index][0]
+    def dist(self, laser_index):
+        return self.datas[laser_index][3], self.datas[laser_index][0]
+    def x(self, laser_index):
+        return self.datas[laser_index][4], self.datas[laser_index][0]
+    def y(self, laser_index):
+        return self.datas[laser_index][5], self.datas[laser_index][0]
+    def number(self, laser_index):
+        return self.datas[laser_index][6], self.datas[laser_index][0]
+
+class Laser:
+    """  激光雷达的数据
+    data[0]: t
+    data[4]: x m
+    data[5]: y m
+    data[6]: number
+    """
+    def __init__(self, max_dist):
+        """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
+        self.regex = re.compile('\[(.*?)\].* \[Laser:? ?(\d*?)\]\[(.*?)\]')
+        #self.data = [[] for _ in range(7)]
+        self.datas = dict()
+        self.max_dist = max_dist
+    def parse(self, line):
+        out = self.regex.match(line)
+        if out:
+            datas = out.groups()
+            laser_id = 0
+            if datas[1] != "":
+                laser_id =  int(datas[1])
+            if laser_id not in self.datas:
+                self.datas[laser_id] = [[] for _ in range(7)]
+            self.datas[laser_id][0].append(rbktimetodate(datas[0]))
+            tmp_datas = datas[2].split('|')
+            self.datas[laser_id][1].append(float(tmp_datas[0]))
+            #min_angle = float(tmp_datas[1])
+            #max_angle = float(tmp_datas[2])
+            #step_angle = float(tmp_datas[3])
+            #data_number = int((max_angle - min_angle) / step_angle)
+            angle = [float(tmp)/180.0*math.pi for tmp in tmp_datas[4::2]]
+            dist = [float(tmp) for tmp in tmp_datas[5::2]]
+            tmp_a, tmp_d = [], []
+            for a, d in zip(angle,dist):
+                if d < self.max_dist:
+                    tmp_a.append(a)
+                    tmp_d.append(d)
+            angle = tmp_a 
+            dist = tmp_d
+            self.datas[laser_id][2].append(angle)
+            self.datas[laser_id][3].append(dist)
+            x , y = polar2xy(angle, dist)
+            self.datas[laser_id][4].append(x)
+            self.datas[laser_id][5].append(y)
+            self.datas[laser_id][6].append(len(x))
+            return True
+        return False
+    def t(self, laser_index):
+        return self.datas[laser_index][0]
+    def ts(self, laser_index):
+        return self.datas[laser_index][1], self.datas[laser_index][0]
+    def angle(self, laser_index):
+        return self.datas[laser_index][2], self.datas[laser_index][0]
+    def dist(self, laser_index):
+        return self.datas[laser_index][3], self.datas[laser_index][0]
+    def x(self, laser_index):
+        return self.datas[laser_index][4], self.datas[laser_index][0]
+    def y(self, laser_index):
+        return self.datas[laser_index][5], self.datas[laser_index][0]
+    def number(self, laser_index):
+        return self.datas[laser_index][6], self.datas[laser_index][0]
 
 class ErrorLine:
     """  错误信息

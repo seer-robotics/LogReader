@@ -474,53 +474,54 @@ class MapWidget(QtWidgets.QWidget):
 
     def readModelFinished(self, result):
         if self.read_model.head and self.read_model.tail and self.read_model.width:
-            xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
-            ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
-            robot_shape = np.array([xdata, ydata])
-            xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
-            xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
-            cross_shape = np.array([xxdata,xydata])
-            self.laser_pos = self.read_model.laser
-            laser_data = [self.laser_pos[self.laser_index][0], self.laser_pos[self.laser_index][1]]
-            if not self.robot_pos:
-                if len(self.draw_size) == 4:
-                    xmid = (self.draw_size[0] + self.draw_size[1])/2
-                    ymid = (self.draw_size[2] + self.draw_size[3])/2
-                else:
-                    xmid = 0.5
-                    ymid = 0.5
-                self.robot_pos = [xmid, ymid, 0.0]
-                self.robot_loc_pos = [xmid, ymid, 0.0]
-            robot_shape = GetGlobalPos(robot_shape,self.robot_pos)
-            self.robot_data.set_xdata(robot_shape[0])
-            self.robot_data.set_ydata(robot_shape[1])
-            cross_shape = GetGlobalPos(cross_shape,self.robot_pos)
-            self.robot_data_c0.set_xdata(cross_shape[0])
-            self.robot_data_c0.set_ydata(cross_shape[1])
-            if self.laser_org_data.any():
-                laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos[self.laser_index])
-            laser_data = GetGlobalPos(laser_data, self.robot_pos)
-            self.laser_data.set_xdata(laser_data[0])
-            self.laser_data.set_ydata(laser_data[1])
+            if self.laser_index in self.read_model.laser.keys():
+                xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
+                ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
+                robot_shape = np.array([xdata, ydata])
+                xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
+                xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
+                cross_shape = np.array([xxdata,xydata])
+                self.laser_pos = self.read_model.laser
+                laser_data = [self.laser_pos[self.laser_index][0], self.laser_pos[self.laser_index][1]]
+                if not self.robot_pos:
+                    if len(self.draw_size) == 4:
+                        xmid = (self.draw_size[0] + self.draw_size[1])/2
+                        ymid = (self.draw_size[2] + self.draw_size[3])/2
+                    else:
+                        xmid = 0.5
+                        ymid = 0.5
+                    self.robot_pos = [xmid, ymid, 0.0]
+                    self.robot_loc_pos = [xmid, ymid, 0.0]
+                robot_shape = GetGlobalPos(robot_shape,self.robot_pos)
+                self.robot_data.set_xdata(robot_shape[0])
+                self.robot_data.set_ydata(robot_shape[1])
+                cross_shape = GetGlobalPos(cross_shape,self.robot_pos)
+                self.robot_data_c0.set_xdata(cross_shape[0])
+                self.robot_data_c0.set_ydata(cross_shape[1])
+                if self.laser_org_data.any():
+                    laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos[self.laser_index])
+                laser_data = GetGlobalPos(laser_data, self.robot_pos)
+                self.laser_data.set_xdata(laser_data[0])
+                self.laser_data.set_ydata(laser_data[1])
 
-            cross_shape = np.array([xxdata,xydata])
-            cross_shape = GetGlobalPos(cross_shape,self.robot_pos)
-            self.robot_loc_data_c0.set_xdata(cross_shape[0])
-            self.robot_loc_data_c0.set_ydata(cross_shape[1])
-            robot_shape = np.array([xdata, ydata])
-            robot_shape = GetGlobalPos(robot_shape,self.robot_loc_pos)
-            self.robot_loc_data_c0.set_xdata([self.robot_pos[0]])
-            self.robot_loc_data_c0.set_ydata([self.robot_pos[1]])
+                cross_shape = np.array([xxdata,xydata])
+                cross_shape = GetGlobalPos(cross_shape,self.robot_pos)
+                self.robot_loc_data_c0.set_xdata(cross_shape[0])
+                self.robot_loc_data_c0.set_ydata(cross_shape[1])
+                robot_shape = np.array([xdata, ydata])
+                robot_shape = GetGlobalPos(robot_shape,self.robot_loc_pos)
+                self.robot_loc_data_c0.set_xdata([self.robot_pos[0]])
+                self.robot_loc_data_c0.set_ydata([self.robot_pos[1]])
 
-            if len(self.draw_size) != 4:
-                xmax = self.robot_pos[0] + 10
-                xmin = self.robot_pos[0] - 10
-                ymax = self.robot_pos[1] + 10
-                ymin = self.robot_pos[1] - 10
-                self.draw_size = [xmin,xmax, ymin, ymax]
-                self.ax.set_xlim(xmin, xmax)
-                self.ax.set_ylim(ymin, ymax)
-            self.static_canvas.figure.canvas.draw()
+                if len(self.draw_size) != 4:
+                    xmax = self.robot_pos[0] + 10
+                    xmin = self.robot_pos[0] - 10
+                    ymax = self.robot_pos[1] + 10
+                    ymin = self.robot_pos[1] - 10
+                    self.draw_size = [xmin,xmax, ymin, ymax]
+                    self.ax.set_xlim(xmin, xmax)
+                    self.ax.set_ylim(ymin, ymax)
+                self.static_canvas.figure.canvas.draw()
     
 
     
@@ -571,6 +572,11 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_pos = robot_loc_pos
         self.laser_org_data = laser_org_data
         self.laser_index = laser_index
+        if self.laser_index not in self.laser_pos.keys():
+            self.read_model.head = None 
+            self.read_model.tail = None
+            self.read_model.width = None
+            self.robot_lable.show()
         if self.read_model.tail and self.read_model.head and self.read_model.width:
             xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
             ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]

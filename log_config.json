@@ -1,17 +1,4 @@
 {
-  "Location": {
-    "type": "Location",
-    "content": [
-      { "index": 0, "name": "x", "type": "mm" },
-      { "index": 1, "name": "y", "type": "mm" },
-      { "index": 2, "name": "theta", "type": "double" },
-      { "index": 3, "name": "confidence", "type": "double" },
-      { "index": 4, "name": "covariance_00", "type": "double" },
-      { "index": 5, "name": "covariance_01", "type": "double" },
-      { "index": 6, "name": "covariance_10", "type": "double" },
-      { "index": 7, "name": "covariance_11", "type": "double" }
-    ]
-  },
   "LocationEachFrame": {
     "type": "LocationEachFrame",
     "content": [
@@ -178,6 +165,13 @@
       { "index": 7, "name": "gv", "type": "double" }
     ]
   },
+  "Fork": {
+    "type": "Fork",
+    "content": [
+      { "index": 0, "name": "height", "type": "double" },
+      { "index": 1, "name": "height_in_place", "type": "bool" }
+    ]
+  },
   "DoubleSteer": {
     "type": "DoubleSteer",
     "content": [
@@ -202,12 +196,16 @@
       {"index": 2, "name": "theta", "type": "rad"}
     ]
   },
-  "GoPahCharge":{
-    "type": "GoPahCharge",
+  "OutputV":{
+    "type": "OutputV",
     "content": [
-      {"index": 0, "name": "path_size", "type":"double"},
-      {"index": 1, "name": "ischarge", "type":"bool"},
-      {"index": 2, "name": "m_move_status", "type": "double"}
+      {"index": 0, "name": "global_spin_anle", "type":"rad"},
+      {"index": 1, "name": "cur_global_angle", "type":"rad"},
+      {"index": 2, "name": "local_spin_angle", "type": "rad"},
+      {"index": 3, "name": "local_plate_angle", "type": "rad"},
+      {"index": 4, "name": "vx", "type": "double"},
+      {"index": 5, "name": "vw", "type": "double"},
+      {"index": 6, "name": "spin_vw", "type": "double"}
     ]
   },
   "OdoSpin": {
@@ -218,6 +216,28 @@
       { "index": 2, "name": "total_angle", "type": "double" },
       { "index": 3, "name": "spin_dir", "type": "int64" },
       { "index": 4, "name": "wbest", "type": "double" }
+    ]
+  },
+  "DI": {
+    "type": "DI",
+    "content": [
+      { "index": 0, "name": "di0", "type": "double" },
+      { "index": 1, "name": "di1", "type": "double" },
+      { "index": 2, "name": "di2", "type": "double" },
+      { "index": 3, "name": "di3", "type": "double" },
+      { "index": 4, "name": "di4", "type": "double" },
+      { "index": 5, "name": "di5", "type": "double" },
+      { "index": 6, "name": "di6", "type": "double" }
+    ]
+  },
+  "Last_Speed": {
+    "type": "Last_Speed",
+    "content": [
+      { "index": 0, "name": "vx", "type": "double" },
+      { "index": 1, "name": "vy", "type": "double" },
+      { "index": 2, "name": "vw", "type": "double" },
+      { "index": 3, "name": "steer_size", "type": "double" },
+      { "index": 4, "name": "steer_vel_size", "type": "double" }
     ]
   }
 }

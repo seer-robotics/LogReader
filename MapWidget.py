@@ -270,6 +270,7 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_loc_data_c0 = lines.Line2D([],[], linestyle = '--', linewidth = 2, color='gray')
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
+        self.depthCamera_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='gray')
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
         self.trajectory_next = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='mediumpurple')
         self.cur_arrow = patches.FancyArrow(0, 0, 0.5, 0,
@@ -309,6 +310,7 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.robot_loc_data_c0)
         self.ax.add_line(self.laser_data)
         self.ax.add_line(self.obs_points)
+        self.ax.add_line(self.depthCamera_points)
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
         self.ax.add_patch(self.cur_arrow)
@@ -560,7 +562,7 @@ class MapWidget(QtWidgets.QWidget):
                 self.ax.set_xlim(xmin, xmax)
                 self.ax.set_ylim(ymin, ymax)
 
-    def updateRobotLaser(self, laser_org_data, laser_index, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info):
+    def updateRobotLaser(self, laser_org_data, laser_index, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depthcamera_pos):
         self.timestamp_lable.setText('实框定位: '+ laser_info)
         self.logt_lable.setText('虚框定位: '+ loc_info)
         if obs_info != '':
@@ -610,6 +612,12 @@ class MapWidget(QtWidgets.QWidget):
             else:
                 self.obs_points.set_xdata([])
                 self.obs_points.set_ydata([])
+            if len(depthcamera_pos) > 0:
+                self.depthCamera_points.set_xdata([depthcamera_pos[0]])
+                self.depthCamera_points.set_ydata([depthcamera_pos[1]])
+            else:
+                self.depthCamera_points.set_xdata([])
+                self.depthCamera_points.set_ydata([])
     def redraw(self):
         self.static_canvas.figure.canvas.draw()
 

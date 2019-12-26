@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from loglib import Data, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
-from loglib import Memory
+from loglib import Memory, DepthCamera
 from datetime import timedelta
 from datetime import datetime
 import os
@@ -73,15 +73,17 @@ class ReadThread(QThread):
         self.taskfinish = TaskFinish()
         self.service = Service()
         self.memory = Memory()
+        self.depthcamera = DepthCamera()
         self.tlist = []
         self.log =  []
         if self.filenames:
             log = ReadLog(self.filenames)
             time_start=time.time()
-            log.parse(self.content, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service, self.memory)
+            log.parse(self.content, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service, self.memory, self.depthcamera)
             time_end=time.time()
             self.log.append('read time cost: ' + str(time_end-time_start))
             #analyze content
+            old_imu_flag = False
             if 'IMU' in self.js:
                 old_imu_flag = decide_old_imu(self.content['IMU']['gx'], self.content['IMU']['gy'], self.content['IMU']['gz'])
             if old_imu_flag:
@@ -142,5 +144,7 @@ class ReadThread(QThread):
             self.data["IMU.org_gz"] = ([i+j for (i,j) in zip(self.content['IMU']['gz'],self.content['IMU']['offz'])], self.content['IMU']['t'])
         for k in self.laser.datas.keys():
             self.data["laser"+str(k)+'.'+"ts"] = self.laser.ts(k)
-            self.data["laser"+str(k)+'.'+"mumber"] = self.laser.number(k)
+            self.data["laser"+str(k)+'.'+"number"] = self.laser.number(k)
+        self.data["depthcamera.number"] = self.depthcamera.number()
+        self.data["depthcamera.ts"] = self.depthcamera.ts()
         self.signal.emit(self.filenames)

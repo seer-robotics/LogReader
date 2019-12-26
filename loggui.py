@@ -353,8 +353,18 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                         + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
                                         + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
                                         + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
-
-                    self.map_widget.updateRobotLaser(laser_poitns,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info)
+                    depthCamera_idx = 0
+                    t = np.array(self.read_thread.depthcamera.t())
+                    depth_pos = []
+                    if len(t) > 0:
+                        depthCamera_idx = (np.abs(t-mouse_time)).argmin()
+                        dt = (t[depthCamera_idx] - mouse_time).total_seconds()
+                        if abs(dt) < 0.5:
+                            pos_x = self.read_thread.depthcamera.x()[0][depthCamera_idx]
+                            pos_y = self.read_thread.depthcamera.y()[0][depthCamera_idx]
+                            depth_pos = np.array([pos_x, pos_y])
+                    
+                    self.map_widget.updateRobotLaser(laser_poitns,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depth_pos)
         self.map_widget.redraw()
 
 
@@ -496,6 +506,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 flink = Fdir2Flink(f)
                 self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
+
     def readFinished(self, result):
         for tmps in self.read_thread.log:
             self.log_info.append(tmps)
@@ -537,10 +548,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_select_lines = []
             keys = list(self.read_thread.data.keys())
             for ax, xy in zip(self.axs, self.xys):
+                last_combo_ind = xy.y_combo.currentIndex()
                 xy.y_combo.clear()
                 xy.y_combo.addItems(keys) 
                 xy.x_combo.clear()
-                xy.x_combo.addItems(['t'])
+                xy.x_combo.addItems(['t']) 
+                if last_combo_ind >= 0:
+                    xy.y_combo.setCurrentIndex(last_combo_ind)
                 group_name = xy.y_combo.currentText().split('.')[0]
                 if group_name in self.read_thread.content:
                     if 'timestamp' in self.read_thread.content[group_name].data:
@@ -555,7 +569,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.8""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.9""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

@@ -32,7 +32,8 @@
 * 打包生成exe文件
   
 <pre><code> pyinstaller -w loggui.py</pre></code>
-
+* 如果在打包的时候出现字体错误，则先在控制台运行下面的命令
+<pre><code> chcp 65001 </pre></code>
 * 图形界面截图
 
 ![screen shot](screen_shot.PNG)

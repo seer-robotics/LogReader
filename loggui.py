@@ -191,7 +191,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.static_canvas_ORG_resizeEvent(event)
         w = event.size().width()
         font_width = 100.0
-        self.static_canvas.figure.subplots_adjust(left = (font_width/(w*1.0)), right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
+        self.static_canvas.figure.subplots_adjust(left = (font_width/(w*1.0)), right = 0.99, bottom = 0.05, top = 0.95, hspace = 0.1)
 
     def get_content(self, mouse_time):
         content = ""

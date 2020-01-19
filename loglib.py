@@ -493,12 +493,12 @@ class Memory:
     data[6]: cpu_usage
     """
     def __init__(self):
-        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *GB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory *: *(.*?) *GB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *MB\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *MB\]"),
+        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *[MG]B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory *: *(.*?) *[MG]B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *[GM]B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *[GM]B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *[GM]B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *[GM]B\]"),
                     re.compile("\[(.*?)\].*\[Text\]\[Robokit CPU usage *: *(.*?)%\]")]
         self.short_regx =  re.compile("memory|CPU")
         self.time = [[] for _ in range(7)]

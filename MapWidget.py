@@ -37,9 +37,22 @@ class Readcp (QThread):
         self.js = js.load(fid)
         fid.close()
         self.laser = []
-        self.laser = [ float(self.js['laser']['index'][0]['x']),
-                       float(self.js['laser']['index'][0]['y']),
-                       np.deg2rad(float(self.js['laser']['index'][0]['r']))]
+        x, y, r = 0, 0, 0
+        if 'deviceTypes' in self.js:
+            for device in self.js['deviceTypes']:
+                if device['name'] == 'laser':
+                    for laser in device['devices']:
+                        for param in laser['deviceParams']:
+                            if param['key'] == 'basic':
+                                for p in param['arrayParam']['params']:
+                                    if p['key'] == 'x':
+                                        x = p['doubleValue']
+                                    elif p['key'] == 'y':
+                                        y = p['doubleValue']
+                                    elif p['key'] == 'yaw':
+                                        r = p['doubleValue']
+                    break
+        self.laser = [float(x), float(y), np.deg2rad(r)]
         self.signal.emit(self.cp_name)
 
 class Readmodel(QThread):
@@ -51,6 +64,7 @@ class Readmodel(QThread):
         self.head = None
         self.tail = None 
         self.width = None
+        self.loc_laser_ind = 0
         self.laser = dict() #x,y,r
     # run method gets called when we start the thread
     def run(self):
@@ -103,6 +117,9 @@ class Readmodel(QThread):
                                         r = p['doubleValue']
                                     elif p['key'] == 'id':
                                         idx = p['uint32Value']
+                                    elif p['key'] == 'useForLocalization':
+                                        if p['boolValue'] == True:
+                                            self.loc_laser_ind = idx
                         self.laser[idx] = [float(x),float(y),np.deg2rad(r)]
         else:
             logging.error('Cannot Open robot.model: ' + self.model_name)
@@ -293,8 +310,8 @@ class MapWidget(QtWidgets.QWidget):
         self.read_map.signal.connect(self.readMapFinished)
         self.read_model = Readmodel()
         self.read_model.signal.connect(self.readModelFinished)
-        # self.read_cp = Readcp()
-        # self.read_cp.signal.connect(self.readCPFinished)
+        self.read_cp = Readcp()
+        self.read_cp.signal.connect(self.readCPFinished)
         self.setupUI()
 
     def setupUI(self):
@@ -326,10 +343,10 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_lable.setText('2. 机器人模型(*.model)文件拖入窗口')
         self.robot_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.robot_lable.setFixedHeight(16.0)
-        # self.cp_lable = QtWidgets.QLabel(self)
-        # self.cp_lable.setText('3. (可选)机器人标定(*.cp)文件拖入窗口')
-        # self.cp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-        # self.cp_lable.setFixedHeight(16.0)
+        self.cp_lable = QtWidgets.QLabel(self)
+        self.cp_lable.setText('3. (可选)机器人标定(*.cp)文件拖入窗口')
+        self.cp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+        self.cp_lable.setFixedHeight(16.0)
         self.timestamp_lable = QtWidgets.QLabel(self)
         self.timestamp_lable.setText('实框定位: ')
         self.timestamp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
@@ -345,7 +362,7 @@ class MapWidget(QtWidgets.QWidget):
         self.fig_layout.addWidget(self.toolbar)
         self.fig_layout.addWidget(self.file_lable)
         self.fig_layout.addWidget(self.robot_lable)
-        # self.fig_layout.addWidget(self.cp_lable)
+        self.fig_layout.addWidget(self.cp_lable)
         self.fig_layout.addWidget(self.timestamp_lable)
         self.fig_layout.addWidget(self.logt_lable)
         self.fig_layout.addWidget(self.obs_lable)
@@ -423,10 +440,10 @@ class MapWidget(QtWidgets.QWidget):
             self.read_model.model_name = self.model_names[0]
             self.robot_lable.hide()
             self.read_model.start()
-        # if self.cp_names:
-            # self.read_cp.cp_name = self.cp_names[0]
-            # self.cp_lable.hide()
-            # self.read_cp.start()
+        if self.cp_names:
+            self.read_cp.cp_name = self.cp_names[0]
+            self.cp_lable.hide()
+            self.read_cp.start()
 
 
     def readMapFinished(self, result):
@@ -528,19 +545,19 @@ class MapWidget(QtWidgets.QWidget):
 
     
 
-    # def readCPFinished(self, result):
-    #     if self.read_model.laser:
-    #         if self.read_cp.laser:
-    #             self.laser_pos[0] = self.read_model.laser[0] + self.read_cp.laser[0]
-    #             self.laser_pos[1] = self.read_model.laser[1] + self.read_cp.laser[1]
-    #             self.laser_pos[2] = self.read_model.laser[2] + self.read_cp.laser[2]
-    #             laser_data = [self.laser_pos[0], self.laser_pos[1]]
-    #             if self.laser_org_data.any():
-    #                 laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos)
-    #             laser_data = GetGlobalPos(laser_data, self.robot_pos)
-    #             self.laser_data.set_xdata(laser_data[0])
-    #             self.laser_data.set_ydata(laser_data[1])
-    #             self.static_canvas.figure.canvas.draw()
+    def readCPFinished(self, result):
+        if self.read_model.laser:
+            if self.read_cp.laser:
+                self.laser_pos[self.read_model.loc_laser_ind][0] = self.read_model.laser[self.read_model.loc_laser_ind][0] + self.read_cp.laser[0]
+                self.laser_pos[self.read_model.loc_laser_ind][1] = self.read_model.laser[self.read_model.loc_laser_ind][1] + self.read_cp.laser[1]
+                self.laser_pos[self.read_model.loc_laser_ind][2] = self.read_model.laser[self.read_model.loc_laser_ind][2] + self.read_cp.laser[2]
+                laser_data = [self.laser_pos[self.read_model.loc_laser_ind][0], self.laser_pos[self.read_model.loc_laser_ind][1]]
+                if self.laser_org_data.any() and self.laser_index == self.read_model.loc_laser_ind:
+                    laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos[self.laser_index])
+                    laser_data = GetGlobalPos(laser_data, self.robot_pos)
+                    self.laser_data.set_xdata(laser_data[0])
+                    self.laser_data.set_ydata(laser_data[1])
+                    self.static_canvas.figure.canvas.draw()
 
     def readtrajectory(self, x, y, xn, yn, x0, y0, r0):
         self.trajectory.set_xdata(x)

@@ -13,6 +13,7 @@ from Widget import Widget
 from ReadThread import ReadThread, Fdir2Flink
 from loglib import ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
 from MapWidget import MapWidget, Readmap
+from MyToolBar import MyToolBar, RulerShapeMap, RulerShape
 import logging
 import numpy as np
 import traceback
@@ -122,15 +123,18 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.scroll.setWidgetResizable(True)
         self.scroll.keyPressEvent = self.keyPressEvent
         # self.layout.addWidget(self.scroll)
-        self.old_home = NavigationToolbar.home
-        self.old_forward = NavigationToolbar.forward
-        self.old_back = NavigationToolbar.back
-        NavigationToolbar.home = self.new_home
-        NavigationToolbar.forward = self.new_forward
-        NavigationToolbar.back = self.new_back
-        self.addToolBar(NavigationToolbar(self.static_canvas, self._main))
+        self.ruler = RulerShapeMap()
+        self.old_home = MyToolBar.home
+        self.old_forward = MyToolBar.forward
+        self.old_back = MyToolBar.back
+        MyToolBar.home = self.new_home
+        MyToolBar.forward = self.new_forward
+        MyToolBar.back = self.new_back
+        self.addToolBar(MyToolBar(self.static_canvas, self._main, ruler = self.ruler))
         # self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
+        for ax in self.axs:
+            self.ruler.add_ruler(ax)
         #鼠标移动消息
         self.static_canvas.mpl_connect('motion_notify_event', self.mouse_move)
         self.static_canvas.mpl_connect('button_press_event', self.mouse_press)
@@ -632,6 +636,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         # self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
         self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
+        self.ruler.clear_rulers()
+        for ax in self.axs:
+            self.ruler.add_ruler(ax)
         self.static_canvas.figure.canvas.draw()
         self.scroll.setWidgetResizable(True)
         for i in range(0, self.xy_hbox.count()): 
@@ -698,6 +705,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         ind = np.where(self.axs == ax)[0][0]
         if self.map_select_lines:
             ax.add_line(self.map_select_lines[ind])
+        self.ruler.add_ruler(ax)
         self.static_canvas.figure.canvas.draw()
 
     def drawFEWN(self,ax):

@@ -4,6 +4,7 @@ import matplotlib.text as text
 import math, os
 from matplotlib.backends.backend_qt5agg import  FigureCanvas, NavigationToolbar2QT
 from PyQt5 import QtGui, QtCore,QtWidgets
+from datetime import datetime
 
 def keepRatio(xmin, xmax, ymin, ymax, fig_ratio, bigger = True):
     ax_ratio = (xmax - xmin)/(ymax - ymin)
@@ -112,7 +113,8 @@ class MyToolBar(NavigationToolbar2QT):
         if os.path.exists(filename):
             pm = QtGui.QPixmap(filename)
         else:
-            pm = QtGui.QPixmap(name)
+            cur_dir = os.getcwd()
+            pm = QtGui.QPixmap(cur_dir+'/'+name)
         if hasattr(pm, 'setDevicePixelRatio'):
             pm.setDevicePixelRatio(self.canvas._dpi_ratio)
         return QtGui.QIcon(pm)
@@ -153,10 +155,9 @@ class MyToolBar(NavigationToolbar2QT):
                                                       self.release_ruler)
             self.mode = 'measuring'
             self.canvas.widgetlock(self)
-            self._ruler.set_visible(True)
         else:
             self.canvas.widgetlock.release(self)
-            self._ruler.set_visible(False)
+            self._ruler.hide_all()
             self.canvas.figure.canvas.draw()
 
         for a in self.canvas.figure.get_axes():
@@ -176,7 +177,8 @@ class MyToolBar(NavigationToolbar2QT):
         if self._idDrag is not None:
             self._idDrag = self.canvas.mpl_disconnect(self._idDrag)
         self._idDrag = self.canvas.mpl_connect('motion_notify_event', self.move_ruler)
-        self._ruler.update(self._rulerXY)
+        self._ruler.update(event.inaxes, self._rulerXY)
+        self._ruler.set_visible(event.inaxes, True)
 
     def release_ruler(self, event):
         """Callback for mouse button release in Ruler mode."""
@@ -196,31 +198,72 @@ class MyToolBar(NavigationToolbar2QT):
             self._button_pressed = None
             return
         self._rulerXY[1] = [event.xdata, event.ydata]
-        self._ruler.update(self._rulerXY)
+        self._ruler.update(event.inaxes, self._rulerXY)
         self.canvas.figure.canvas.draw()
 
 class RulerShape:
-    def __init__(self, ax):
-        self._ax = ax
-        self._text = text.Text(0, 0, '',backgroundcolor = 'white')
-        self._line = lines.Line2D([],[], marker = '+', linestyle = '-', markersize = 10.0)
-        self._line.set_visible(False)
-        self._text.set_visible(False)
-        self._line.set_zorder(101)
-        self._text.set_zorder(100)
-        self._ax.add_line(self._line)
-        self._ax.add_artist(self._text)
+    def __init__(self):
+        self._lines = []
+        self._texts = []
+        self._axs = []
+    
+    def clear_rulers(self):
+        self._lines = []
+        self._texts = []
+        self._axs = []
+
+    def add_ruler(self,ax):
+        ruler_t = text.Text(0, 0, '')
+        ruler_t.set_bbox(dict(facecolor='white', alpha=0.5))
+        ruler_l = lines.Line2D([],[], marker = '+', linestyle = '-', color = 'black', markersize = 10.0)
+        ruler_t.set_visible(False)
+        ruler_l.set_visible(False)
+        ruler_l.set_zorder(101)
+        ruler_t.set_zorder(100)
+        ax.add_line(ruler_l)
+        ax.add_artist(ruler_t)
+        if ax not in self._axs:
+            self._lines.append(ruler_l)
+            self._texts.append(ruler_t)
+            self._axs.append(ax)
+        else:
+            indx = self._axs.index(ax)
+            self._lines[indx] = ruler_l
+            self._texts[indx] = ruler_t
         
-    def update(self, data):
-        self._line.set_xdata([data[0][0],data[1][0]])
-        self._line.set_ydata([data[0][1],data[1][1]])
-        self._text.set_x(data[1][0])
-        self._text.set_y(data[1][1])
+    def update(self, ax, data):
+        indx = self._axs.index(ax)
+        self._lines[indx].set_xdata([data[0][0],data[1][0]])
+        self._lines[indx].set_ydata([data[0][1],data[1][1]])
+        self._texts[indx].set_x(data[1][0])
+        self._texts[indx].set_y(data[1][1])
         dx = data[1][0] - data[0][0]
         dy = data[1][1] - data[0][1]
         ds = math.sqrt(dx * dx + dy * dy)
-        self._text.set_text('X:{:.3f}\nY:{:.3f}\nD:{:.3f}'.format(dx, dy, ds))
+        self._texts[indx].set_text('X:{:.3f} m\nY:{:.3f} m\nD:{:.3f} m'.format(dx, dy, ds))
 
-    def set_visible(self, value):
-        self._text.set_visible(value)
-        self._line.set_visible(value)
+    def set_visible(self, ax, value):
+        indx = self._axs.index(ax)
+        self._texts[indx].set_visible(value)
+        self._lines[indx].set_visible(value)
+
+    def hide_all(self):
+        for t,l in zip(self._texts, self._lines):
+            t.set_visible(False)
+            l.set_visible(False)
+
+class RulerShapeMap(RulerShape):
+    def __init__(self):
+        super(RulerShapeMap, self).__init__()
+
+    def update(self, ax, data):
+        indx = self._axs.index(ax)
+        self._lines[indx].set_xdata([data[0][0],data[1][0]])
+        self._lines[indx].set_ydata([data[0][1],data[1][1]])
+        self._texts[indx].set_x(data[1][0])
+        self._texts[indx].set_y(data[1][1])
+        t1 = datetime.fromtimestamp(data[1][0] * 86400 - 62135712000)
+        t0 = datetime.fromtimestamp(data[0][0] * 86400 - 62135712000)
+        dt = (t1 - t0).total_seconds()
+        dy = data[1][1] - data[0][1]
+        self._texts[indx].set_text('dY:{:.3e}\ndT:{:.3e} s'.format(dy, dt))

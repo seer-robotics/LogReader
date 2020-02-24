@@ -277,7 +277,7 @@ class MapWidget(QtWidgets.QWidget):
         self.map_names = []
         self.model_names = []
         self.cp_names = []
-        self.draw_size = [0,1,0,1] #xmin xmax ymin ymax
+        self.draw_size = [] #xmin xmax ymin ymax
         self.map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0)
         self.laser_data = lines.Line2D([],[], marker = 'o', markersize = 2.0, 
                                         linestyle = '-', linewidth = 0.1, 
@@ -331,7 +331,8 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
         self.ax.add_patch(self.cur_arrow)
-        self.ruler = RulerShape(self.ax)
+        self.ruler = RulerShape()
+        self.ruler.add_ruler(self.ax)
         MyToolBar.home = self.toolbarHome
         self.toolbar = MyToolBar(self.static_canvas, self, ruler = self.ruler)
         self.toolbar.fig_ratio = 1

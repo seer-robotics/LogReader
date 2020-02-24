@@ -10,7 +10,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, pyqtSlot
 import numpy as np
 import json as js
 import os
-from MyToolBar import MyToolBar, keepRatio
+from MyToolBar import MyToolBar, keepRatio, RulerShape
 from matplotlib.path import Path
 import matplotlib.patches as patches
 from matplotlib.textpath import TextPath
@@ -277,7 +277,7 @@ class MapWidget(QtWidgets.QWidget):
         self.map_names = []
         self.model_names = []
         self.cp_names = []
-        self.draw_size = [] #xmin xmax ymin ymax
+        self.draw_size = [0,1,0,1] #xmin xmax ymin ymax
         self.map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0)
         self.laser_data = lines.Line2D([],[], marker = 'o', markersize = 2.0, 
                                         linestyle = '-', linewidth = 0.1, 
@@ -331,8 +331,9 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
         self.ax.add_patch(self.cur_arrow)
+        self.ruler = RulerShape(self.ax)
         MyToolBar.home = self.toolbarHome
-        self.toolbar = MyToolBar(self.static_canvas, self)
+        self.toolbar = MyToolBar(self.static_canvas, self, ruler = self.ruler)
         self.toolbar.fig_ratio = 1
         self.fig_layout = QtWidgets.QVBoxLayout(self)
         self.file_lable = QtWidgets.QLabel(self)
@@ -375,10 +376,11 @@ class MapWidget(QtWidgets.QWidget):
         self.hiddened.emit(True)
 
     def toolbarHome(self, *args, **kwargs):
-        xmin, xmax, ymin ,ymax = keepRatio(self.draw_size[0], self.draw_size[1], self.draw_size[2], self.draw_size[3], self.fig_ratio)
-        self.ax.set_xlim(xmin,xmax)
-        self.ax.set_ylim(ymin,ymax)
-        self.static_canvas.figure.canvas.draw()
+        if len(self.draw_size) == 4:
+            xmin, xmax, ymin ,ymax = keepRatio(self.draw_size[0], self.draw_size[1], self.draw_size[2], self.draw_size[3], self.fig_ratio)
+            self.ax.set_xlim(xmin,xmax)
+            self.ax.set_ylim(ymin,ymax)
+            self.static_canvas.figure.canvas.draw()
 
     def resize_fig(self, event):
         ratio = event.width/event.height

@@ -33,6 +33,7 @@
   
 <pre><code> pyinstaller -w loggui.py</pre></code>
 * 如果在打包的时候出现字体错误，则先在控制台运行下面的命令
+* 如果没有尺子图标，把images文件夹拷贝到dist/loggui文件夹下
 <pre><code> chcp 65001 </pre></code>
 * 图形界面截图
 

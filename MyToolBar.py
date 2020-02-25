@@ -266,4 +266,7 @@ class RulerShapeMap(RulerShape):
         t0 = datetime.fromtimestamp(data[0][0] * 86400 - 62135712000)
         dt = (t1 - t0).total_seconds()
         dy = data[1][1] - data[0][1]
-        self._texts[indx].set_text('dY:{:.3e}\ndT:{:.3e} s'.format(dy, dt))
+        dydt = 0
+        if abs(dt) > 1e-9:
+            dydt = dy/dt
+        self._texts[indx].set_text('dY:{:.3e}\ndT:{:.3e} s\n dY/dT:{:.3e}'.format(dy, dt, dydt))

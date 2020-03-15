@@ -207,8 +207,8 @@ class DepthCamera:
     """
     def __init__(self):
         """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
-        self.regex = re.compile('\[(.*?)\].* \[DepthCamera\]\[(.*?)\]')
-        self.short_regx = re.compile("\[DepthCamera\]\[")
+        self.regex = re.compile('\[(.*?)\].* \[DepthCamera\d*?\]\[(.*?)\]')
+        self.short_regx = re.compile("\[DepthCamera\d*?\]\[")
         #self.data = [[] for _ in range(7)]
         self.datas =  [[] for _ in range(5)]
     def parse(self, line):
@@ -217,8 +217,10 @@ class DepthCamera:
             out = self.regex.match(line)
             if out:
                 datas = out.groups()
-                self.datas[0].append(rbktimetodate(datas[0]))
                 tmp_datas = datas[1].split('|')
+                if(len(tmp_datas) < 2):
+                    return True
+                self.datas[0].append(rbktimetodate(datas[0]))
                 ts = 0
                 if len(tmp_datas)%2 == 0:
                     dx = [float(tmp) for tmp in tmp_datas[0::2]]

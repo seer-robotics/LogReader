@@ -573,7 +573,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.10b""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.11a""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

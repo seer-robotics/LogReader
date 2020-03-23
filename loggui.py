@@ -122,6 +122,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.scroll.setWidget(self.static_canvas)
         self.scroll.setWidgetResizable(True)
         self.scroll.keyPressEvent = self.keyPressEvent
+        self.scroll.keyReleaseEvent = self.keyReleaseEvent
+        self.is_keypressed = False
+        self.key_loc_idx = -1
+        self.key_laser_idx = -1
+        self.key_laser_channel = -1
         # self.layout.addWidget(self.scroll)
         self.ruler = RulerShapeMap()
         self.old_home = MyToolBar.home
@@ -274,14 +279,18 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             content = '\n'.join(contents)
         return content
 
-    def updateMap(self, mouse_time):
+    def updateMap(self, mouse_time, in_loc_idx, in_laser_idx, in_laser_channel):
+        loc_idx = in_loc_idx
+        laser_idx = in_laser_idx
+        min_laser_channel = in_laser_channel
         for ln in self.map_select_lines:
             ln.set_xdata([mouse_time,mouse_time])
         self.static_canvas.figure.canvas.draw()
         if 'LocationEachFrame' in self.read_thread.content:
             if len(self.read_thread.content['LocationEachFrame']['x']) > 0 :
-                loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
-                loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                if loc_idx < 0:
+                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
                 self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'][0:loc_idx], self.read_thread.content['LocationEachFrame']['y'][0:loc_idx],
                                                self.read_thread.content['LocationEachFrame']['x'][loc_idx::], self.read_thread.content['LocationEachFrame']['y'][loc_idx::],
                                                self.read_thread.content['LocationEachFrame']['x'][loc_idx], self.read_thread.content['LocationEachFrame']['y'][loc_idx], 
@@ -298,26 +307,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if self.read_thread.content['LocationEachFrame']['timestamp']:
                 if self.read_thread.laser.datas:
                     #最近的定位时间
-                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
-                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                    if loc_idx < 0:
+                        loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                        loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
                     robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
                                 self.read_thread.content['LocationEachFrame']['y'][loc_idx],
                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
-
                     #最近的激光时间
-                    min_laser_channel = 0
-                    laser_idx = 0
-                    min_dt = None
-                    for index in self.read_thread.laser.datas.keys():
-                        t = np.array(self.read_thread.laser.t(index))
-                        if len(t) < 1:
-                            continue
-                        tmp_laser_idx = (np.abs(t-mouse_time)).argmin()
-                        tmp_dt = np.min(np.abs(t-mouse_time))
-                        if min_dt == None or tmp_dt < min_dt:
-                            min_laser_channel = index
-                            laser_idx = tmp_laser_idx
-                            min_dt = tmp_dt
+                    if laser_idx < 0 or min_laser_channel < 0:
+                        min_laser_channel = 0
+                        laser_idx = 0
+                        min_dt = None
+                        for index in self.read_thread.laser.datas.keys():
+                            t = np.array(self.read_thread.laser.t(index))
+                            if len(t) < 1:
+                                continue
+                            tmp_laser_idx = (np.abs(t-mouse_time)).argmin()
+                            tmp_dt = np.min(np.abs(t-mouse_time))
+                            if min_dt == None or tmp_dt < min_dt:
+                                min_laser_channel = index
+                                laser_idx = tmp_laser_idx
+                                min_dt = tmp_dt
                     org_point = [0 for _ in range(len(self.read_thread.laser.x(min_laser_channel)[0][laser_idx]))]
                     laser_x = [None] * len(org_point) * 2
                     laser_x[::2] = self.read_thread.laser.x(min_laser_channel)[0][laser_idx]
@@ -326,9 +336,20 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     laser_y[::2] = self.read_thread.laser.y(min_laser_channel)[0][laser_idx]
                     laser_y[1::2] = org_point
                     laser_poitns = np.array([laser_x, laser_y])
+
+                    #在一个区间内差找最小值
                     ts = self.read_thread.laser.ts(min_laser_channel)[0][laser_idx]
-                    pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'])
+                    loc_min_ind = loc_idx - 100
+                    loc_max_ind = loc_idx + 100
+                    if loc_min_ind < 0:
+                        loc_min_ind = 0
+                    if loc_max_ind >= len(self.read_thread.content['LocationEachFrame']['timestamp']):
+                        loc_max_ind = len(self.read_thread.content['LocationEachFrame']['timestamp'] - 1)
+                        if loc_max_ind < 0:
+                            loc_max_ind = 0
+                    pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'][loc_min_ind:loc_max_ind])
                     pos_idx = (np.abs(pos_ts - ts)).argmin()
+                    pos_idx = loc_min_ind + pos_idx
                     robot_pos = [self.read_thread.content['LocationEachFrame']['x'][pos_idx],
                                 self.read_thread.content['LocationEachFrame']['y'][pos_idx],
                                 np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][pos_idx])]
@@ -385,7 +406,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     content = self.get_content(mouse_time)
                     self.log_info.append(content[:-1])
                 if self.map_select_flag:
-                    self.updateMap(mouse_time)
+                    self.updateMap(mouse_time, -1, -1, -1)
 
     def mouse_move(self, event):
         if event.inaxes and self.finishReadFlag:
@@ -395,7 +416,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 content = self.get_content(mouse_time)
                 self.info.setText(content)
                 if self.map_select_flag:
-                    self.updateMap(mouse_time)
+                    self.updateMap(mouse_time, -1, -1, -1)
             else:
                 self.info.setText("")
         elif not self.finishReadFlag:
@@ -420,19 +441,51 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     t = []
                     if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
                         t = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                        if self.key_loc_idx < 0:
+                            self.key_loc_idx = (np.abs(t-cur_t)).argmin()
+                        if event.key() == QtCore.Qt.Key_A:
+                            if self.key_loc_idx > 0:
+                                self.key_loc_idx = self.key_loc_idx - 1
+                        if event.key() ==  QtCore.Qt.Key_D:
+                            if self.key_loc_idx < (len(t) -1 ):
+                                self.key_loc_idx = self.key_loc_idx + 1
+                        cur_t = t[self.key_loc_idx]
                     else:
                         for  key in self.read_thread.laser.datas.keys():
                             t = t + self.read_thread.laser.t(key)
                         t = np.array(t)
-                    loc_idx = (np.abs(t-cur_t)).argmin()
-                    if event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_A:
-                        if loc_idx > 0:
-                            loc_idx = loc_idx - 1
-                    elif event.key() == QtCore.Qt.Key_Right or  event.key() == QtCore.Qt.Key_D:
-                        if loc_idx < (len(t)-1):
-                            loc_idx = loc_idx + 1
-                    self.updateMap(t[loc_idx])
-                # for ln in self.map_select_lines:
+                        if self.key_laser_idx < 0:
+                            min_laser_channel = -1
+                            laser_idx = -1
+                            min_dt = None
+                            for index in self.read_thread.laser.datas.keys():
+                                t = np.array(self.read_thread.laser.t(index))
+                                if len(t) < 1:
+                                    continue
+                                tmp_laser_idx = (np.abs(t-cur_t)).argmin()
+                                tmp_dt = np.min(np.abs(t-cur_t))
+                                if min_dt == None or tmp_dt < min_dt:
+                                    min_laser_channel = index
+                                    laser_idx = tmp_laser_idx
+                                    min_dt = tmp_dt
+                            self.key_laser_idx = laser_idx
+                            self.key_laser_channel = min_laser_channel
+                        if event.key() == QtCore.Qt.Key_Left:
+                            if self.key_laser_idx > 0:
+                                self.key_laser_idx = self.key_laser_idx -1
+                        if event.key() == QtCore.Qt.Key_Right:
+                            if self.key_laser_idx < (len(t)-1):
+                                self.key_laser_idx = self.key_laser_idx + 1
+                        cur_t = t[self.key_laser_idx]
+                    self.updateMap(cur_t, self.key_loc_idx, self.key_laser_idx, self.key_laser_channel)
+
+
+    def keyReleaseEvent(self, event):
+        if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
+            self.key_loc_idx = -1
+        if event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right:
+            self.key_laser_idx = -1
+            self.key_laser_channel = -1
 
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
@@ -573,7 +626,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.11a""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.11b""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()
@@ -870,7 +923,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             mouse_time = tmid * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
-                self.updateMap(mouse_time)
+                self.updateMap(mouse_time, -1, -1, -1)
 
         else:
             if self.map_widget:

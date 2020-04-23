@@ -291,6 +291,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 if loc_idx < 0:
                     loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
                     loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                if loc_idx < 1:
+                    loc_idx = 1
                 self.map_widget.readtrajectory(self.read_thread.content['LocationEachFrame']['x'][0:loc_idx], self.read_thread.content['LocationEachFrame']['y'][0:loc_idx],
                                                self.read_thread.content['LocationEachFrame']['x'][loc_idx::], self.read_thread.content['LocationEachFrame']['y'][loc_idx::],
                                                self.read_thread.content['LocationEachFrame']['x'][loc_idx], self.read_thread.content['LocationEachFrame']['y'][loc_idx], 
@@ -344,7 +346,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     if loc_min_ind < 0:
                         loc_min_ind = 0
                     if loc_max_ind >= len(self.read_thread.content['LocationEachFrame']['timestamp']):
-                        loc_max_ind = len(self.read_thread.content['LocationEachFrame']['timestamp'] - 1)
+                        loc_max_ind = len(self.read_thread.content['LocationEachFrame']['timestamp']) - 1
                         if loc_max_ind < 0:
                             loc_max_ind = 0
                     pos_ts = np.array(self.read_thread.content['LocationEachFrame']['timestamp'][loc_min_ind:loc_max_ind])

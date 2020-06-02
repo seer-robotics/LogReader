@@ -287,7 +287,8 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_data = lines.Line2D([],[], linestyle = '--', color='gray')
         self.robot_loc_data_c0 = lines.Line2D([],[], linestyle = '--', linewidth = 2, color='gray')
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
-        self.depthCamera_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='gray')
+        self.depthCamera_hole_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='black')
+        self.depthCamera_obs_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='gray')
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
         self.trajectory_next = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='mediumpurple')
         self.cur_arrow = patches.FancyArrow(0, 0, 0.5, 0,
@@ -327,7 +328,8 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.robot_loc_data_c0)
         self.ax.add_line(self.laser_data)
         self.ax.add_line(self.obs_points)
-        self.ax.add_line(self.depthCamera_points)
+        self.ax.add_line(self.depthCamera_hole_points)
+        self.ax.add_line(self.depthCamera_obs_points)
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
         self.ax.add_patch(self.cur_arrow)
@@ -544,6 +546,12 @@ class MapWidget(QtWidgets.QWidget):
                     self.ax.set_xlim(xmin, xmax)
                     self.ax.set_ylim(ymin, ymax)
                 self.static_canvas.figure.canvas.draw()
+            else:
+                print("read laser error! laser_index: ", self.laser_index, "; laser index in model: ", self.read_model.laser.keys())
+                logging.debug("read laser error! laser_index: " + str(self.laser_index) +" "+ str(self.read_model.laser.keys()))
+        else:
+            print("readModel error!")
+            logging.debug("readModel error!")
     
 
     
@@ -633,11 +641,24 @@ class MapWidget(QtWidgets.QWidget):
                 self.obs_points.set_xdata([])
                 self.obs_points.set_ydata([])
             if len(depthcamera_pos) > 0:
-                self.depthCamera_points.set_xdata([depthcamera_pos[0]])
-                self.depthCamera_points.set_ydata([depthcamera_pos[1]])
+                hole_points = [[],[]]
+                obs_points = [[],[]]
+                for ind, val in enumerate(depthcamera_pos[2]):
+                    if val < 0:
+                        hole_points[0].append(depthcamera_pos[0][ind])
+                        hole_points[1].append(depthcamera_pos[1][ind])
+                    else:
+                        obs_points[0].append(depthcamera_pos[0][ind])
+                        obs_points[1].append(depthcamera_pos[1][ind])
+                self.depthCamera_hole_points.set_xdata([hole_points[0]])
+                self.depthCamera_hole_points.set_ydata([hole_points[1]])
+                self.depthCamera_obs_points.set_xdata([obs_points[0]])
+                self.depthCamera_obs_points.set_ydata([obs_points[1]])
             else:
-                self.depthCamera_points.set_xdata([])
-                self.depthCamera_points.set_ydata([])
+                self.depthCamera_hole_points.set_xdata([])
+                self.depthCamera_hole_points.set_ydata([])
+                self.depthCamera_obs_points.set_xdata([])
+                self.depthCamera_obs_points.set_ydata([])
     def redraw(self):
         self.static_canvas.figure.canvas.draw()
 

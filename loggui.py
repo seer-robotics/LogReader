@@ -389,7 +389,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         if abs(dt) < 0.5:
                             pos_x = self.read_thread.depthcamera.x()[0][depthCamera_idx]
                             pos_y = self.read_thread.depthcamera.y()[0][depthCamera_idx]
-                            depth_pos = np.array([pos_x, pos_y])
+                            pos_z = self.read_thread.depthcamera.z()[0][depthCamera_idx]
+                            depth_pos = np.array([pos_x, pos_y, pos_z])
                     
                     self.map_widget.updateRobotLaser(laser_poitns,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depth_pos)
         self.map_widget.redraw()
@@ -749,8 +750,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.drawFEWN(ax)
         if data[1] and data[0]:
             ax.plot(data[1], data[0], '.')
-            max_range = max(max(data[0]) - min(data[0]), 1.0)
-            ax.set_ylim(min(data[0]) - 0.05 * max_range, max(data[0]) + 0.05 * max_range)
+            tmpd = np.array(data[0])
+            tmpd = tmpd[~np.isnan(tmpd)]
+            max_range = max(max(tmpd) - min(tmpd), 1.0)
+            ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd) + 0.05 * max_range)
         if resize:
             ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         else:

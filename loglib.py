@@ -4,6 +4,7 @@ from datetime import datetime
 import codecs
 import chardet
 import logging
+import numpy as np
 
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
@@ -117,6 +118,8 @@ class Data:
                                     self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
                                 except:
                                     self.data[tmp['name']].append(0.0)
+                        else:
+                            self.data[tmp['name']].append(np.nan)
                     else:
                         if not self.parse_error:
                             logging.error("Error in {} {} ".format(self.type, tmp.keys()))
@@ -210,7 +213,7 @@ class DepthCamera:
         self.regex = re.compile('\[(.*?)\].* \[DepthCamera\d*?\]\[(.*?)\]')
         self.short_regx = re.compile("\[DepthCamera\d*?\]\[")
         #self.data = [[] for _ in range(7)]
-        self.datas =  [[] for _ in range(5)]
+        self.datas =  [[] for _ in range(6)]
     def parse(self, line):
         short_out = self.short_regx.search(line)
         if short_out:
@@ -222,17 +225,25 @@ class DepthCamera:
                     return True
                 self.datas[0].append(rbktimetodate(datas[0]))
                 ts = 0
-                if len(tmp_datas)%2 == 0:
+                if len(tmp_datas[1:]) %3 == 0:
+                    dx = [float(tmp) for tmp in tmp_datas[1::3]]
+                    dy = [float(tmp) for tmp in tmp_datas[2::3]]
+                    dz = [float(tmp) for tmp in tmp_datas[3::3]]
+                    ts = float(tmp_datas[0])
+                elif len(tmp_datas)%2 == 0:
                     dx = [float(tmp) for tmp in tmp_datas[0::2]]
                     dy = [float(tmp) for tmp in tmp_datas[1::2]]
+                    dz = [0 for tmp in dx]
                 else:
                     dx = [float(tmp) for tmp in tmp_datas[1::2]]
                     dy = [float(tmp) for tmp in tmp_datas[2::2]]
+                    dz = [0 for tmp in dx]
                     ts = float(tmp_datas[0])
                 self.datas[1].append(dx)
                 self.datas[2].append(dy)
-                self.datas[3].append(len(tmp_datas))
-                self.datas[4].append(ts)
+                self.datas[3].append(dz)
+                self.datas[4].append(len(tmp_datas))
+                self.datas[5].append(ts)
                 return True
             return False
         return False
@@ -242,10 +253,12 @@ class DepthCamera:
         return self.datas[1], self.datas[0]
     def y(self):
         return self.datas[2], self.datas[0]
-    def number(self):
+    def z(self):
         return self.datas[3], self.datas[0]
-    def ts(self):
+    def number(self):
         return self.datas[4], self.datas[0]
+    def ts(self):
+        return self.datas[5], self.datas[0]
 
 class ErrorLine:
     """  错误信息

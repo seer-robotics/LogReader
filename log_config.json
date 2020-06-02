@@ -12,6 +12,19 @@
       { "index": 7, "name": "covariance_11", "type": "double" }
     ]
   },
+  "Vel": {
+    "type": "Vel",
+    "content": [
+      { "index": 0, "name": "getvx", "type": "double" },
+      { "index": 1, "name": "getvy", "type": "double" },
+      { "index": 2, "name": "getvw", "type": "double" },
+      { "index": 3, "name": "getsteer", "type": "double" },
+      { "index": 4, "name": "sendvx", "type": "int64" },
+      { "index": 5, "name": "sendvy", "type": "int64" },
+      { "index": 6, "name": "sendvw", "type": "double" },
+      { "index": 7, "name": "sendsteer", "type": "double" }
+    ]
+  },
   "IMU": {
     "type": "IMU",
     "content": [
@@ -47,7 +60,8 @@
       { "index": 11, "name": "encode0", "type": "double" },
       { "index": 12, "name": "encode1", "type": "double" },
       { "index": 13, "name": "encode2", "type": "double" },
-      { "index": 14, "name": "encode3", "type": "double" }
+      { "index": 14, "name": "encode3", "type": "double" },
+      { "index": 15, "name": "encode4", "type": "double" }
     ]
   },
   "SensorFuserPoints":{
@@ -107,6 +121,17 @@
       { "index": 4, "name": "spin_speed", "type": "double" }
     ]
   },
+  "Collision": {
+    "type": "Collision",
+    "content": [
+      { "index": 0, "name": "blocked", "type": "bool" },
+      { "index": 1, "name": "x", "type": "double" },
+      { "index": 2, "name": "y", "type": "double" },
+      { "index": 3, "name": "reason", "type": "double" },
+      { "index": 4, "name": "ultra_id", "type": "double" },
+      { "index": 5, "name": "block_di", "type": "double" }
+    ]
+  },
   "Battery": {
     "type": "Battery",
     "content": [
@@ -129,7 +154,9 @@
       { "index": 5, "name": "driveremc", "type": "bool" },
       { "index": 6, "name": "manualcharge", "type": "bool" },
       { "index": 7, "name": "autocharge", "type": "bool" },
-      { "index": 8, "name": "electric", "type": "bool" }
+      { "index": 8, "name": "electric", "type": "bool" },
+      { "index": 9, "name": "noName", "type": "bool" },
+      { "index": 10, "name": "external", "type": "bool" }
     ]
   },
   "StopPoints": {
@@ -162,7 +189,11 @@
       { "index": 4, "name": "ind", "type": "double" },
       { "index": 5, "name": "state", "type": "double" },
       { "index": 6, "name": "psize", "type": "double" },
-      { "index": 7, "name": "gv", "type": "double" }
+      { "index": 7, "name": "gv", "type": "double" },
+      { "index": 8, "name": "vmax", "type": "double" },
+      { "index": 9, "name": "vwmax", "type": "double" },
+      { "index": 10, "name": "el", "type": "double" },
+      { "index": 11, "name": "et", "type": "double" }
     ]
   },
   "Fork": {
@@ -170,6 +201,19 @@
     "content": [
       { "index": 0, "name": "height", "type": "double" },
       { "index": 1, "name": "height_in_place", "type": "bool" }
+    ]
+  },
+  "SingleSteer": {
+    "type": "SingleSteer",
+    "content": [
+      { "index": 0, "name": "vx0", "type": "double" },
+      { "index": 1, "name": "vw0", "type": "double" },
+      { "index": 2, "name": "steer0", "type": "double" },
+      { "index": 3, "name": "vx", "type": "double" },
+      { "index": 4, "name": "vw", "type": "double" },
+      { "index": 5, "name": "steer", "type": "double" },
+      { "index": 6, "name": "wheel_v", "type": "double" },
+      { "index": 7, "name": "steer_active", "type": "bool" }
     ]
   },
   "DoubleSteer": {
@@ -185,11 +229,28 @@
       { "index": 7, "name": "last_steerv0", "type": "double" },
       { "index": 8, "name": "last_steerv1", "type": "double" },
       { "index": 9, "name": "last_steer0", "type": "rad" },
-      { "index": 10, "name": "last_steer1", "type": "rad" }
+      { "index": 10, "name": "last_steer1", "type": "rad" },
+      { "index": 11, "name": "steer_active", "type": "bool" }
     ]
   },
   "PGV":{
     "type": "PGV",
+    "content": [
+      {"index": 0, "name": "x", "type":"double"},
+      {"index": 1, "name": "y", "type":"double"},
+      {"index": 2, "name": "theta", "type": "rad"}
+    ]
+  },
+  "code2world":{
+    "type": "code2world",
+    "content": [
+      {"index": 0, "name": "x", "type":"double"},
+      {"index": 1, "name": "y", "type":"double"},
+      {"index": 2, "name": "theta", "type": "rad"}
+    ]
+  },
+  "robot2world":{
+    "type": "robot2world",
     "content": [
       {"index": 0, "name": "x", "type":"double"},
       {"index": 1, "name": "y", "type":"double"},
@@ -211,11 +272,21 @@
   "OdoSpin": {
     "type": "OdoSpin",
     "content": [
-      { "index": 0, "name": "cur_global_spin_angle", "type": "double" },
-      { "index": 1, "name": "global_spin_angle", "type": "double" },
-      { "index": 2, "name": "total_angle", "type": "double" },
-      { "index": 3, "name": "spin_dir", "type": "int64" },
-      { "index": 4, "name": "wbest", "type": "double" }
+      { "index": 0, "name": "cur_global_spin_angle", "type": "rad" },
+      { "index": 1, "name": "cur_local_spin_angle", "type": "rad" },
+      { "index": 2, "name": "diff_spin_angle", "type": "rad" },
+      { "index": 3, "name": "total_odo_angle", "type": "rad" },
+      { "index": 4, "name": "spin_dir", "type": "double" },
+      { "index": 5, "name": "wbest", "type": "rad" }
+    ]
+  },
+  "code2robot":{
+    "type": "code2robot",
+    "content": [
+      { "index": 0, "name": "x", "type": "double" },
+      { "index": 1, "name": "y", "type": "double" },
+      { "index": 2, "name": "theta", "type": "rad" },
+      { "index": 3, "name": "offset", "type": "rad" }
     ]
   },
   "DI": {
@@ -227,7 +298,70 @@
       { "index": 3, "name": "di3", "type": "double" },
       { "index": 4, "name": "di4", "type": "double" },
       { "index": 5, "name": "di5", "type": "double" },
-      { "index": 6, "name": "di6", "type": "double" }
+      { "index": 6, "name": "di6", "type": "double" },
+      { "index": 7, "name": "di7", "type": "double" },
+      { "index": 8, "name": "di8", "type": "double" }
+    ]
+  },
+  "DO": {
+    "type": "DO",
+    "content": [
+      { "index": 0, "name": "do0", "type": "double" },
+      { "index": 1, "name": "do1", "type": "double" },
+      { "index": 2, "name": "do2", "type": "double" },
+      { "index": 3, "name": "do3", "type": "double" },
+      { "index": 4, "name": "do4", "type": "double" },
+      { "index": 5, "name": "do5", "type": "double" },
+      { "index": 6, "name": "do6", "type": "double" },
+      { "index": 7, "name": "do7", "type": "double" }
+    ]
+  },
+  "JackStatus": {
+    "type": "JackStatus",
+    "content": [
+      { "index": 0, "name": "state", "type": "double" },
+      { "index": 1, "name": "errorcode", "type": "double" },
+      { "index": 2, "name": "mode", "type": "bool" },
+      { "index": 3, "name": "enable", "type": "bool" },
+      { "index": 4, "name": "isFull", "type": "bool" },
+      { "index": 5, "name": "speed", "type": "double" },
+      { "index": 6, "name": "emc", "type": "bool" },
+      { "index": 7, "name": "height", "type": "double" }
+    ]
+  },
+  "JackSpeed": {
+    "type": "JackSpeed",
+    "content": [
+      { "index": 0, "name": "jack_target_height", "type": "double" },
+      { "index": 1, "name": "jack_height", "type": "double" },
+      { "index": 2, "name": "jack_v", "type": "double" }
+    ]
+  },
+  "lookAheadDist": {
+    "type": "lookAheadDist",
+    "content": [
+      {"index": 0, "name": "dist", "type": "double" },
+      {"index": 1, "name": "sim_dist", "type": "double" },
+      {"index": 2, "name": "path_size", "type": "double" }
+    ]
+  },
+  "CollisoinPath": {
+    "type": "CollisoinPath",
+    "content": [
+      {"index": 0, "name": "in_size", "type": "double" },
+      {"index": 1, "name": "ahead_dist", "type": "double" },
+      {"index": 2, "name": "sample_dist", "type": "double" },
+      {"index": 3, "name": "out_size", "type": "double" }
+    ]
+  },
+  "GoPathCharge": {
+    "type": "GoPathCharge",
+    "content": [
+      {"index": 0, "name": "path_size", "type": "double" },
+      {"index": 1, "name": "ischarge", "type": "double" },
+      {"index": 2, "name": "openChargeDi", "type": "double" },
+      {"index": 3, "name": "move_status", "type": "double" },
+      {"index": 4, "name": "to_charge_dist", "type": "double" }
     ]
   },
   "Last_Speed": {

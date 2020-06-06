@@ -1,5 +1,7 @@
 import matplotlib
 matplotlib.use('Qt5Agg')
+matplotlib.rcParams['font.sans-serif']=['FangSong']
+matplotlib.rcParams['axes.unicode_minus'] = False
 from matplotlib.backends.backend_qt5agg import (
     FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from PyQt5 import QtCore, QtWidgets,QtGui
@@ -374,12 +376,17 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
                         if abs(dt) < 0.5:
                             obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
-                            obs_info = (str(self.read_thread.content['StopPoints']['t'][stop_idx])
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
-                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['category'][stop_idx]))
-                                        + ' , ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
-                                        + ' , ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
+                            stop_type = ["Ultrasonic", "Laser", "Fallingdown", "Collision" ,"Infrared",
+                            "VirtualPoint", "APIObstacle", "ReservedPoint", "DiUltrasonic", "DepthCamera"]
+                            cur_type = "unknown"
+                            tmp_id = (int)(self.read_thread.content['StopPoints']['category'][stop_idx])
+                            if tmp_id >= 0 and tmp_id < len(stop_type):
+                                cur_type = stop_type[(int)(self.read_thread.content['StopPoints']['category'][stop_idx])]
+                            obs_info = ('x: ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
+                                        + ' y: ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
+                                        + ' 类型: ' + cur_type
+                                        + ' id: ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
+                                        + ' 距离: ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
                     depthCamera_idx = 0
                     t = np.array(self.read_thread.depthcamera.t())
                     depth_pos = []
@@ -620,7 +627,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     if 'timestamp' in self.read_thread.content[group_name].data:
                         xy.x_combo.addItems(['timestamp'])
                 self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
-                                str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), True)
+                                self.read_thread.ylabel[xy.y_combo.currentText()], True)
             self.updateMapSelectLine()
             self.openMap(self.map_action.isChecked())
 
@@ -629,7 +636,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.0.11b""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.0a""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()
@@ -650,14 +657,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         ax = self.axs[index]
         if self.xys[index].x_combo.count() == 1 or current_x_index == 0:
             logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 't')
-            self.drawdata(ax, self.read_thread.data[text], str(index + 1) + ' : ' + text, False)
+            self.drawdata(ax, self.read_thread.data[text], self.read_thread.ylabel[text], False)
         else:
             logging.info('Fig.' + str(index+1) + ' : ' + text + ' ' + 'timestamp')
             org_t = self.read_thread.data[group_name + '.timestamp'][0]
             t = []
             dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
             t = [self.read_thread.data[text][1][0] + tmp for tmp in dt]
-            self.drawdata(ax, (self.read_thread.data[text][0], t), str(index + 1) + ' : ' + text, False)
+            self.drawdata(ax, (self.read_thread.data[text][0], t), self.read_thread.ylabel[text], False)
 
 
     def xcombo_onActivated(self):
@@ -672,14 +679,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         y_label = self.xys[index].y_combo.currentText()
         logging.info('Fig.' + str(index+1) + ' : ' + y_label + ' ' + text)
         if text == 't':
-            self.drawdata(ax, self.read_thread.data[y_label], str(index + 1) + ' : ' + y_label, False)
+            self.drawdata(ax, self.read_thread.data[y_label], self.read_thread.ylabel[y_label], False)
         elif text == 'timestamp':
             group_name = y_label.split('.')[0]
             org_t = self.read_thread.data[group_name + '.timestamp'][0]
             t = []
             dt = [timedelta(seconds = (tmp_t/1e9 - org_t[0]/1e9)) for tmp_t in org_t]
             t = [self.read_thread.data[y_label][1][0] + tmp for tmp in dt]
-            self.drawdata(ax, (self.read_thread.data[y_label][0], t), str(index + 1) + ' : ' + y_label, False)
+            self.drawdata(ax, (self.read_thread.data[y_label][0], t), self.read_thread.ylabel[y_label], False)
 
 
     def fignum_changed(self,action):
@@ -732,7 +739,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     #TO DO
                     if xy.x_combo.currentText() == 't':
                         self.drawdata(ax, self.read_thread.data[xy.y_combo.currentText()],
-                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), False)
+                                   self.read_thread.ylabel[xy.y_combo.currentText()], False)
                     elif xy.x_combo.currentText() == 'timestamp':
                         org_t = self.read_thread.data[group_name + '.timestamp'][0]
                         t = []
@@ -740,7 +747,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         t = [self.read_thread.data[xy.y_combo.currentText()][1][0] + tmp for tmp in dt]
                         data = (self.read_thread.data[xy.y_combo.currentText()][0], t)
                         self.drawdata(ax, data,
-                                    str(self.xys.index(xy) + 1) + ' : ' + xy.y_combo.currentText(), False)
+                                    self.read_thread.ylabel[xy.y_combo.currentText()], False)
                 self.updateMapSelectLine()
 
 

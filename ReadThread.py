@@ -39,10 +39,11 @@ class ReadThread(QThread):
         self.js = dict()
         self.content = dict()
         self.data = dict()
+        self.ylabel = dict()
         self.log =  []
         self.tlist = []
         try:
-            f = open('log_config.json')
+            f = open('log_config.json',encoding= 'UTF-8')
             self.js = js.load(f)
         except FileNotFoundError:
             logging.error('Failed to open log_config.json')
@@ -53,7 +54,7 @@ class ReadThread(QThread):
         """读取log"""
         #初始化log数据
         try:
-            f = open(self.log_config)
+            f = open(self.log_config,encoding= 'UTF-8')
             self.js = js.load(f)
             f.close()
             logging.error("Load {}".format(self.log_config))
@@ -63,7 +64,7 @@ class ReadThread(QThread):
             self.log.append("Failed to open {}".format(self.log_config))
         self.content = dict()
         for k in list(self.js):
-            self.content[k] = Data(self.js[k]) 
+            self.content[k] = Data(self.js[k])
         self.laser = Laser(1000.0)
         self.err = ErrorLine()
         self.war = WarningLine()
@@ -83,18 +84,18 @@ class ReadThread(QThread):
             time_end=time.time()
             self.log.append('read time cost: ' + str(time_end-time_start))
             #analyze content
-            old_imu_flag = False
-            if 'IMU' in self.js:
-                old_imu_flag = decide_old_imu(self.content['IMU']['gx'], self.content['IMU']['gy'], self.content['IMU']['gz'])
-            if old_imu_flag:
-                self.content['IMU']['gx'] = rad2LSB(self.content['IMU']['gx'])
-                self.content['IMU']['gy'] = rad2LSB(self.content['IMU']['gy'])
-                self.content['IMU']['gz'] = rad2LSB(self.content['IMU']['gz'])
-                logging.info('The unit of gx, gy, gz in file is rad/s.')
-                self.log.append('The unit of gx, gy, gz in file is rad/s.') 
-            else:
-                logging.info('The org unit of gx, gy, gz in IMU is LSB/s.')
-                self.log.append('The org unit of gx, gy, gz in IMU is LSB/s.')
+            # old_imu_flag = False
+            # if 'IMU' in self.js:
+            #     old_imu_flag = decide_old_imu(self.content['IMU']['gx'], self.content['IMU']['gy'], self.content['IMU']['gz'])
+            # if old_imu_flag:
+            #     self.content['IMU']['gx'] = rad2LSB(self.content['IMU']['gx'])
+            #     self.content['IMU']['gy'] = rad2LSB(self.content['IMU']['gy'])
+            #     self.content['IMU']['gz'] = rad2LSB(self.content['IMU']['gz'])
+            #     logging.info('The unit of gx, gy, gz in file is rad/s.')
+            #     self.log.append('The unit of gx, gy, gz in file is rad/s.') 
+            # else:
+            #     logging.info('The org unit of gx, gy, gz in IMU is LSB/s.')
+            #     self.log.append('The org unit of gx, gy, gz in IMU is LSB/s.')
             # tmax = max(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
             # tmin = min(self.laser.t() + self.err.t() + self.fatal.t() + self.notice.t() + self.memory.t() + self.service.t())
             tmax = datetime.fromtimestamp(100000000) 
@@ -141,17 +142,28 @@ class ReadThread(QThread):
         self.data = {"memory.used_sys":self.memory.used_sys(), "memory.free_sys":self.memory.free_sys(), "memory.rbk_phy": self.memory.rbk_phy(),
                      "memory.rbk_vir":self.memory.rbk_vir(),"memory.rbk_max_phy":self.memory.rbk_max_phy(),"memory.rbk_max_vir":self.memory.rbk_max_vir(),
                      "memory.cpu":self.memory.rbk_cpu()}
+        self.ylabel = {"memory.used_sys": "used_sys MB", "memory.free_sys":"free_sys MB", "memory.rbk_phy": "rbk_phy MB",
+                     "memory.rbk_vir":"rbk_vir MB","memory.rbk_max_phy":"rbk_max_phy MB","memory.rbk_max_vir":"rbk_max_vir MB",
+                     "memory.cpu":"cpu %"}
         for k in self.content.keys():
             for name in self.content[k].data.keys():
                 if name != 't':
                     self.data[k+'.'+name] = (self.content[k][name], self.content[k]['t'])
+                    self.ylabel[k+'.'+name] = self.content[k].description[name]
         if 'IMU' in self.js:
             self.data["IMU.org_gx"] = ([i+j for (i,j) in zip(self.content['IMU']['gx'],self.content['IMU']['offx'])], self.content['IMU']['t'])
             self.data["IMU.org_gy"] = ([i+j for (i,j) in zip(self.content['IMU']['gy'],self.content['IMU']['offy'])], self.content['IMU']['t'])
             self.data["IMU.org_gz"] = ([i+j for (i,j) in zip(self.content['IMU']['gz'],self.content['IMU']['offz'])], self.content['IMU']['t'])
+            self.ylabel["IMU.org_gx"] = "原始的gx degree/s"
+            self.ylabel["IMU.org_gy"] = "原始的gy degree/s"
+            self.ylabel["IMU.org_gz"] = "原始的gz degree/s"
         for k in self.laser.datas.keys():
             self.data["laser"+str(k)+'.'+"ts"] = self.laser.ts(k)
             self.data["laser"+str(k)+'.'+"number"] = self.laser.number(k)
+            self.ylabel["laser"+str(k)+'.'+"ts"] = "激光的时间戳"
+            self.ylabel["laser"+str(k)+'.'+"number"] = "激光的id"
         self.data["depthcamera.number"] = self.depthcamera.number()
         self.data["depthcamera.ts"] = self.depthcamera.ts()
+        self.data["depthcamera.number"] = "深度摄像头id"
+        self.data["depthcamera.ts"] = "深度摄像头时间戳"
         self.signal.emit(self.filenames)

@@ -33,7 +33,7 @@ class Readcp (QThread):
         self.laser = []
     # run method gets called when we start the thread
     def run(self):
-        fid = open(self.cp_name)
+        fid = open(self.cp_name, encoding= 'UTF-8')
         self.js = js.load(fid)
         fid.close()
         self.laser = []
@@ -68,62 +68,62 @@ class Readmodel(QThread):
         self.laser = dict() #x,y,r
     # run method gets called when we start the thread
     def run(self):
-        fid = open(self.model_name)
-        self.js = js.load(fid)
-        fid.close()
-        self.head = None
-        self.tail = None 
-        self.width = None
-        self.laser = dict() #x,y,r
-        if 'chassis' in self.js:
-            self.head = float(self.js['chassis']['head'])
-            self.tail = float(self.js['chassis']['tail'])
-            self.width = float(self.js['chassis']['width'])
-            laser0 = self.js['laser']['index'][0]
-            self.laser[0] = [float(laser0['x']),float(laser0['y']),np.deg2rad(float(laser0['r']))]
-        elif 'deviceTypes' in self.js:
-            for device in self.js['deviceTypes']:
-                if device['name'] == 'chassis':
-                    for param in device['devices'][0]['deviceParams']:
-                        if param['key'] == 'shape':
-                            for childparam in param['comboParam']['childParams']:
-                                if childparam['key'] == 'rectangle':
-                                    if param['comboParam']['childKey'] == childparam['key']:
-                                        for p in childparam['params']:
-                                            if p['key'] == 'width':
-                                                self.width = p['doubleValue']
-                                            elif p['key'] == 'head':
-                                                self.head = p['doubleValue']
-                                            elif p['key'] == 'tail':
-                                                self.tail = p['doubleValue']
-                                elif childparam['key'] == 'circle':
-                                    if param['comboParam']['childKey'] == childparam['key']:
-                                        for p in childparam['params']:
-                                            if p['key'] == 'radius':
-                                                self.width = p['doubleValue']
-                                                self.head = self.width
-                                                self.tail = self.width
-                elif device['name'] == 'laser':
-                    x, y, r, idx = 0, 0, 0, 0
-                    for laser in device['devices']:
-                        for param in laser['deviceParams']:
-                            if param['key'] == 'basic':
-                                for p in param['arrayParam']['params']:
-                                    if p['key'] == 'x':
-                                        x = p['doubleValue']
-                                    elif p['key'] == 'y':
-                                        y = p['doubleValue']
-                                    elif p['key'] == 'yaw':
-                                        r = p['doubleValue']
-                                    elif p['key'] == 'id':
-                                        idx = p['uint32Value']
-                                    elif p['key'] == 'useForLocalization':
-                                        if p['boolValue'] == True:
-                                            self.loc_laser_ind = idx
-                        self.laser[idx] = [float(x),float(y),np.deg2rad(r)]
-        else:
-            logging.error('Cannot Open robot.model: ' + self.model_name)
-        self.signal.emit(self.model_name)
+        with open(self.model_name, 'r',encoding= 'UTF-8') as fid:
+            self.js = js.load(fid)
+            # fid.close()
+            self.head = None
+            self.tail = None 
+            self.width = None
+            self.laser = dict() #x,y,r
+            if 'chassis' in self.js:
+                self.head = float(self.js['chassis']['head'])
+                self.tail = float(self.js['chassis']['tail'])
+                self.width = float(self.js['chassis']['width'])
+                laser0 = self.js['laser']['index'][0]
+                self.laser[0] = [float(laser0['x']),float(laser0['y']),np.deg2rad(float(laser0['r']))]
+            elif 'deviceTypes' in self.js:
+                for device in self.js['deviceTypes']:
+                    if device['name'] == 'chassis':
+                        for param in device['devices'][0]['deviceParams']:
+                            if param['key'] == 'shape':
+                                for childparam in param['comboParam']['childParams']:
+                                    if childparam['key'] == 'rectangle':
+                                        if param['comboParam']['childKey'] == childparam['key']:
+                                            for p in childparam['params']:
+                                                if p['key'] == 'width':
+                                                    self.width = p['doubleValue']
+                                                elif p['key'] == 'head':
+                                                    self.head = p['doubleValue']
+                                                elif p['key'] == 'tail':
+                                                    self.tail = p['doubleValue']
+                                    elif childparam['key'] == 'circle':
+                                        if param['comboParam']['childKey'] == childparam['key']:
+                                            for p in childparam['params']:
+                                                if p['key'] == 'radius':
+                                                    self.width = p['doubleValue']
+                                                    self.head = self.width
+                                                    self.tail = self.width
+                    elif device['name'] == 'laser':
+                        x, y, r, idx = 0, 0, 0, 0
+                        for laser in device['devices']:
+                            for param in laser['deviceParams']:
+                                if param['key'] == 'basic':
+                                    for p in param['arrayParam']['params']:
+                                        if p['key'] == 'x':
+                                            x = p['doubleValue']
+                                        elif p['key'] == 'y':
+                                            y = p['doubleValue']
+                                        elif p['key'] == 'yaw':
+                                            r = p['doubleValue']
+                                        elif p['key'] == 'id':
+                                            idx = p['uint32Value']
+                                        elif p['key'] == 'useForLocalization':
+                                            if p['boolValue'] == True:
+                                                self.loc_laser_ind = idx
+                            self.laser[idx] = [float(x),float(y),np.deg2rad(r)]
+            else:
+                logging.error('Cannot Open robot.model: ' + self.model_name)
+            self.signal.emit(self.model_name)
 
 class Readmap(QThread):
     signal = pyqtSignal('PyQt_PyObject')
@@ -149,7 +149,7 @@ class Readmap(QThread):
         ]
     # run method gets called when we start the thread
     def run(self):
-        fid = open(self.map_name)
+        fid = open(self.map_name, encoding= 'UTF-8')
         self.js = js.load(fid)
         fid.close()
         self.map_x = []
@@ -602,6 +602,32 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_pos = robot_loc_pos
         self.laser_org_data = laser_org_data
         self.laser_index = laser_index
+        if obs_pos:
+            self.obs_points.set_xdata([obs_pos[0]])
+            self.obs_points.set_ydata([obs_pos[1]])
+        else:
+            self.obs_points.set_xdata([])
+            self.obs_points.set_ydata([])
+        if len(depthcamera_pos) > 0:
+            hole_points = [[],[]]
+            obs_points = [[],[]]
+            for ind, val in enumerate(depthcamera_pos[2]):
+                if val < 0:
+                    hole_points[0].append(depthcamera_pos[0][ind])
+                    hole_points[1].append(depthcamera_pos[1][ind])
+                else:
+                    obs_points[0].append(depthcamera_pos[0][ind])
+                    obs_points[1].append(depthcamera_pos[1][ind])
+            self.depthCamera_hole_points.set_xdata([hole_points[0]])
+            self.depthCamera_hole_points.set_ydata([hole_points[1]])
+            self.depthCamera_obs_points.set_xdata([obs_points[0]])
+            self.depthCamera_obs_points.set_ydata([obs_points[1]])
+        else:
+            self.depthCamera_hole_points.set_xdata([])
+            self.depthCamera_hole_points.set_ydata([])
+            self.depthCamera_obs_points.set_xdata([])
+            self.depthCamera_obs_points.set_ydata([])
+
         if self.laser_index not in self.laser_pos.keys():
             self.read_model.head = None 
             self.read_model.tail = None
@@ -633,32 +659,6 @@ class MapWidget(QtWidgets.QWidget):
             robot_shape = GetGlobalPos(robot_shape,robot_loc_pos)
             self.robot_loc_data.set_xdata(robot_shape[0])
             self.robot_loc_data.set_ydata(robot_shape[1])
-
-            if obs_pos:
-                self.obs_points.set_xdata([obs_pos[0]])
-                self.obs_points.set_ydata([obs_pos[1]])
-            else:
-                self.obs_points.set_xdata([])
-                self.obs_points.set_ydata([])
-            if len(depthcamera_pos) > 0:
-                hole_points = [[],[]]
-                obs_points = [[],[]]
-                for ind, val in enumerate(depthcamera_pos[2]):
-                    if val < 0:
-                        hole_points[0].append(depthcamera_pos[0][ind])
-                        hole_points[1].append(depthcamera_pos[1][ind])
-                    else:
-                        obs_points[0].append(depthcamera_pos[0][ind])
-                        obs_points[1].append(depthcamera_pos[1][ind])
-                self.depthCamera_hole_points.set_xdata([hole_points[0]])
-                self.depthCamera_hole_points.set_ydata([hole_points[1]])
-                self.depthCamera_obs_points.set_xdata([obs_points[0]])
-                self.depthCamera_obs_points.set_ydata([obs_points[1]])
-            else:
-                self.depthCamera_hole_points.set_xdata([])
-                self.depthCamera_hole_points.set_ydata([])
-                self.depthCamera_obs_points.set_xdata([])
-                self.depthCamera_obs_points.set_ydata([])
     def redraw(self):
         self.static_canvas.figure.canvas.draw()
 

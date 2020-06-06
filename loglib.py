@@ -74,9 +74,20 @@ class Data:
         self.info = info['content']
         self.data = dict()
         self.data['t'] = []
+        self.description = dict()
+        self.unit = dict()
         self.parse_error = False
         for tmp in self.info:
             self.data[tmp['name']] =  []
+            if 'unit' in tmp:
+                self.unit[tmp['name']] = tmp['unit']
+            else:
+                self.unit[tmp['name']] = ""
+            if 'description' in tmp:
+                self.description[tmp['name']] = tmp['description'] + " " + self.unit[tmp['name']]
+            else:
+                self.description[tmp['name']] = self.type + '.' + tmp['name'] + " " + self.unit[tmp['name']]
+
     def parse(self, line):
         short_out = self.short_regx.search(line)
         if short_out:
@@ -113,6 +124,11 @@ class Data:
                                     self.data[tmp['name']].append(float(values[int(tmp['index'])]))
                                 except:
                                     self.data[tmp['name']].append(0.0)
+                            elif tmp['type'] == 'LSB':
+                                try:
+                                    self.data[tmp['name']].append(float(values[int(tmp['index'])])/16.03556)
+                                except:
+                                    self.data[tmp['name']].append(0.0)                               
                             elif tmp['type'] == 'bool':
                                 try:
                                     self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
@@ -508,12 +524,12 @@ class Memory:
     data[6]: cpu_usage
     """
     def __init__(self):
-        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *[MG]B\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory *: *(.*?) *[MG]B\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *[GM]B\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *[GM]B\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *[GM]B\]"),
-                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *[GM]B\]"),
+        self.regex = [re.compile("\[(.*?)\].*\[Text\]\[Used system memory *: *(.*?) *([MG])B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Free system memory *: *(.*?) *([MG])B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit physical memory usage *: *(.*?) *([GM])B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit virtual memory usage *: *(.*?) *([GM])B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max physical memory usage *: *(.*?) *([GM])B\]"),
+                    re.compile("\[(.*?)\].*\[Text\]\[Robokit Max virtual memory usage *: *(.*?) *([GM])B\]"),
                     re.compile("\[(.*?)\].*\[Text\]\[Robokit CPU usage *: *(.*?)%\]")]
         self.short_regx =  re.compile("memory|CPU")
         self.time = [[] for _ in range(7)]
@@ -525,7 +541,13 @@ class Memory:
                 out = self.regex[iter].match(line)
                 if out:
                     self.time[iter].append(rbktimetodate(out.group(1)))
-                    self.data[iter].append(float(out.group(2)))
+                    if iter == 6:
+                        self.data[iter].append(float(out.group(2)))
+                    else:
+                        if out.group(3) == "G":
+                            self.data[iter].append(float(out.group(2)) * 1024.0)
+                        else:
+                            self.data[iter].append(float(out.group(2)))
                     return True
             return False
         return False

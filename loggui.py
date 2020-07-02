@@ -503,9 +503,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if text in self.read_thread.data:
                 data = self.read_thread.data[text][0]
                 if data:
-                    max_range = max(max(data) - min(data), 1e-6)
-                    ax.set_ylim(min(data) - 0.05 * max_range, max(data)  + 0.05 * max_range)
-                    ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
+                    tmpd = np.array(data)
+                    tmpd = tmpd[~np.isnan(tmpd)]
+                    if len(tmpd) > 0:
+                        max_range = max(max(tmpd) - min(tmpd), 1e-6)
+                        ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd)  + 0.05 * max_range)
+                        ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         self.static_canvas.figure.canvas.draw()
 
     def new_forward(self, *args, **kwargs):
@@ -759,8 +762,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             ax.plot(data[1], data[0], '.')
             tmpd = np.array(data[0])
             tmpd = tmpd[~np.isnan(tmpd)]
-            max_range = max(max(tmpd) - min(tmpd), 1.0)
-            ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd) + 0.05 * max_range)
+            if len(tmpd) > 0:
+                max_range = max(max(tmpd) - min(tmpd), 1.0)
+                ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd) + 0.05 * max_range)
         if resize:
             ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         else:

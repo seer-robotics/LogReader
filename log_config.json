@@ -301,5 +301,13 @@
       { "index": 1, "name": "jack_height", "type": "double", "description": "顶升当前高度", "unit":"m"  },
       { "index": 2, "name": "jack_v", "type": "double" , "description": "顶升下发速度", "unit":"m/s" }
     ]
+  },
+  "Motors": {
+    "type": "Motors",
+    "content": [
+      { "name": "motor5", "type": "double", "description": "电机5速度", "unit":"m/s"  },
+      { "name": "motor6", "type": "double", "description": "电机6速度", "unit":"m/s"  },
+      { "name": "motor7", "type": "double" , "description": "电机7速度", "unit":"m/s" }
+    ]
   }
 }

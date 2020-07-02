@@ -88,6 +88,42 @@ class Data:
             else:
                 self.description[tmp['name']] = self.type + '.' + tmp['name'] + " " + self.unit[tmp['name']]
 
+    def _storeData(self, tmp, ind, values):
+        if tmp['type'] == 'double' or tmp['type'] == 'int64':
+            try:
+                self.data[tmp['name']].append(float(values[ind]))
+            except:
+                self.data[tmp['name']].append(0.0)
+        elif tmp['type'] == 'mm':
+            try:
+                self.data[tmp['name']].append(float(values[ind])/1000.0)
+            except:
+                self.data[tmp['name']].append(0.0)
+        elif tmp['type'] == 'cm':
+            try:
+                self.data[tmp['name']].append(float(values[ind])/100.0)
+            except:
+                self.data[tmp['name']].append(0.0)
+        elif tmp['type'] == 'rad':
+            try:
+                self.data[tmp['name']].append(float(values[ind])/math.pi * 180.0)
+            except:
+                self.data[tmp['name']].append(0.0)
+        elif tmp['type'] == 'm':
+            try:
+                self.data[tmp['name']].append(float(values[ind]))
+            except:
+                self.data[tmp['name']].append(0.0)
+        elif tmp['type'] == 'LSB':
+            try:
+                self.data[tmp['name']].append(float(values[ind])/16.03556)
+            except:
+                self.data[tmp['name']].append(0.0)                               
+        elif tmp['type'] == 'bool':
+            try:
+                self.data[tmp['name']].append(float(values[ind] == "true"))
+            except:
+                self.data[tmp['name']].append(0.0)        
     def parse(self, line):
         short_out = self.short_regx.search(line)
         if short_out:
@@ -99,41 +135,13 @@ class Data:
                 for tmp in self.info:
                     if 'type' in tmp and 'index' in tmp and 'name' in tmp:
                         if tmp['index'] < len(values):
-                            if tmp['type'] == 'double' or tmp['type'] == 'int64':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])]))
-                                except:
-                                    self.data[tmp['name']].append(0.0)
-                            elif tmp['type'] == 'mm':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])])/1000.0)
-                                except:
-                                    self.data[tmp['name']].append(0.0)
-                            elif tmp['type'] == 'cm':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])])/100.0)
-                                except:
-                                    self.data[tmp['name']].append(0.0)
-                            elif tmp['type'] == 'rad':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])])/math.pi * 180.0)
-                                except:
-                                    self.data[tmp['name']].append(0.0)
-                            elif tmp['type'] == 'm':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])]))
-                                except:
-                                    self.data[tmp['name']].append(0.0)
-                            elif tmp['type'] == 'LSB':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])])/16.03556)
-                                except:
-                                    self.data[tmp['name']].append(0.0)                               
-                            elif tmp['type'] == 'bool':
-                                try:
-                                    self.data[tmp['name']].append(float(values[int(tmp['index'])] == "true"))
-                                except:
-                                    self.data[tmp['name']].append(0.0)
+                            self._storeData(tmp, int(tmp['index']), values)
+                        else:
+                            self.data[tmp['name']].append(np.nan)
+                    elif 'type' in tmp and 'name' in tmp:
+                        ind = values.index(tmp['name']) if tmp['name'] in values else -1
+                        if ind >= 0 and ind + 1 < len(values):
+                            self._storeData(tmp, ind+1, values)                        
                         else:
                             self.data[tmp['name']].append(np.nan)
                     else:

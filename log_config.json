@@ -71,8 +71,8 @@
       { "index":1, "name":"globalnum", "type":"double", "description": "全局障碍物点数目", "unit":"" }
     ]
   },
-  "LaserOdometer":{
-    "type":"LaserOdometer",
+  "LaserOdo":{
+    "type":"LaserOdo",
     "content":[
       { "index":0, "name":"timestamp", "type":"int64", "description": "激光里程时间戳", "unit":"" },
       { "index":1, "name":"x", "type":"double", "description": "激光x方向里程", "unit":"m" },
@@ -170,6 +170,32 @@
       { "index": 7, "name": "gv", "type": "double","description": "当前到达目标标点速度", "unit":"m/s"  },
       { "index": 8, "name": "vmax", "type": "double","description": "agv最大速度", "unit":"m/s"  },
       { "index": 9, "name": "vwmax", "type": "rad","description": "agv最大角速度", "unit":"degree/s"  }
+    ]
+  },
+  "LQR1": {
+    "type": "LQR1",
+    "content": [
+      { "index": 0, "name": "vw", "type": "double" },
+      { "index": 1, "name": "vx", "type": "double"  },
+      { "index": 2, "name": "vw0", "type": "double"},
+      { "index": 3, "name": "dvw", "type": "double" },
+      { "index": 4, "name": "u00", "type": "double" },
+      { "index": 5, "name": "m_e", "type": "double"},
+      { "index": 6, "name": "m_pe", "type": "double"},
+      { "index": 7, "name": "th_e", "type": "double"},
+      { "index": 8, "name": "m_pthe", "type": "double" },
+      { "index": 9, "name": "cur_vx", "type": "double" },
+      { "index": 10, "name": "speed", "type": "double" },
+      { "index": 11, "name": "step_t", "type": "double" },
+      { "index": 12, "name": "Q", "type": "double" }
+    ]
+  },
+  "StopRobotPos": {
+    "type": "StopRobotPos",
+    "content": [
+      { "index": 0, "name": "x", "type": "double" },
+      { "index": 1, "name": "y", "type": "double"  },
+      { "index": 2, "name": "theta", "type": "rad"}
     ]
   },
   "Fork": {
@@ -278,7 +304,9 @@
       { "index": 4, "name": "do4", "type": "double", "description": "do4状态", "unit":""  },
       { "index": 5, "name": "do5", "type": "double", "description": "do5状态", "unit":""  },
       { "index": 6, "name": "do6", "type": "double", "description": "do6状态", "unit":""  },
-      { "index": 7, "name": "do7", "type": "double", "description": "do7状态", "unit":""  }
+      { "index": 7, "name": "do7", "type": "double", "description": "do7状态", "unit":""  },
+      { "index": 8, "name": "do8", "type": "double", "description": "do8状态", "unit":""  },
+      { "index": 9, "name": "do9", "type": "double", "description": "do9状态", "unit":""  }
     ]
   },
   "JackStatus": {

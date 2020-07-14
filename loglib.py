@@ -121,7 +121,10 @@ class Data:
                 self.data[tmp['name']].append(0.0)                               
         elif tmp['type'] == 'bool':
             try:
-                self.data[tmp['name']].append(float(values[ind] == "true"))
+                if values[ind] == "true" or values[ind] == "1":
+                    self.data[tmp['name']].append(1.0)
+                else:
+                    self.data[tmp['name']].append(0.0)
             except:
                 self.data[tmp['name']].append(0.0)        
     def parse(self, line):

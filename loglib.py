@@ -5,12 +5,11 @@ import codecs
 import chardet
 import logging
 import numpy as np
+import gzip
 
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
     return datetime.strptime(rbktime, '%Y-%m-%d %H:%M:%S.%f')
-
-
 
 def findrange(ts, t1, t2):
     """ 在ts中寻找大于t1小于t2对应的下标 """
@@ -37,33 +36,39 @@ class ReadLog:
     def __init__(self, filenames):
         """ 支持传入多个文件名称"""
         self.filenames = filenames
+    def _readData(self, f, ile, argv):
+        line_num = 0
+        for line in f.readlines(): 
+            try:
+                line = line.decode('utf-8')
+            except UnicodeDecodeError:
+                try:
+                    line = line.decode('gbk')
+                except UnicodeDecodeError:
+                    print(file, " L:",line_num+1, " is skipped due to decoding failure!", " ", line)
+                    continue
+            line_num += 1
+            break_flag = False
+            for data in argv:
+                if type(data).__name__ == 'dict':
+                    for k in data.keys():
+                        if data[k].parse(line):
+                            break_flag = True
+                            break
+                    if break_flag:
+                        break_flag = False
+                        break
+                elif data.parse(line):
+                    break     
     def parse(self,*argv):
         """依据输入的正则进行解析"""
-        line_num = 0
         for file in self.filenames:
-            with open(file,'rb') as f:
-                for line in f.readlines(): 
-                    try:
-                        line = line.decode('utf-8')
-                    except UnicodeDecodeError:
-                        try:
-                            line = line.decode('gbk')
-                        except UnicodeDecodeError:
-                            print("Line ",line_num+1, " is skipped due to decoding failure!", " ", line)
-                            continue
-                    line_num += 1
-                    break_flag = False
-                    for data in argv:
-                        if type(data).__name__ == 'dict':
-                            for k in data.keys():
-                                if data[k].parse(line):
-                                    break_flag = True
-                                    break
-                            if break_flag:
-                                break_flag = False
-                                break
-                        elif data.parse(line):
-                            break
+            if file.endswith(".log"):
+                with open(file,'rb') as f:
+                    self._readData(f,file, argv)
+            else:
+                with gzip.open(file,'rb') as f:
+                    self._readData(f, file, argv)
 
 
 class Data:

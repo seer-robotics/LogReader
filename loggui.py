@@ -554,7 +554,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         flag_first_in = True
         for file in files:
             if os.path.exists(file):
-                if os.path.splitext(file)[1] == ".log":
+                subffix = os.path.splitext(file)[1]
+                if subffix == ".log" or subffix == ".gz":
                     if flag_first_in:
                         self.filenames = []
                         flag_first_in = False

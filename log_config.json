@@ -333,9 +333,9 @@
   "Motors": {
     "type": "Motors",
     "content": [
-      { "name": "motor5", "type": "double", "description": "电机5速度", "unit":"m/s"  },
-      { "name": "motor6", "type": "double", "description": "电机6速度", "unit":"m/s"  },
-      { "name": "motor7", "type": "double" , "description": "电机7速度", "unit":"m/s" }
+      { "name": "motor1", "type": "double", "description": "电机1速度", "unit":"m/s"  },
+      { "name": "motor2", "type": "double", "description": "电机2速度", "unit":"m/s"  },
+      { "name": "motor3", "type": "double" , "description": "电机3速度", "unit":"m/s" }
     ]
   }
 }

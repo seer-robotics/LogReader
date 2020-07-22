@@ -289,6 +289,8 @@ class MapWidget(QtWidgets.QWidget):
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
         self.depthCamera_hole_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='black')
         self.depthCamera_obs_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='gray')
+        self.particle_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='b')
+        self.particle_points.set_zorder(101)
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
         self.trajectory_next = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='mediumpurple')
         self.cur_arrow = patches.FancyArrow(0, 0, 0.5, 0,
@@ -322,6 +324,7 @@ class MapWidget(QtWidgets.QWidget):
         self.static_canvas.figure.tight_layout()
         self.ax= self.static_canvas.figure.subplots(1, 1)
         self.ax.add_line(self.map_data)
+        self.ax.add_patch(self.cur_arrow)
         self.ax.add_line(self.robot_data)
         self.ax.add_line(self.robot_data_c0)
         self.ax.add_line(self.robot_loc_data)
@@ -330,9 +333,9 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.obs_points)
         self.ax.add_line(self.depthCamera_hole_points)
         self.ax.add_line(self.depthCamera_obs_points)
+        self.ax.add_line(self.particle_points)
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
-        self.ax.add_patch(self.cur_arrow)
         self.ruler = RulerShape()
         self.ruler.add_ruler(self.ax)
         MyToolBar.home = self.toolbarHome
@@ -590,7 +593,7 @@ class MapWidget(QtWidgets.QWidget):
                 self.ax.set_xlim(xmin, xmax)
                 self.ax.set_ylim(ymin, ymax)
 
-    def updateRobotLaser(self, laser_org_data, laser_index, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depthcamera_pos):
+    def updateRobotLaser(self, laser_org_data, laser_index, robot_pos, robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depthcamera_pos, particle_pos):
         self.timestamp_lable.setText('实框定位: '+ laser_info)
         self.logt_lable.setText('虚框定位: '+ loc_info)
         if obs_info != '':
@@ -627,6 +630,16 @@ class MapWidget(QtWidgets.QWidget):
             self.depthCamera_hole_points.set_ydata([])
             self.depthCamera_obs_points.set_xdata([])
             self.depthCamera_obs_points.set_ydata([])
+        if len(particle_pos) > 0:
+            points = [[],[]]
+            for ind, val in enumerate(particle_pos[2]):
+                points[0].append(particle_pos[0][ind])
+                points[1].append(particle_pos[1][ind])
+            self.particle_points.set_xdata([points[0]])
+            self.particle_points.set_ydata([points[1]])
+        else:
+            self.particle_points.set_xdata([])
+            self.particle_points.set_ydata([])
 
         if self.laser_index not in self.laser_pos.keys():
             self.read_model.head = None 

@@ -36,7 +36,7 @@ class ReadLog:
     def __init__(self, filenames):
         """ 支持传入多个文件名称"""
         self.filenames = filenames
-    def _readData(self, f, ile, argv):
+    def _readData(self, f, file, argv):
         line_num = 0
         for line in f.readlines(): 
             try:
@@ -237,8 +237,9 @@ class DepthCamera:
     data[0]: t
     data[1]: x m
     data[2]: y m
-    data[3]: number
-    data[4]: ts
+    data[3]: z m
+    data[4]: number
+    data[5]: ts
     """
     def __init__(self):
         """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
@@ -286,6 +287,60 @@ class DepthCamera:
     def y(self):
         return self.datas[2], self.datas[0]
     def z(self):
+        return self.datas[3], self.datas[0]
+    def number(self):
+        return self.datas[4], self.datas[0]
+    def ts(self):
+        return self.datas[5], self.datas[0]
+
+class ParticleState:
+    """ 粒子滤波数据
+    data[0]: t
+    data[1]: x m
+    data[2]: y m
+    data[3]: theta m
+    data[4]: number
+    data[5]: ts
+    """
+    def __init__(self):
+        
+        self.regex = re.compile('\[(.*?)\].* \[Particle State: \]\[(.*?)\]')
+        self.short_regx = re.compile("\[Particle State: \]\[")
+        #self.data = [[] for _ in range(7)]
+        self.datas =  [[] for _ in range(6)]
+    def parse(self, line):
+        short_out = self.short_regx.search(line)
+        if short_out:
+            out = self.regex.match(line)
+            if out:
+                datas = out.groups()
+                tmp_datas = datas[1].split('|')
+                if(len(tmp_datas) < 2):
+                    return True
+                dx, dy, dz, ts = [], [], [], 0
+                if len(tmp_datas[1:]) %3 == 0:
+                    dx = [float(tmp) for tmp in tmp_datas[1::3]]
+                    dy = [float(tmp) for tmp in tmp_datas[2::3]]
+                    dz = [float(tmp) for tmp in tmp_datas[3::3]]
+                    ts = float(tmp_datas[0])
+                else:
+                    return True
+                self.datas[0].append(rbktimetodate(datas[0]))
+                self.datas[1].append(dx)
+                self.datas[2].append(dy)
+                self.datas[3].append(dz)
+                self.datas[4].append(len(dx))
+                self.datas[5].append(ts)
+                return True
+            return False
+        return False
+    def t(self):
+        return self.datas[0]
+    def x(self):
+        return self.datas[1], self.datas[0]
+    def y(self):
+        return self.datas[2], self.datas[0]
+    def theta(self):
         return self.datas[3], self.datas[0]
     def number(self):
         return self.datas[4], self.datas[0]

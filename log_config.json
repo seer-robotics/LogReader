@@ -181,13 +181,13 @@
       { "index": 3, "name": "dvw", "type": "double" },
       { "index": 4, "name": "u00", "type": "double" },
       { "index": 5, "name": "m_e", "type": "double"},
-      { "index": 6, "name": "m_pe", "type": "double"},
-      { "index": 7, "name": "th_e", "type": "double"},
+      { "index": 6, "name": "m_orge", "type": "double"},
+      { "index": 7, "name": "m_pe", "type": "double"},
       { "index": 8, "name": "m_pthe", "type": "double" },
-      { "index": 9, "name": "cur_vx", "type": "double" },
-      { "index": 10, "name": "speed", "type": "double" },
-      { "index": 11, "name": "step_t", "type": "double" },
-      { "index": 12, "name": "Q", "type": "double" }
+      { "index": 9, "name": "offset", "type": "double" },
+      { "index": 10, "name": "mean_vw2v", "type": "double" },
+      { "index": 11, "name": "mean_e", "type": "double" },
+      { "index": 12, "name": "diffe", "type": "double" }
     ]
   },
   "StopRobotPos": {

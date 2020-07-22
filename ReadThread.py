@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QThread, pyqtSignal
-from loglib import Data, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
+from loglib import Data, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service, ParticleState
 from loglib import Memory, DepthCamera
 from datetime import timedelta
 from datetime import datetime
@@ -28,6 +28,14 @@ def rad2LSB(data):
 def Fdir2Flink(f):
     flink = " <a href='file:///" + f + "'>"+f+"</a>"
     return flink
+
+def printData(data, fid):
+    try:
+        print(data, file= fid)
+    except UnicodeEncodeError:
+        data = data.encode(errors='ignore')  
+        print(data, file= fid)
+    return
 
 class ReadThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
@@ -75,12 +83,13 @@ class ReadThread(QThread):
         self.service = Service()
         self.memory = Memory()
         self.depthcamera = DepthCamera()
+        self.particle = ParticleState()
         self.tlist = []
         self.log =  []
         if self.filenames:
             log = ReadLog(self.filenames)
             time_start=time.time()
-            log.parse(self.content, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service, self.memory, self.depthcamera)
+            log.parse(self.content, self.laser, self.err, self.war, self.fatal, self.notice, self.taskstart, self.taskfinish, self.service, self.memory, self.depthcamera, self.particle)
             time_end=time.time()
             self.log.append('read time cost: ' + str(time_end-time_start))
             #analyze content
@@ -127,16 +136,16 @@ class ReadThread(QThread):
                 " ERRORs, " + str(len(self.war.content()[0])) + " WARNINGs, " + str(len(self.notice.content()[0])) + " NOTICEs")
             print("FATALs:", file = fid)
             for data in self.fatal.content()[0]:
-                print(data, file = fid)
+                printData(data, fid)
             print("ERRORs:", file = fid)
             for data in self.err.content()[0]:
-                print(data,file = fid)
+                printData(data, fid)
             print("WARNINGs:", file = fid)
             for data in self.war.content()[0]:
-                print(data, file = fid)
+                printData(data, fid)
             print("NOTICEs:", file = fid)
             for data in self.notice.content()[0]:
-                print(data, file = fid)
+                printData(data, fid)
             fid.close()
         #creat dic
         self.data = {"memory.used_sys":self.memory.used_sys(), "memory.free_sys":self.memory.free_sys(), "memory.rbk_phy": self.memory.rbk_phy(),
@@ -164,6 +173,12 @@ class ReadThread(QThread):
             self.ylabel["laser"+str(k)+'.'+"number"] = "激光的id"
         self.data["depthcamera.number"] = self.depthcamera.number()
         self.data["depthcamera.ts"] = self.depthcamera.ts()
-        self.data["depthcamera.number"] = "深度摄像头id"
-        self.data["depthcamera.ts"] = "深度摄像头时间戳"
+        self.ylabel["depthcamera.number"] = "深度摄像头id"
+        self.ylabel["depthcamera.ts"] = "深度摄像头时间戳"
+        
+        self.data["particle.number"] = self.particle.number()
+        self.data["particle.ts"] = self.particle.ts()
+        self.ylabel["particle.number"] = "粒子数目"
+        self.ylabel["particle.ts"] = "粒子时间戳"    
+
         self.signal.emit(self.filenames)

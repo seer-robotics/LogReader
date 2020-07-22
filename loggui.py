@@ -309,14 +309,68 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                                np.deg2rad(self.read_thread.content['Location']['theta'][loc_idx]))
         if 'LocationEachFrame' in self.read_thread.content:
             if self.read_thread.content['LocationEachFrame']['timestamp']:
+                #最近的定位时间
+                if loc_idx < 0:
+                    loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
+                    loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
+                robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
+                            self.read_thread.content['LocationEachFrame']['y'][loc_idx],
+                            np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
+                loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
+                                    + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
+                                    + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
+                                    + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
+                                    + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
+                obs_pos = []
+                obs_info = ''
+                stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
+                if len(stop_ts) > 0:
+                    stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
+                    dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
+                    if abs(dt) < 0.5:
+                        obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
+                        stop_type = ["Ultrasonic", "Laser", "Fallingdown", "Collision" ,"Infrared",
+                        "VirtualPoint", "APIObstacle", "ReservedPoint", "DiUltrasonic", "DepthCamera"]
+                        cur_type = "unknown"
+                        tmp_id = (int)(self.read_thread.content['StopPoints']['category'][stop_idx])
+                        if tmp_id >= 0 and tmp_id < len(stop_type):
+                            cur_type = stop_type[(int)(self.read_thread.content['StopPoints']['category'][stop_idx])]
+                        obs_info = ('x: ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
+                                    + ' y: ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
+                                    + ' 类型: ' + cur_type
+                                    + ' id: ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
+                                    + ' 距离: ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
+
+                depthCamera_idx = 0
+                t = np.array(self.read_thread.depthcamera.t())
+                depth_pos = []
+                if len(t) > 0:
+                    depthCamera_idx = (np.abs(t-mouse_time)).argmin()
+                    dt = (t[depthCamera_idx] - mouse_time).total_seconds()
+                    if abs(dt) < 0.5:
+                        pos_x = self.read_thread.depthcamera.x()[0][depthCamera_idx]
+                        pos_y = self.read_thread.depthcamera.y()[0][depthCamera_idx]
+                        pos_z = self.read_thread.depthcamera.z()[0][depthCamera_idx]
+                        depth_pos = np.array([pos_x, pos_y, pos_z])
+
+                particle_idx = 0
+                t = np.array(self.read_thread.particle.t())
+                particle_pos = []
+                if len(t) > 0:
+                    particle_idx = (np.abs(t-mouse_time)).argmin()
+                    dt = (t[particle_idx] - mouse_time).total_seconds()
+                    if abs(dt) < 0.5:
+                        pos_x = self.read_thread.particle.x()[0][particle_idx]
+                        pos_y = self.read_thread.particle.y()[0][particle_idx]
+                        theta = self.read_thread.particle.theta()[0][particle_idx]
+                        particle_pos = np.array([pos_x, pos_y, theta])
+
+                laser_points = []
+                min_laser_channel = 0
+                robot_pos = []
+                laser_info = ""
                 if self.read_thread.laser.datas:
-                    #最近的定位时间
-                    if loc_idx < 0:
-                        loc_ts = np.array(self.read_thread.content['LocationEachFrame']['t'])
-                        loc_idx = (np.abs(loc_ts - mouse_time)).argmin()
-                    robot_loc_pos = [self.read_thread.content['LocationEachFrame']['x'][loc_idx],
-                                self.read_thread.content['LocationEachFrame']['y'][loc_idx],
-                                np.deg2rad(self.read_thread.content['LocationEachFrame']['theta'][loc_idx])]
+                    print(3)
                     #最近的激光时间
                     if laser_idx < 0 or min_laser_channel < 0:
                         min_laser_channel = 0
@@ -339,7 +393,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     laser_y = [None] * len(org_point) * 2
                     laser_y[::2] = self.read_thread.laser.y(min_laser_channel)[0][laser_idx]
                     laser_y[1::2] = org_point
-                    laser_poitns = np.array([laser_x, laser_y])
+                    laser_points = np.array([laser_x, laser_y])
 
                     #在一个区间内差找最小值
                     ts = self.read_thread.laser.ts(min_laser_channel)[0][laser_idx]
@@ -362,44 +416,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                         + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][pos_idx])
                                         + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][pos_idx])
                                         + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
-                    loc_info = (str(self.read_thread.content['LocationEachFrame']['t'][loc_idx]) 
-                                        + ' , ' + str((int)(self.read_thread.content['LocationEachFrame']['timestamp'][loc_idx]))
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['x'][loc_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['y'][loc_idx])
-                                        + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][loc_idx]))
                     
-                    obs_pos = []
-                    obs_info = ''
-                    stop_ts = np.array(self.read_thread.content['StopPoints']['t'])
-                    if len(stop_ts) > 0:
-                        stop_idx = (np.abs(stop_ts - mouse_time)).argmin()
-                        dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
-                        if abs(dt) < 0.5:
-                            obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
-                            stop_type = ["Ultrasonic", "Laser", "Fallingdown", "Collision" ,"Infrared",
-                            "VirtualPoint", "APIObstacle", "ReservedPoint", "DiUltrasonic", "DepthCamera"]
-                            cur_type = "unknown"
-                            tmp_id = (int)(self.read_thread.content['StopPoints']['category'][stop_idx])
-                            if tmp_id >= 0 and tmp_id < len(stop_type):
-                                cur_type = stop_type[(int)(self.read_thread.content['StopPoints']['category'][stop_idx])]
-                            obs_info = ('x: ' + str(self.read_thread.content['StopPoints']['x'][stop_idx])
-                                        + ' y: ' + str(self.read_thread.content['StopPoints']['y'][stop_idx])
-                                        + ' 类型: ' + cur_type
-                                        + ' id: ' + str((int)(self.read_thread.content['StopPoints']['ultra_id'][stop_idx]))
-                                        + ' 距离: ' + str(self.read_thread.content['StopPoints']['dist'][stop_idx]))
-                    depthCamera_idx = 0
-                    t = np.array(self.read_thread.depthcamera.t())
-                    depth_pos = []
-                    if len(t) > 0:
-                        depthCamera_idx = (np.abs(t-mouse_time)).argmin()
-                        dt = (t[depthCamera_idx] - mouse_time).total_seconds()
-                        if abs(dt) < 0.5:
-                            pos_x = self.read_thread.depthcamera.x()[0][depthCamera_idx]
-                            pos_y = self.read_thread.depthcamera.y()[0][depthCamera_idx]
-                            pos_z = self.read_thread.depthcamera.z()[0][depthCamera_idx]
-                            depth_pos = np.array([pos_x, pos_y, pos_z])
-                    
-                    self.map_widget.updateRobotLaser(laser_poitns,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depth_pos)
+                self.map_widget.updateRobotLaser(laser_points,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depth_pos, particle_pos)
         self.map_widget.redraw()
 
 
@@ -640,7 +658,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.0b""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.1a""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

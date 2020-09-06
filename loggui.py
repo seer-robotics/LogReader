@@ -124,7 +124,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.scroll.setWidget(self.static_canvas)
         self.scroll.setWidgetResizable(True)
         self.scroll.keyPressEvent = self.keyPressEvent
-        self.scroll.keyReleaseEvent = self.keyReleaseEvent
+        # self.scroll.keyReleaseEvent = self.keyReleaseEvent
         self.is_keypressed = False
         self.key_loc_idx = -1
         self.key_laser_idx = -1
@@ -282,6 +282,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         return content
 
     def updateMap(self, mouse_time, in_loc_idx, in_laser_idx, in_laser_channel):
+        self.key_loc_idx = in_loc_idx
+        self.key_laser_idx = in_laser_idx
+        self.key_laser_channel = in_laser_channel
         loc_idx = in_loc_idx
         laser_idx = in_laser_idx
         min_laser_channel = in_laser_channel
@@ -370,7 +373,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 robot_pos = []
                 laser_info = ""
                 if self.read_thread.laser.datas:
-                    print(3)
                     #最近的激光时间
                     if laser_idx < 0 or min_laser_channel < 0:
                         min_laser_channel = 0
@@ -508,12 +510,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     self.updateMap(cur_t, self.key_loc_idx, self.key_laser_idx, self.key_laser_channel)
 
 
-    def keyReleaseEvent(self, event):
-        if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
-            self.key_loc_idx = -1
-        if event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right:
-            self.key_laser_idx = -1
-            self.key_laser_channel = -1
+    # def keyReleaseEvent(self, event): #####
+    #     print("keyRelease {}".format(event.key()))
+    #     if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
+    #         self.key_loc_idx = -1
+    #     if event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right:
+    #         self.key_laser_idx = -1
+    #         self.key_laser_channel = -1
 
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
@@ -658,7 +661,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.1a""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.1b""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

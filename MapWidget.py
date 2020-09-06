@@ -69,7 +69,10 @@ class Readmodel(QThread):
     # run method gets called when we start the thread
     def run(self):
         with open(self.model_name, 'r',encoding= 'UTF-8') as fid:
-            self.js = js.load(fid)
+            try:
+                self.js = js.load(fid)
+            except:
+                logging.error("robot model file cannot read!!!")
             # fid.close()
             self.head = None
             self.tail = None 

@@ -59,19 +59,19 @@
       { "index": 2, "name": "x", "type": "double", "description": "里程x", "unit":"m" },
       { "index": 3, "name": "y", "type": "double", "description": "里程y", "unit":"m"  },
       { "index": 4, "name": "theta", "type": "rad", "description": "里程角度", "unit":"degree"  },
-      { "index": 5, "name": "stopped", "type": "bool", "description": "底盘是否停止", "unit":""  },
-      { "index": 6, "name": "AllStopped", "type": "bool", "description": "全部底盘是否停止", "unit":""  },
+      { "index": 5, "name": "stopped", "type": "bool", "description": "agv是否停止", "unit":""  },
+      { "index": 6, "name": "all_motor_stopped", "type": "bool", "description": "所有电机是否停止", "unit":""  },
       { "index": 7, "name": "vel_x", "type": "double", "description": "里程x速度", "unit":"m/s"  },
       { "index": 8, "name": "vel_y", "type": "double", "description": "里程y速度", "unit":"m/s"  },
       { "index": 9, "name": "vel_rotate", "type": "rad", "description": "里程角速度", "unit":"degree/s"  },
       { "index": 10, "name": "steer_angle", "type": "rad", "description": "舵角值", "unit":"degree"  },
       { "index": 11, "name": "spin_angle", "type": "rad", "description": "随动托盘角度", "unit":"degree"  },
-      { "index": 12, "name": "encode0", "type": "double", "description": "0号编码器", "unit":""  },
-      { "index": 13, "name": "encode1", "type": "double", "description": "1号编码器", "unit":""  },
-      { "index": 14, "name": "encode2", "type": "double", "description": "2号编码器", "unit":"" },
-      { "index": 15, "name": "encode3", "type": "double", "description": "3号编码器", "unit":"" },
-      { "index": 16, "name": "encode4", "type": "double", "description": "4号编码器", "unit":"" }
-    ]  
+      { "index": 12, "name": "encode0", "type": "int64", "description": "0号编码器", "unit":""  },
+      { "index": 13, "name": "encode1", "type": "int64", "description": "1号编码器", "unit":""  },
+      { "index": 14, "name": "encode2", "type": "int64", "description": "2号编码器", "unit":"" },
+      { "index": 15, "name": "encode3", "type": "int64", "description": "3号编码器", "unit":"" },
+      { "index": 16, "name": "encode4", "type": "int64", "description": "4号编码器", "unit":"" }
+    ]
   },
   "SensorFuserPoints":{
     "type":"SensorFuserPoints",
@@ -114,7 +114,18 @@
       { "index": 2, "name": "vw", "type": "rad", "description": "DSP接收到的vw", "unit":"degree/s"  },
       { "index": 3, "name": "steer_angle", "type": "rad", "description": "DSP接收到的舵角", "unit":"degree"  },
       { "index": 4, "name": "spin_speed", "type": "rad", "description": "DSP接收到托盘速度", "unit":"degree/s"  },
-      { "index": 5, "name": "jack_speed", "type": "m", "description": "DSP接收到顶升速度", "unit":"m/s"  }
+      { "index": 5, "name": "jack_speed", "type": "double", "description": "DSP接收到顶升速度", "unit":"m/s"  }
+    ]
+  },
+  "GDNavSpeed": {
+    "type": "GDNavSpeed",
+    "content": [
+      { "index": 0, "name": "vx", "type": "double", "description": "底层下发的vx", "unit":"m/s" },
+      { "index": 1, "name": "vy", "type": "double", "description": "底层下发的vy", "unit":"m/s"  },
+      { "index": 2, "name": "vw", "type": "rad", "description": "底层下发的vw", "unit":"degree/s"  },
+      { "index": 3, "name": "steer_angle", "type": "rad", "description": "底层下发的舵角", "unit":"degree"  },
+      { "index": 4, "name": "spin_speed", "type": "rad", "description": "底层下发的托盘速度", "unit":"degree/s"  },
+      { "index": 5, "name": "jack_speed", "type": "double", "description": "底层下发的顶升速度", "unit":"m/s"  }
     ]
   },
   "Collision": {
@@ -506,6 +517,28 @@
       { "name": "motor5", "type": "double", "description": "电机5速度", "unit":"m/s"  },
       { "name": "motor6", "type": "double", "description": "电机6速度", "unit":"m/s"  },
       { "name": "motor7", "type": "double" , "description": "电机7速度", "unit":"m/s" }
+    ]
+  },
+  "pgv1": {
+    "type": "pgv1",
+    "content": [
+      { "index": 0, "name": "device_address", "type": "int64", "description": "设备地址", "unit":""  },
+      { "index": 1, "name": "tag_x", "type": "double", "description": "x差值", "unit":"0.1mm"  },
+      { "index": 2, "name": "tag_y", "type": "double", "description": "y差值", "unit":"0.1mm"  },
+      { "index": 3, "name": "tag_angle", "type": "double", "description": "angle差值", "unit":"0.1degree"  },
+      { "index": 4, "name": "tag_value", "type": "int64", "description": "标签数据", "unit":""  },
+      { "index": 5, "name": "is_DMT_detected", "type": "bool", "description": "是否检测到Data Matrix", "unit":""  }
+    ]
+  },
+  "pgv2": {
+    "type": "pgv2",
+    "content": [
+      { "index": 0, "name": "device_address", "type": "int64", "description": "设备地址", "unit":""  },
+      { "index": 1, "name": "tag_x", "type": "double", "description": "x差值", "unit":"0.1mm"  },
+      { "index": 2, "name": "tag_y", "type": "double", "description": "y差值", "unit":"0.1mm"  },
+      { "index": 3, "name": "tag_angle", "type": "double", "description": "angle差值", "unit":"0.1degree"  },
+      { "index": 4, "name": "tag_value", "type": "int64", "description": "标签数据", "unit":""  },
+      { "index": 5, "name": "is_DMT_detected", "type": "bool", "description": "是否检测到Data Matrix", "unit":""  }
     ]
   }
 }

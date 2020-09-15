@@ -73,6 +73,22 @@
       { "index": 16, "name": "encode4", "type": "int64", "description": "4号编码器", "unit":"" }
     ]
   },
+  "MotorTemp": {
+    "type": "MotorTemp",
+    "content": [
+      { "index": 0, "name": "temp1", "type": "double"},
+      { "index": 1, "name": "temp2", "type": "double"},
+      { "index": 2, "name": "temp3", "type": "double"}
+    ]
+  },
+  "MotorCurrent": {
+    "type": "MotorCurrent",
+    "content": [
+      { "index": 0, "name": "current1", "type": "double"},
+      { "index": 1, "name": "current2", "type": "double"},
+      { "index": 2, "name": "current3", "type": "double"}
+    ]
+  },
   "SensorFuserPoints":{
     "type":"SensorFuserPoints",
     "content":[

@@ -332,8 +332,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     dt = (stop_ts[stop_idx] - mouse_time).total_seconds()
                     if abs(dt) < 0.5:
                         obs_pos = [self.read_thread.content['StopPoints']['x'][stop_idx], self.read_thread.content['StopPoints']['y'][stop_idx]]
-                        stop_type = ["Ultrasonic", "Laser", "Fallingdown", "Collision" ,"Infrared",
-                        "VirtualPoint", "APIObstacle", "ReservedPoint", "DiUltrasonic", "DepthCamera"]
+                        stop_type = ["Ultrasonic", "Laser", "Fallingdown", "CollisionBar" ,"Infrared",
+                        "VirtualPoint", "APIObstacle", "ReservedPoint", "DiUltrasonic", "DepthCamera", 
+                        "ReservedDepthCamera", "DistanceNode"]
                         cur_type = "unknown"
                         tmp_id = (int)(self.read_thread.content['StopPoints']['category'][stop_idx])
                         if tmp_id >= 0 and tmp_id < len(stop_type):
@@ -369,7 +370,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         particle_pos = np.array([pos_x, pos_y, theta])
 
                 laser_points = []
-                min_laser_channel = 0
                 robot_pos = []
                 laser_info = ""
                 if self.read_thread.laser.datas:
@@ -388,6 +388,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                 min_laser_channel = index
                                 laser_idx = tmp_laser_idx
                                 min_dt = tmp_dt
+                    print("min_laser_channer: ", min_laser_channel, " laser_idx: " , laser_idx)
                     org_point = [0 for _ in range(len(self.read_thread.laser.x(min_laser_channel)[0][laser_idx]))]
                     laser_x = [None] * len(org_point) * 2
                     laser_x[::2] = self.read_thread.laser.x(min_laser_channel)[0][laser_idx]
@@ -467,6 +468,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if len(self.map_select_lines) > 1:
                 if (event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D
                     or event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right):
+                    self.key_laser_idx = -1
+                    self.key_laser_channel = -1
                     cur_t = self.map_select_lines[0].get_xdata()[0]
                     t = []
                     if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
@@ -481,9 +484,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                 self.key_loc_idx = self.key_loc_idx + 1
                         cur_t = t[self.key_loc_idx]
                     else:
-                        for  key in self.read_thread.laser.datas.keys():
-                            t = t + self.read_thread.laser.t(key)
-                        t = np.array(t)
+                        self.key_loc_idx = -1
                         if self.key_laser_idx < 0:
                             min_laser_channel = -1
                             laser_idx = -1
@@ -500,13 +501,20 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                     min_dt = tmp_dt
                             self.key_laser_idx = laser_idx
                             self.key_laser_channel = min_laser_channel
+                            t = self.read_thread.laser.t(min_laser_channel)
+                            cur_t = t[laser_idx]
                         if event.key() == QtCore.Qt.Key_Left:
-                            if self.key_laser_idx > 0:
+                            if self.key_laser_idx >= 0:
                                 self.key_laser_idx = self.key_laser_idx -1
+                                t = self.read_thread.laser.t(self.key_laser_channel)
+                                cur_t = t[self.key_laser_idx]
                         if event.key() == QtCore.Qt.Key_Right:
                             if self.key_laser_idx < (len(t)-1):
                                 self.key_laser_idx = self.key_laser_idx + 1
-                        cur_t = t[self.key_laser_idx]
+                                t = self.read_thread.laser.t(self.key_laser_channel)
+                                cur_t = t[self.key_laser_idx]
+                        
+                    print("laser channel: ", self.key_laser_channel, self.key_laser_idx, self.read_thread.laser.datas.keys())
                     self.updateMap(cur_t, self.key_loc_idx, self.key_laser_idx, self.key_laser_channel)
 
 

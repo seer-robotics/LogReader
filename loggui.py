@@ -140,6 +140,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.addToolBar(MyToolBar(self.static_canvas, self._main, ruler = self.ruler))
         # self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
+        self.axs[0].tick_params(axis='x', labeltop=True, top = True)
         for ax in self.axs:
             self.ruler.add_ruler(ax)
         #鼠标移动消息
@@ -732,6 +733,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         # self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
         self.axs= self.static_canvas.figure.subplots(new_fig_num, 1, sharex = True)
+        self.axs[0].tick_params(axis='x', labeltop=True, top = True)
         self.ruler.clear_rulers()
         for ax in self.axs:
             self.ruler.add_ruler(ax)

@@ -283,9 +283,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         return content
 
     def updateMap(self, mouse_time, in_loc_idx, in_laser_idx, in_laser_channel):
-        self.key_loc_idx = in_loc_idx
-        self.key_laser_idx = in_laser_idx
-        self.key_laser_channel = in_laser_channel
         loc_idx = in_loc_idx
         laser_idx = in_laser_idx
         min_laser_channel = in_laser_channel
@@ -380,6 +377,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         laser_idx = 0
                         min_dt = None
                         for index in self.read_thread.laser.datas.keys():
+                            if self.map_widget is not None and not self.map_widget.isHidden():
+                                if index in self.map_widget.check_lasers:
+                                    if not self.map_widget.check_lasers[index].isChecked():
+                                        continue
                             t = np.array(self.read_thread.laser.t(index))
                             if len(t) < 1:
                                 continue
@@ -389,7 +390,6 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                 min_laser_channel = index
                                 laser_idx = tmp_laser_idx
                                 min_dt = tmp_dt
-                    print("min_laser_channer: ", min_laser_channel, " laser_idx: " , laser_idx)
                     org_point = [0 for _ in range(len(self.read_thread.laser.x(min_laser_channel)[0][laser_idx]))]
                     laser_x = [None] * len(org_point) * 2
                     laser_x[::2] = self.read_thread.laser.x(min_laser_channel)[0][laser_idx]
@@ -422,6 +422,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                                         + ' , ' + str(self.read_thread.content['LocationEachFrame']['theta'][pos_idx]))
                     
                 self.map_widget.updateRobotLaser(laser_points,min_laser_channel,robot_pos,robot_loc_pos, laser_info, loc_info, obs_pos, obs_info, depth_pos, particle_pos)
+        # print("min_laser_channer: ", min_laser_channel, " laser_idx: " , laser_idx)
+        self.key_loc_idx = loc_idx
+        self.key_laser_idx = laser_idx
+        self.key_laser_channel = min_laser_channel
         self.map_widget.redraw()
 
 
@@ -469,11 +473,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if len(self.map_select_lines) > 1:
                 if (event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D
                     or event.key() == QtCore.Qt.Key_Left or event.key() == QtCore.Qt.Key_Right):
-                    self.key_laser_idx = -1
-                    self.key_laser_channel = -1
                     cur_t = self.map_select_lines[0].get_xdata()[0]
-                    t = []
                     if event.key() == QtCore.Qt.Key_A or event.key() == QtCore.Qt.Key_D:
+                        self.key_laser_idx = -1
+                        self.key_laser_channel = -1
                         t = np.array(self.read_thread.content['LocationEachFrame']['t'])
                         if self.key_loc_idx < 0:
                             self.key_loc_idx = (np.abs(t-cur_t)).argmin()
@@ -505,17 +508,17 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                             t = self.read_thread.laser.t(min_laser_channel)
                             cur_t = t[laser_idx]
                         if event.key() == QtCore.Qt.Key_Left:
-                            if self.key_laser_idx >= 0:
-                                self.key_laser_idx = self.key_laser_idx -1
-                                t = self.read_thread.laser.t(self.key_laser_channel)
-                                cur_t = t[self.key_laser_idx]
+                            self.key_laser_idx = self.key_laser_idx -1
+                            t = self.read_thread.laser.t(self.key_laser_channel)
+                            if self.key_laser_idx < 0:
+                                self.key_laser_idx = len(t) - 1
+                            cur_t = t[self.key_laser_idx]
                         if event.key() == QtCore.Qt.Key_Right:
-                            if self.key_laser_idx < (len(t)-1):
-                                self.key_laser_idx = self.key_laser_idx + 1
-                                t = self.read_thread.laser.t(self.key_laser_channel)
-                                cur_t = t[self.key_laser_idx]
-                        
-                    print("laser channel: ", self.key_laser_channel, self.key_laser_idx, self.read_thread.laser.datas.keys())
+                            self.key_laser_idx = self.key_laser_idx + 1
+                            t = self.read_thread.laser.t(self.key_laser_channel)
+                            if self.key_laser_idx >= len(t):
+                                self.key_laser_idx = 0
+                            cur_t = t[self.key_laser_idx]
                     self.updateMap(cur_t, self.key_loc_idx, self.key_laser_idx, self.key_laser_channel)
 
 
@@ -670,7 +673,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.1b""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.2a""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

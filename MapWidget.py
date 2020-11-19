@@ -307,7 +307,7 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_pos = []
         self.laser_pos = dict()
         self.laser_org_data = np.array([])
-        self.laser_index = 0
+        self.laser_index = -1
         self.check_draw_flag = False
         self.fig_ratio = 1.0
         self.setAcceptDrops(True)
@@ -379,6 +379,80 @@ class MapWidget(QtWidgets.QWidget):
         self.fig_layout.addWidget(self.static_canvas)
         self.static_canvas.mpl_connect('resize_event', self.resize_fig)
 
+                #选择消息框
+        self.hbox = QtWidgets.QHBoxLayout()
+        self.check_all = QtWidgets.QCheckBox('ALL',self)
+        self.check_map = QtWidgets.QCheckBox('MAP',self)
+        self.check_robot = QtWidgets.QCheckBox('ROBOT',self)
+        self.check_partical = QtWidgets.QCheckBox('Paritical',self)
+        self.hbox.addWidget(self.check_all)
+        self.hbox.addWidget(self.check_map)
+        self.hbox.addWidget(self.check_robot)
+        self.hbox.addWidget(self.check_partical)
+        self.check_all.stateChanged.connect(self.changeCheckBoxAll)
+        self.check_map.stateChanged.connect(self.changeCheckBox)
+        self.check_robot.stateChanged.connect(self.changeCheckBox)
+        self.check_partical.stateChanged.connect(self.changeCheckBox)
+
+        self.check_lasers = dict()
+        self.hbox.setAlignment(QtCore.Qt.AlignLeft)
+        self.fig_layout.addLayout(self.hbox)
+        self.check_all.setChecked(True)
+
+    def add_laser_check(self, index):
+        self.check_lasers[index] = QtWidgets.QCheckBox('Laser'+str(index),self)
+        self.check_lasers[index].stateChanged.connect(self.changeCheckBox)
+        self.hbox.addWidget(self.check_lasers[index])
+
+    def changeCheckBoxAll(self):
+        if self.check_all.checkState() == QtCore.Qt.Checked:
+            self.check_map.setChecked(True)
+            self.check_robot.setChecked(True)
+            self.check_partical.setChecked(True)
+            for k in self.check_lasers.keys():
+                self.check_lasers[k].setChecked(True)
+        elif self.check_all.checkState() == QtCore.Qt.Unchecked:
+            self.check_map.setChecked(False)
+            self.check_robot.setChecked(False)
+            self.check_partical.setChecked(False)
+            for k in self.check_lasers.keys():
+                self.check_lasers[k].setChecked(False)
+
+    def changeCheckBox(self):
+        all_laser_check = True
+        part_laser_check = False
+        for k in self.check_lasers.keys():
+            if self.check_lasers[k].isChecked:
+                part_laser_check = True
+            else:
+                all_laser_check = False
+        if self.check_map.isChecked() and self.check_robot.isChecked() and all_laser_check\
+            and self.check_partical.isChecked():
+            self.check_all.setCheckState(QtCore.Qt.Checked)
+        elif self.check_map.isChecked() or self.check_robot.isChecked() or part_laser_check\
+            or self.check_partical.isChecked():
+            self.check_all.setTristate()
+            self.check_all.setCheckState(QtCore.Qt.PartiallyChecked)
+        else:
+            self.check_all.setTristate(False)
+            self.check_all.setCheckState(QtCore.Qt.Unchecked)
+
+        cur_check = self.sender()
+        if cur_check is self.check_robot:
+            self.robot_data.set_visible(cur_check.isChecked())
+            self.cur_arrow.set_visible(cur_check.isChecked())
+            self.cur_arrow.set_visible(cur_check.isChecked())
+        elif cur_check is self.check_map:
+            self.map_data.set_visible(cur_check.isChecked())
+        elif cur_check is self.check_partical:
+            self.particle_points.set_visible(cur_check.isChecked())
+        else:
+            for k in self.check_lasers.keys():
+                if cur_check is self.check_lasers[k]:
+                    if self.laser_index is k:
+                        self.laser_data.set_visible(cur_check.isChecked())
+                       
+        self.static_canvas.figure.canvas.draw() 
 
     def closeEvent(self,event):
         self.hide()
@@ -504,7 +578,28 @@ class MapWidget(QtWidgets.QWidget):
 
     def readModelFinished(self, result):
         if self.read_model.head and self.read_model.tail and self.read_model.width:
+            if self.laser_index is -1:
+                if len(self.read_model.laser) > 0:
+                    self.laser_index = list(self.read_model.laser.keys())[0]
             if self.laser_index in self.read_model.laser.keys():
+                for i in range(0, self.hbox.count()): 
+                    self.hbox.itemAt(i).widget().deleteLater()
+                self.check_all = QtWidgets.QCheckBox('ALL',self)
+                self.check_map = QtWidgets.QCheckBox('MAP',self)
+                self.check_robot = QtWidgets.QCheckBox('ROBOT',self)
+                self.check_partical = QtWidgets.QCheckBox('Paritical',self)
+                self.hbox.addWidget(self.check_all)
+                self.hbox.addWidget(self.check_map)
+                self.hbox.addWidget(self.check_robot)
+                self.hbox.addWidget(self.check_partical)
+                self.check_all.stateChanged.connect(self.changeCheckBoxAll)
+                self.check_map.stateChanged.connect(self.changeCheckBox)
+                self.check_robot.stateChanged.connect(self.changeCheckBox)
+                self.check_partical.stateChanged.connect(self.changeCheckBox)
+                for k in self.read_model.laser.keys():
+                    self.add_laser_check(k)
+                self.check_all.setChecked(True)
+
                 xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
                 ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
                 robot_shape = np.array([xdata, ydata])
@@ -662,6 +757,8 @@ class MapWidget(QtWidgets.QWidget):
             cross_shape = GetGlobalPos(cross_shape,self.robot_pos)
             self.robot_data_c0.set_xdata(cross_shape[0])
             self.robot_data_c0.set_ydata(cross_shape[1])
+            if self.laser_index in self.check_lasers:
+                self.laser_data.set_visible(self.check_lasers[self.laser_index].isChecked())
             laser_data = GetGlobalPos(laser_org_data, self.laser_pos[self.laser_index])
             laser_data = GetGlobalPos(laser_data,robot_pos)
             self.laser_data.set_xdata(laser_data[0])

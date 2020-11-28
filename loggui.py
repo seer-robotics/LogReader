@@ -137,7 +137,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         MyToolBar.home = self.new_home
         MyToolBar.forward = self.new_forward
         MyToolBar.back = self.new_back
-        self.addToolBar(MyToolBar(self.static_canvas, self._main, ruler = self.ruler))
+        self.toolBar = MyToolBar(self.static_canvas, self._main, ruler = self.ruler)
+        self.addToolBar(self.toolBar)
         # self.static_canvas.figure.subplots_adjust(left = 0.2/cur_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.axs= self.static_canvas.figure.subplots(cur_fig_num, 1, sharex = True)
         self.axs[0].tick_params(axis='x', labeltop=True, top = True)
@@ -198,7 +199,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_service.stateChanged.connect(self.changeCheckBox)
         self.check_all.stateChanged.connect(self.changeCheckBoxAll)
         self.check_all.setChecked(True)
-    
+
     def static_canvas_resizeEvent(self, event):
         self.static_canvas_ORG_resizeEvent(event)
         w = event.size().width()
@@ -431,21 +432,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def mouse_press(self, event):
         self.mouse_pressed = True
-        if event.inaxes and self.finishReadFlag:
+        if event.inaxes and self.finishReadFlag and not self.toolBar.isActive():
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 if event.button == 1:
                     content = 't, '  + event.inaxes.get_ylabel() + ' : ' + str(mouse_time) + ',' +str(event.ydata)
                     self.log_info.append(content)
-                else:
+                elif event.button == 3:      
+                    self.popMenu = QtWidgets.QMenu(self)
+                    self.popMenu.addAction('&Save Data',lambda:self.savePlotData(event.inaxes))
+                    cursor = QtGui.QCursor()
+                    self.popMenu.exec_(cursor.pos())
+                    # show info
                     content = self.get_content(mouse_time)
-                    self.log_info.append(content[:-1])
+                    if content != "":
+                        self.log_info.append(content[:-1])
                 if self.map_select_flag:
                     self.updateMap(mouse_time, -1, -1, -1)
 
     def mouse_move(self, event):
-        if event.inaxes and self.finishReadFlag:
+        if event.inaxes and self.finishReadFlag and not self.toolBar.isActive():
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
@@ -461,6 +468,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
     def mouse_release(self, event):
         self.mouse_pressed = False
         self.map_select_flag = False
+
+    def savePlotData(self, cur_ax):
+        indx = self.axs.tolist().index(cur_ax)
+        xy = self.xys[indx]
+        group_name = xy.y_combo.currentText().split('.')[0]
+        outdata = []
+        if xy.x_combo.currentText() == 't':
+            tmpdata = self.read_thread.data[xy.y_combo.currentText()]
+            for t, d in zip(tmpdata[1], tmpdata[0]):
+                outdata.append("{},{}".format(t.strftime('%Y-%m-%d %H:%M:%S.%f'), d))
+        elif xy.x_combo.currentText() == 'timestamp':
+            org_t = self.read_thread.data[group_name + '.timestamp'][0]
+            tmpdata = (self.read_thread.data[xy.y_combo.currentText()][0], org_t)
+            for t, d in zip(tmpdata[1], tmpdata[0]):
+                outdata.append("{},{}".format(t, d))
+        fname, _ = QtWidgets.QFileDialog.getSaveFileName(self,"选取log文件", "","CSV Files (*.csv);;All Files (*)")
+        logging.debug('Save ' + xy.y_combo.currentText() + ' and ' + xy.x_combo.currentText() + ' in ' + fname)
+        if fname:
+            with open(fname, 'w') as fn:
+                for d in outdata:
+                    fn.write(d+'\n')
 
     def onpick(self, event):
         if self.map_action.isChecked():
@@ -673,7 +701,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def about(self):
-        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.2a""")
+        QtWidgets.QMessageBox.about(self, "关于", """Log Viewer V2.1.2b""")
 
     def ycombo_onActivated(self):
         curcombo = self.sender()

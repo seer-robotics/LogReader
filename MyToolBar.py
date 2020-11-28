@@ -133,6 +133,9 @@ class MyToolBar(NavigationToolbar2QT):
         super().zoom(*args)
         self._update_buttons_checked()
 
+    def isActive(self):
+        return (self._active is not None)
+
     def ruler(self):
         """Activate ruler."""
         if self._active == 'RULER':
@@ -262,9 +265,13 @@ class RulerShapeMap(RulerShape):
         self._lines[indx].set_ydata([data[0][1],data[1][1]])
         self._texts[indx].set_x(data[1][0])
         self._texts[indx].set_y(data[1][1])
-        t1 = datetime.fromtimestamp(data[1][0] * 86400 - 62135712000)
-        t0 = datetime.fromtimestamp(data[0][0] * 86400 - 62135712000)
-        dt = (t1 - t0).total_seconds()
+        dt = data[1][0] - data[0][0]
+        try:
+            t1 = datetime.fromtimestamp(data[1][0] * 86400 - 62135712000)
+            t0 = datetime.fromtimestamp(data[0][0] * 86400 - 62135712000)
+            dt = (t1 - t0).total_seconds()
+        except:
+            pass 
         dy = data[1][1] - data[0][1]
         dydt = 0
         if abs(dt) > 1e-9:

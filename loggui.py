@@ -432,18 +432,19 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
     def mouse_press(self, event):
         self.mouse_pressed = True
-        if event.inaxes and self.finishReadFlag and not self.toolBar.isActive():
+        if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)
                 if event.button == 1:
                     content = 't, '  + event.inaxes.get_ylabel() + ' : ' + str(mouse_time) + ',' +str(event.ydata)
                     self.log_info.append(content)
-                elif event.button == 3:      
-                    self.popMenu = QtWidgets.QMenu(self)
-                    self.popMenu.addAction('&Save Data',lambda:self.savePlotData(event.inaxes))
-                    cursor = QtGui.QCursor()
-                    self.popMenu.exec_(cursor.pos())
+                elif event.button == 3:
+                    if not self.toolBar.isActive():
+                        self.popMenu = QtWidgets.QMenu(self)
+                        self.popMenu.addAction('&Save Data',lambda:self.savePlotData(event.inaxes))
+                        cursor = QtGui.QCursor()
+                        self.popMenu.exec_(cursor.pos())
                     # show info
                     content = self.get_content(mouse_time)
                     if content != "":
@@ -452,7 +453,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     self.updateMap(mouse_time, -1, -1, -1)
 
     def mouse_move(self, event):
-        if event.inaxes and self.finishReadFlag and not self.toolBar.isActive():
+        if event.inaxes and self.finishReadFlag:
             mouse_time = event.xdata * 86400 - 62135712000
             if mouse_time > 1e6:
                 mouse_time = datetime.fromtimestamp(mouse_time)

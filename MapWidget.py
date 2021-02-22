@@ -16,6 +16,7 @@ import matplotlib.patches as patches
 from matplotlib.textpath import TextPath
 import math
 import logging
+import copy
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -36,7 +37,7 @@ class Readcp (QThread):
         fid = open(self.cp_name, encoding= 'UTF-8')
         self.js = js.load(fid)
         fid.close()
-        self.laser = []
+        self.laser = dict()
         x, y, r = 0, 0, 0
         if 'deviceTypes' in self.js:
             for device in self.js['deviceTypes']:
@@ -51,8 +52,8 @@ class Readcp (QThread):
                                         y = p['doubleValue']
                                     elif p['key'] == 'yaw':
                                         r = p['doubleValue']
+                        self.laser[laser['name']] = [float(x), float(y), np.deg2rad(r)]
                     break
-        self.laser = [float(x), float(y), np.deg2rad(r)]
         self.signal.emit(self.cp_name)
 
 class Readmodel(QThread):
@@ -66,6 +67,7 @@ class Readmodel(QThread):
         self.width = None
         self.loc_laser_ind = 0
         self.laser = dict() #x,y,r
+        self.laser_id2name = dict()
     # run method gets called when we start the thread
     def run(self):
         with open(self.model_name, 'r',encoding= 'UTF-8') as fid:
@@ -124,6 +126,7 @@ class Readmodel(QThread):
                                             if p['boolValue'] == True:
                                                 self.loc_laser_ind = idx
                             self.laser[idx] = [float(x),float(y),np.deg2rad(r)]
+                            self.laser_id2name[idx] = laser['name']
             else:
                 logging.error('Cannot Open robot.model: ' + self.model_name)
             self.signal.emit(self.model_name)
@@ -606,7 +609,7 @@ class MapWidget(QtWidgets.QWidget):
                 xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
                 xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
                 cross_shape = np.array([xxdata,xydata])
-                self.laser_pos = self.read_model.laser
+                self.laser_pos = copy.deepcopy(self.read_model.laser)
                 laser_data = [self.laser_pos[self.laser_index][0], self.laser_pos[self.laser_index][1]]
                 if not self.robot_pos:
                     if len(self.draw_size) == 4:
@@ -660,16 +663,19 @@ class MapWidget(QtWidgets.QWidget):
     def readCPFinished(self, result):
         if self.read_model.laser:
             if self.read_cp.laser:
-                self.laser_pos[self.read_model.loc_laser_ind][0] = self.read_model.laser[self.read_model.loc_laser_ind][0] + self.read_cp.laser[0]
-                self.laser_pos[self.read_model.loc_laser_ind][1] = self.read_model.laser[self.read_model.loc_laser_ind][1] + self.read_cp.laser[1]
-                self.laser_pos[self.read_model.loc_laser_ind][2] = self.read_model.laser[self.read_model.loc_laser_ind][2] + self.read_cp.laser[2]
-                laser_data = [self.laser_pos[self.read_model.loc_laser_ind][0], self.laser_pos[self.read_model.loc_laser_ind][1]]
-                if self.laser_org_data.any() and self.laser_index == self.read_model.loc_laser_ind:
-                    laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos[self.laser_index])
-                    laser_data = GetGlobalPos(laser_data, self.robot_pos)
-                    self.laser_data.set_xdata(laser_data[0])
-                    self.laser_data.set_ydata(laser_data[1])
-                    self.static_canvas.figure.canvas.draw()
+                for key in self.read_model.laser.keys():
+                    self.laser_pos[key] = [0,0,0]
+                    laser_name = self.read_model.laser_id2name[key]
+                    self.laser_pos[key][0] = self.read_model.laser[key][0] + self.read_cp.laser[laser_name][0]
+                    self.laser_pos[key][1] = self.read_model.laser[key][1] + self.read_cp.laser[laser_name][1]
+                    self.laser_pos[key][2] = self.read_model.laser[key][2] + self.read_cp.laser[laser_name][2]
+                    laser_data = [self.laser_pos[key][0], self.laser_pos[key][1]]
+                    if self.laser_org_data.any() and self.laser_index == key:
+                        laser_data = GetGlobalPos(self.laser_org_data, self.laser_pos[self.laser_index])
+                        laser_data = GetGlobalPos(laser_data, self.robot_pos)
+                        self.laser_data.set_xdata(laser_data[0])
+                        self.laser_data.set_ydata(laser_data[1])
+                        self.static_canvas.figure.canvas.draw()
 
     def readtrajectory(self, x, y, xn, yn, x0, y0, r0):
         self.trajectory.set_xdata(x)

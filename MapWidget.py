@@ -385,9 +385,13 @@ class MapWidget(QtWidgets.QWidget):
                 #选择消息框
         self.hbox = QtWidgets.QHBoxLayout()
         self.check_all = QtWidgets.QCheckBox('ALL',self)
+        self.check_all.setFocusPolicy(QtCore.Qt.NoFocus)
         self.check_map = QtWidgets.QCheckBox('MAP',self)
+        self.check_map.setFocusPolicy(QtCore.Qt.NoFocus)
         self.check_robot = QtWidgets.QCheckBox('ROBOT',self)
+        self.check_robot.setFocusPolicy(QtCore.Qt.NoFocus)
         self.check_partical = QtWidgets.QCheckBox('Paritical',self)
+        self.check_partical.setFocusPolicy(QtCore.Qt.NoFocus)
         self.hbox.addWidget(self.check_all)
         self.hbox.addWidget(self.check_map)
         self.hbox.addWidget(self.check_robot)
@@ -401,9 +405,10 @@ class MapWidget(QtWidgets.QWidget):
         self.hbox.setAlignment(QtCore.Qt.AlignLeft)
         self.fig_layout.addLayout(self.hbox)
         self.check_all.setChecked(True)
-
+        
     def add_laser_check(self, index):
         self.check_lasers[index] = QtWidgets.QCheckBox('Laser'+str(index),self)
+        self.check_lasers[index].setFocusPolicy(QtCore.Qt.NoFocus)
         self.check_lasers[index].stateChanged.connect(self.changeCheckBox)
         self.hbox.addWidget(self.check_lasers[index])
 
@@ -588,9 +593,13 @@ class MapWidget(QtWidgets.QWidget):
                 for i in range(0, self.hbox.count()): 
                     self.hbox.itemAt(i).widget().deleteLater()
                 self.check_all = QtWidgets.QCheckBox('ALL',self)
+                self.check_all.setFocusPolicy(QtCore.Qt.NoFocus)
                 self.check_map = QtWidgets.QCheckBox('MAP',self)
+                self.check_map.setFocusPolicy(QtCore.Qt.NoFocus)
                 self.check_robot = QtWidgets.QCheckBox('ROBOT',self)
+                self.check_robot.setFocusPolicy(QtCore.Qt.NoFocus)
                 self.check_partical = QtWidgets.QCheckBox('Paritical',self)
+                self.check_partical.setFocusPolicy(QtCore.Qt.NoFocus)
                 self.hbox.addWidget(self.check_all)
                 self.hbox.addWidget(self.check_map)
                 self.hbox.addWidget(self.check_robot)

@@ -80,7 +80,6 @@ class DataSelection(QtWidgets.QWidget):
             self.getdata.emit([self.ax, name])
         except:
             pass
-
 class SelectEnum(Enum):
     NoSelect = 0
     Left = 1
@@ -538,6 +537,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     self.popMenu.addAction('&Deg2Rad', lambda:self.deg2Rad(event.inaxes))
                     self.popMenu.addAction('&Add Data', lambda:self.addData(event.inaxes))
                     self.popMenu.addAction('&Statistic', lambda:self.statistic(event.inaxes))
+                    self.popMenu.addAction('&Gapping', lambda:self.gappingData(event.inaxes))
                     cursor = QtGui.QCursor()
                     self.popMenu.exec_(cursor.pos())
                 # show info
@@ -778,6 +778,60 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if isinstance(a, int) or isinstance(a, float):
                 data.append(-a)
         self.drawdata(cur_ax, (data, tmpdata[1]), '-'+self.read_thread.ylabel[xy.y_combo.currentText()], False)
+
+    def gappingData(self, cur_ax):
+        newdata = []
+        newdata_t = []
+        text, ok = QtWidgets.QInputDialog.getDouble(self, 'gappingData', '输入差值', decimals=6) 
+        if ok:
+            print(str(text))
+        indx = self.axs.tolist().index(cur_ax)
+        xy = self.xys[indx]        
+        group_name = xy.y_combo.currentText().split('.')[0]
+        if xy.x_combo.currentText() == 'timestamp':
+            org_t = self.read_thread.getData(group_name + '.timestamp')[0]
+            if len(org_t) > 0:
+                ind = self.getTimeStampValidInd(org_t)
+                dt = [timedelta(seconds = (tmp_t/1e9 - org_t[ind]/1e9)) for tmp_t in org_t]
+                t = [self.read_thread.getData(xy.y_combo.currentText())[1][ind] + tmp for tmp in dt]
+                tmpdata = [self.read_thread.getData(xy.y_combo.currentText())[0], t]
+                size = len(tmpdata[0])
+                last_index = 0
+                for i in range(0, size-1):
+                    diff = abs(tmpdata[0][i] - tmpdata[0][i+1])
+                    if(diff > text):
+                        print("diff is %f" % diff)
+                        if i != last_index:
+                            newdata.append(tmpdata[0][i])
+                            newdata_t.append(tmpdata[1][i])
+                            newdata.append(tmpdata[0][i+1])
+                            newdata_t.append(tmpdata[1][i+1])
+                            last_index = i+1
+                        else:
+                            newdata.append(tmpdata[0][i+1])
+                            newdata_t.append(tmpdata[1][i+1])
+                            last_index = i+1
+                self.drawdata(cur_ax, (newdata, newdata_t), str(text)+' '+self.read_thread.ylabel[xy.y_combo.currentText()], False)
+                return
+        tmpdata = self.read_thread.getData(xy.y_combo.currentText())
+        size = len(tmpdata[0])
+        last_index = 0
+        for i in range(0, size-1):
+            diff = abs(tmpdata[0][i] - tmpdata[0][i+1])
+            if(diff > text):
+                print("diff is %f" % diff)
+                if i != last_index:
+                    newdata.append(tmpdata[0][i])
+                    newdata_t.append(tmpdata[1][i])
+                    newdata.append(tmpdata[0][i+1])
+                    newdata_t.append(tmpdata[1][i+1])
+                    last_index = i+1
+                else:
+                    newdata.append(tmpdata[0][i+1])
+                    newdata_t.append(tmpdata[1][i+1])
+                    last_index = i+1
+        
+        self.drawdata(cur_ax, (newdata, newdata_t), str(text)+' '+self.read_thread.ylabel[xy.y_combo.currentText()], False)
 
     def rad2Deg(self, cur_ax):
         indx = self.axs.tolist().index(cur_ax)

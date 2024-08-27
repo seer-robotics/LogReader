@@ -66,6 +66,7 @@ class ReadLog:
         self.filenames = filenames
         self.lines = []
         self.lines_num = 0
+        self.t_and_num = []
         self.thread_num = 4
         self.tmin = None
         self.tmax = None
@@ -100,24 +101,7 @@ class ReadLog:
             if "RoboKit Log Start" in line:
                 continue
             lines.append(line)
-        for line in lines:
-            out = self.regex.match(line)
-            if out:
-                t = rbktimetodate(out.group(1))
-                if self.tmin is None:
-                    self.tmin = t
-                elif self.tmin > t:
-                    self.tmin = t
-                break
-        for line in reversed(lines):
-            out = self.regex.match(line)
-            if out:
-                t = rbktimetodate(out.group(1))
-                if self.tmax is None:
-                    self.tmax = t
-                elif self.tmax < t:
-                    self.tmax = t
-                break
+
         self.lines.extend(lines)
 
     def _work(self, argv):
@@ -221,6 +205,22 @@ class ReadLog:
                         self._readData(f, file)    
                 except:
                     continue
+        self.t_and_num = []
+        last_t_str = ''
+        for ind, line in enumerate(self.lines):
+            if len(line) > 18 and line[0] == '[' and line[18] ==']':
+                if last_t_str != line[1:17]:
+                    last_t_str = line[1:17]
+                    t = rbktimetodate(line[1:18])
+                    self.t_and_num.append([t, ind])
+        self.t_and_num.sort(key = lambda y:y[0])
+        if len(self.t_and_num) > 0:
+            self.tmin = self.t_and_num[0][0]
+            self.tmax = self.t_and_num[-1][0]
+        else:
+            self.tmax = None
+            self.tmin =None
+        print("t:", len(self.t_and_num), self.tmin, self.tmax)
         self._work(argv)
 
 

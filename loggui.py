@@ -1565,22 +1565,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 print(self.read_thread.getData('LocationEachFrame.t'))
                 if len(t) > 0:
                     self.key_loc_idx = (np.abs(t-self.mid_line_t)).argmin()
-            label = ''
-            if 'LocationEachFrame' in self.read_thread.content:
-                label = 'LocationEachFrame'
-            elif 'Location' in self.read_thread.content:
-                label = 'Location'
-            if label != '' and self.key_loc_idx > 0:
-                idx = self.read_thread.content[label].line_num[self.key_loc_idx]
-                dt1 = (self.mid_line_t - self.read_thread.reader.tmin).total_seconds()
-                dt2 = (self.read_thread.content[label]['t'][self.key_loc_idx] - self.read_thread.reader.tmin).total_seconds()
-                ratio = dt1/ dt2
-                idx = idx * ratio
-                if idx > self.read_thread.reader.lines_num:
-                    idx = self.read_thread.reader.lines_num
-                if idx < 0:
-                    idx = 0
-                self.log_widget.setLineNum(idx)
+                
+            if len(self.read_thread.reader.t_and_num) > 0:
+                org_t = [a[0] for a in self.read_thread.reader.t_and_num]
+                t = np.array(org_t)
+                idx = (np.abs(t-self.mid_line_t)).argmin()
+                self.log_widget.setLineNum(self.read_thread.reader.t_and_num[idx][1])
 
     def openDataView(self, flag):
         if flag:

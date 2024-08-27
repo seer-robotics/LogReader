@@ -12,6 +12,7 @@ __pycache__/
 *.7z
 *.xml
 *.iml
+test*
 
 # C extensions
 *.so

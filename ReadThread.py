@@ -1,6 +1,6 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from loglibPlus import Data, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service, ParticleState
-from loglibPlus import Memory, DepthCamera, RobotStatus
+from loglibPlus import Memory, DepthCamera, RobotStatus, obsDetect
 from datetime import timedelta
 from datetime import datetime
 import os
@@ -47,7 +47,7 @@ class ReadThread(QThread):
         self.js = dict()
         self.content = dict()
         self.data = dict()
-        self.data_org_key = dict()
+        self.data_org_key = dict() # 用于动态解析日志文件
         self.ylabel = dict()
         self.laser = Laser(1000.0)
         self.err = ErrorLine()
@@ -59,6 +59,7 @@ class ReadThread(QThread):
         self.service = Service()
         self.memory = Memory()
         self.depthcamera = DepthCamera()
+        self.obsDetect = obsDetect()
         self.particle = ParticleState()
         self.rstatus = RobotStatus()
         self.log =  []
@@ -89,8 +90,15 @@ class ReadThread(QThread):
         content_delay = dict()
         for k in self.js:
             if "type" in self.js[k] and "content" in self.js[k]:
-                if k == "LocationEachFrame" or k == "StopPoints"  or k == "SlowDownPoints" or self.js[k]["content"] == "key|value":
-                    self.content[self.js[k]["type"]] = Data(self.js[k], self.js[k]["type"])
+                if k == "LocationEachFrame" or \
+                k == "StopPoints"  or \
+                k == "SlowDownPoints" or \
+                (isinstance(self.js[k]['content'], str) and self.js[k]["content"] == "key|value") or \
+                (isinstance(self.js[k]['content'], str) and self.js[k]['content'] == "path"):
+                    if isinstance(self.js[k]['content'], str) and self.js[k]['content'] == "path":
+                        self.content[self.js[k]["type"]] = Data(self.js[k], self.js[k]["type"], None, True)
+                    else:
+                        self.content[self.js[k]["type"]] = Data(self.js[k], self.js[k]["type"])
                 else:
                     if isinstance(self.js[k]['type'], list):
                         for type in self.js[k]["type"]:
@@ -99,7 +107,10 @@ class ReadThread(QThread):
                         if self.js[k]['type'] == "Text" and isinstance(self.js[k].get("textKey", None), str):
                             content_delay[self.js[k]['textKey']] = Data(self.js[k], self.js[k]['type'], self.js[k]['textKey'])
                         else:
-                            content_delay[self.js[k]['type']] = Data(self.js[k], self.js[k]['type'], None)
+                            if isinstance(self.js[k]['content'], str) and self.js[k]['content'] == "path":
+                                content_delay[self.js[k]['type']] = Data(self.js[k], self.js[k]['type'], None, True)
+                            else:
+                                content_delay[self.js[k]['type']] = Data(self.js[k], self.js[k]['type'], None)
         self.err = ErrorLine()
         self.war = WarningLine()
         self.fatal = FatalLine()
@@ -109,6 +120,7 @@ class ReadThread(QThread):
         self.service = Service()
         self.memory = Memory()
         self.depthcamera = DepthCamera()
+        self.obsDetect : obsDetect = obsDetect()
         self.particle = ParticleState()
         self.rstatus = RobotStatus()
         self.tlist = []
@@ -125,7 +137,7 @@ class ReadThread(QThread):
                             self.war, self.fatal, self.notice, 
                             self.taskstart, self.taskfinish, self.service, 
                             self.memory, self.depthcamera, self.particle,
-                            self.rstatus)
+                            self.rstatus, self.obsDetect)
             time_end=time.time()
             self.log.append('read time cost: ' + str(time_end-time_start))
             self.content.update(content_delay)
@@ -219,6 +231,13 @@ class ReadThread(QThread):
         self.ylabel["depthcamera.number"] = "深度摄像头id"
         self.ylabel["depthcamera.ts"] = "深度摄像头时间戳"
         
+        self.data["obsDetect.number"] = self.obsDetect.number()
+        self.data["obsDetect.ts"] = self.obsDetect.ts()
+        self.data["obsDetect.name"] = self.obsDetect.device_name()
+        self.ylabel["obsDetect.number"] = "感知Sensor id"
+        self.ylabel["obsDetect.ts"] = "感知Sensor 时间戳"
+        self.ylabel["obsDetect.name"] = "感知Sensor 名称"
+
         self.data["particle.number"] = self.particle.number()
         self.data["particle.ts"] = self.particle.ts()
         self.ylabel["particle.number"] = "粒子数目"

@@ -30,6 +30,7 @@ from PyQt5.QtCore import pyqtSignal
 import MotorRead as mr
 from getMotorErr import MotorErrViewer 
 from TargetPrecision import TargetPrecision
+from ArmPlot import Arm
 
 
 
@@ -268,6 +269,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.precision.triggered.connect(self.openPrecision)
         self.tools_menu.addAction(self.precision)
 
+
+        self.arm_aciton = QtWidgets.QAction('&Arm', self.tools_menu, checkable = True)
+        self.arm_aciton.triggered.connect(self.openArm)
+        self.tools_menu.addAction(self.arm_aciton)
+
         self.help_menu = QtWidgets.QMenu('&Help', self)
         self.help_menu.addAction('&About', self.about)
         self.menuBar().addMenu(self.help_menu)
@@ -391,6 +397,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
         self.targetPrecision = TargetPrecision(self)
         self.targetPrecision.hide()
+        self.arm = Arm()
         # dataView相关的初始化
         self.dataViewNewOne(None)
 
@@ -494,6 +501,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.updateLogView()
         self.updateJsonView()
         self.updateDataViews()
+        self.updateArmViews()
 
     def updateJsonView(self):
         if len(self.read_thread.rstatus.chassis()[1]) > 0:
@@ -851,9 +859,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         min_data = min(datas)
         average = 0.0
         if len(datas) > 0:
-            for a in datas:
-                average += a
-            average = average/len(datas)
+            average = sum(datas) / len(datas)
         content = "{3} average: {0:.4}, max: {1:.4}, min: {2:.4}, num: {4}".format(average, max_data, min_data, xy.y_combo.currentText(), len(datas))
         self.log_info.append(content)
         plt.figure()
@@ -866,44 +872,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         current_text = event[1]
         current_text = current_text.replace(" ", "")
         tmpdata = None
-        print("*" in current_text, current_text)
-        if "+" in current_text or "-" in current_text or "*" in current_text:
-            if "+" in current_text:
-                result = current_text.split("+")
-                if len(result) != 2:
-                    return
-                data0 = self.read_thread.getData(result[0])
-                data1 = self.read_thread.getData(result[1])
-                if len(data0[0]) != len(data1[0]):
-                    return
-                # 时间长度一样
-                tmpdata = [[],[]]
-                tmpdata[1] = data0[1] # 时间在 1 号元素中
-                for (d0, d1) in zip(data0[0], data1[0]):
-                    if type(d0) is float and type(d1) is float:
-                        tmpdata[0].append(d0 + d1)
-                    else:
-                        # print("error", type(d0),type(d1))
-                        tmpdata[0].append(0)
-                print("-",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]), len(data1[1]))
-            elif "-" in current_text:
-                result = current_text.split("-")
-                if len(result) == 1:
-                    data0 = self.read_thread.getData(result[0])
-                    tmpdata = [[],[]]
-                    tmpdata[1] = data0[1]
-                    for d0 in data0[0]:
-                        tmpdata[0].append(-d0)
-                    print("-",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]))
-                elif len(result) == 2:
+        if current_text.count(".") == 2:
+            if " + " in current_text or " - " in current_text or " * " in current_text:
+                if "+" in current_text:
+                    result = current_text.split("+")
+                    if len(result) != 2:
+                        return
                     data0 = self.read_thread.getData(result[0])
                     data1 = self.read_thread.getData(result[1])
-                    print(len(data0[0]), len(data1[0]), result[0])
-                    if result[0] == '':
-                        tmpdata = [[],[]]
-                        tmpdata[1] = data1[1]
-                        for d0 in data1[0]:
-                            tmpdata[0].append(-d0)
                     if len(data0[0]) != len(data1[0]):
                         return
                     # 时间长度一样
@@ -911,36 +887,67 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     tmpdata[1] = data0[1] # 时间在 1 号元素中
                     for (d0, d1) in zip(data0[0], data1[0]):
                         if type(d0) is float and type(d1) is float:
-                            tmpdata[0].append(d0 - d1)
+                            tmpdata[0].append(d0 + d1)
                         else:
                             # print("error", type(d0),type(d1))
                             tmpdata[0].append(0)
                     print("-",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]), len(data1[1]))
-            elif "*" in current_text:
-                result = current_text.split("*")
-                if len(result) != 2:
-                    return
-                data0 = self.read_thread.getData(result[0])
-                data1 = self.read_thread.getData(result[1])
-                print(len(data0[0]), len(data1[0]), result[0])
-                if result[0] == '':
+                elif " - " in current_text:
+                    result = current_text.split("-")
+                    if len(result) == 1:
+                        data0 = self.read_thread.getData(result[0])
+                        tmpdata = [[],[]]
+                        tmpdata[1] = data0[1]
+                        for d0 in data0[0]:
+                            tmpdata[0].append(-d0)
+                        print("-",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]))
+                    elif len(result) == 2:
+                        data0 = self.read_thread.getData(result[0])
+                        data1 = self.read_thread.getData(result[1])
+                        print(len(data0[0]), len(data1[0]), result[0])
+                        if result[0] == '':
+                            tmpdata = [[],[]]
+                            tmpdata[1] = data1[1]
+                            for d0 in data1[0]:
+                                tmpdata[0].append(-d0)
+                        if len(data0[0]) != len(data1[0]):
+                            return
+                        # 时间长度一样
+                        tmpdata = [[],[]]
+                        tmpdata[1] = data0[1] # 时间在 1 号元素中
+                        for (d0, d1) in zip(data0[0], data1[0]):
+                            if type(d0) is float and type(d1) is float:
+                                tmpdata[0].append(d0 - d1)
+                            else:
+                                # print("error", type(d0),type(d1))
+                                tmpdata[0].append(0)
+                        print("-",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]), len(data1[1]))
+                elif " * " in current_text:
+                    result = current_text.split("*")
+                    if len(result) != 2:
+                        return
+                    data0 = self.read_thread.getData(result[0])
+                    data1 = self.read_thread.getData(result[1])
+                    print(len(data0[0]), len(data1[0]), result[0])
+                    if result[0] == '':
+                        tmpdata = [[],[]]
+                        tmpdata[1] = data1[1]
+                        for d0 in data1[0]:
+                            tmpdata[0].append(d0)
+                    if len(data0[0]) != len(data1[0]):
+                        return
+                    # 时间长度一样
                     tmpdata = [[],[]]
-                    tmpdata[1] = data1[1]
-                    for d0 in data1[0]:
-                        tmpdata[0].append(d0)
-                if len(data0[0]) != len(data1[0]):
-                    return
-                # 时间长度一样
-                tmpdata = [[],[]]
-                tmpdata[1] = data0[1] # 时间在 1 号元素中
-                for (d0, d1) in zip(data0[0], data1[0]):
-                    if type(d0) is float and type(d1) is float:
-                        tmpdata[0].append(d0 * d1)
-                    else:
-                        # print("error", type(d0),type(d1))
-                        tmpdata[0].append(0)
-                print("*",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]), len(data1[1]))        
-
+                    tmpdata[1] = data0[1] # 时间在 1 号元素中
+                    for (d0, d1) in zip(data0[0], data1[0]):
+                        if type(d0) is float and type(d1) is float:
+                            tmpdata[0].append(d0 * d1)
+                        else:
+                            # print("error", type(d0),type(d1))
+                            tmpdata[0].append(0)
+                    print("*",len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), len(data0[0]), len(data1[1])) 
+            else:
+                tmpdata = self.read_thread.getData(current_text)       
         else :
             tmpdata = self.read_thread.getData(current_text)
         # print(len(tmpdata), len(tmpdata[0]), len(tmpdata[1]), current_text in self.read_thread.ylabel)
@@ -1013,6 +1020,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if text in self.read_thread.data:
                 data = self.read_thread.getData(text)[0]
                 if data:
+                    if isinstance(data[0], str):
+                        continue
                     tmpd = np.array(data)
                     tmpd = tmpd[~np.isnan(tmpd)]
                     if len(tmpd) > 0:
@@ -1476,6 +1485,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_widget.hide()
         self.static_canvas.figure.canvas.draw()
     
+    def openArm(self, checked):
+        if checked:
+            self.arm.show()
+    
     def viewMotorErr(self, checked):
         if checked:
             if not self.motor_view_widget:
@@ -1545,18 +1558,19 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         if self.log_widget is not None \
             and self.mid_line_t is not None \
                 and self.read_thread.reader is not None:
-            if self.key_loc_idx < 0:
+            if self.key_loc_idx < 0 and 'LocationEachFrame' in self.read_thread.content:
                 t = np.array(self.read_thread.content['LocationEachFrame']['t'])
                 print("t", len(t), len(self.read_thread.content['LocationEachFrame']['t']), len(self.read_thread.content['LocationEachFrame'].data['t']))
                 print(self.read_thread.content['LocationEachFrame'].data.keys())
                 print(self.read_thread.getData('LocationEachFrame.t'))
-                self.key_loc_idx = (np.abs(t-self.mid_line_t)).argmin()
+                if len(t) > 0:
+                    self.key_loc_idx = (np.abs(t-self.mid_line_t)).argmin()
             label = ''
             if 'LocationEachFrame' in self.read_thread.content:
                 label = 'LocationEachFrame'
             elif 'Location' in self.read_thread.content:
                 label = 'Location'
-            if label != '':
+            if label != '' and self.key_loc_idx > 0:
                 idx = self.read_thread.content[label].line_num[self.key_loc_idx]
                 dt1 = (self.mid_line_t - self.read_thread.reader.tmin).total_seconds()
                 dt2 = (self.read_thread.content[label]['t'][self.key_loc_idx] - self.read_thread.reader.tmin).total_seconds()
@@ -1842,7 +1856,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         for (idx, chassis)  in enumerate(self.read_thread.rstatus.chassis()[0]):
             tmpj = self.getRStatusJson(idx, chassis)
             for key in keys:
-                if key in tmpj:
+                if tmpj != None and key in tmpj:
                     tmpj = tmpj[key]
                 else:
                     tmpj = None
@@ -1852,7 +1866,29 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 values.append(tmpj)
                 ts.append(self.read_thread.rstatus.chassis()[1][idx])
         self.drawdata(ax, (values, ts), y_label, False)
-            
+
+    def updateArmViews(self):
+        if not self.arm.isShow():
+            return
+        left_q = []
+        right_q = []
+        def getq(key):
+            cur_j0 = self.read_thread.getData(key+".cur_j0")
+            ts = np.array(cur_j0[1])
+            idx = (np.abs(ts - self.mid_line_t)).argmin()
+            return [self.read_thread.getData(key+".cur_j0")[0][idx],
+                    self.read_thread.getData(key+".cur_j1")[0][idx],
+                    self.read_thread.getData(key+".cur_j2")[0][idx],
+                    self.read_thread.getData(key+".cur_j3")[0][idx],
+                    self.read_thread.getData(key+".cur_j4")[0][idx],
+                    self.read_thread.getData(key+".cur_j5")[0][idx],
+                    self.read_thread.getData(key+".cur_j6")[0][idx]]
+        left_q = getq("left_hand_pose_ik_update")
+        right_q = getq("right_hand_pose_ik_update")
+        self.arm.plot(left_q = left_q, right_q= right_q)
+
+
+
 
 if __name__ == "__main__":
     freeze_support()

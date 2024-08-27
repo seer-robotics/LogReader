@@ -83,7 +83,11 @@
       {"index": 28, "name": "stop_block", "type": "bool"},
       {"index": 29, "name": "cur_block_id", "type": "str"},
       {"index": 30, "name": "set_core_goods_id", "type": "str"},
-      {"index": 31, "name": "multirobots_type", "type": "double", "description": "0: None, 1: Leader, 2: Follower"}
+      {"index": 31, "name": "script_laser_width_size", "type": "double"},
+      {"index": 32, "name": "last_task_status", "type": "double"},
+      {"index": 33, "name": "tcp_x", "type": "double"},
+      {"index": 34, "name": "tcp_y", "type": "double"},
+      {"index": 35, "name": "tcp_theta", "type": "double"}
     ]
   },
   "Odometer": {
@@ -106,6 +110,25 @@
       { "index": 14, "name": "encode2", "type": "int64", "description": "2号编码器", "unit":"" },
       { "index": 15, "name": "encode3", "type": "int64", "description": "3号编码器", "unit":"" },
       { "index": 16, "name": "encode4", "type": "int64", "description": "4号编码器", "unit":"" }
+    ]
+  },
+
+  "OdoFilter": {
+    "type": ["OdoFilterleft-wheel", "OdoFilterright-wheel", "OdoFiltermotor", "OdoFiltermotor1"],
+    "content": [
+      {"name": "org_speed", "type": "double"  },
+      {"name": "org_ts", "type": "double"  },
+      {"name": "speed", "type": "double"  },
+      {"name": "preSpeed", "type": "double" },
+      {"name": "Acc", "type": "double"},
+      {"name": "preAcc", "type": "double"},
+      {"name": "encode", "type": "double"},
+      {"name": "PreEncode", "type": "double" },
+      {"name": "pos", "type": "double"},
+      {"name": "prePos", "type": "double"},
+      {"name": "preTs", "type": "double" },
+      { "name": "Ts", "type": "double"},
+      { "name": "dt", "type": "double"}
     ]
   },
   "SensorFuserPoints":{
@@ -605,6 +628,45 @@
       {"name": "stop_flag", "type": "bool","unit":""  }     
     ]
   },
+  "SMPC": {
+    "type": "SMPC",
+    "content": [
+      {"name": "vw", "type": "rad"},
+      {"name": "cur_vw", "type": "rad"},
+      {"name": "vx", "type": "rad"},
+      {"name": "x", "type": "double"},
+      {"name": "y", "type": "double"},
+      {"name": "theta", "type": "rad"}  
+    ]
+  },
+  "VelInter": {
+    "type": "VelInter",
+    "content": [
+      {"name": "near_ind", "type": "double"},
+      {"name": "prime_vel", "type": "double"},
+      {"name": "vel", "type": "double"}
+    ]
+  },
+  "constrainVwBySteer":{
+    "type": "constrainVwBySteer",
+    "content": [
+      {"name": "vw", "type": "rad"},
+      {"name": "vx", "type": "double"}
+    ]
+  },
+  "FallDown": {
+    "type": "FallDown",
+    "content": [
+      {"name": "state", "type": "str"},
+      {"name": "m_filter_ind", "type": "double"},
+      {"name": "m_cur_filter_size", "type": "double"},
+      {"name": "theta0", "type": "rad"},
+      {"name": "angle", "type": "rad"},
+      {"name": "dtheta", "type": "rad"},
+      {"name": "dt", "type": "double"},
+      {"name": "detect_condition", "type": "double"}
+    ]
+  },
   "followMode":{
     "type":"followMode",
     "content": [
@@ -1023,6 +1085,10 @@
     "type": "MotorSend",
     "content": "key|value"
   },
+  "RealMotorSend": {
+    "type": "RealMotorSend",
+    "content": "key|value"
+  },
   "MotorMoveType": {
     "type": "MotorMoveType",
     "content": "key|value"
@@ -1139,7 +1205,8 @@
       { "index": 9, "name": "encodercnt", "type": "int64", "description": "编码器", "unit":""  },
       { "index": 10, "name": "motorName", "type":"str", "description": "电机名称"},
       { "index": 11, "name": "errcode", "type": "int64", "description": "错误码", "unit":""  },
-      { "index": 12, "name": "raw_position", "type": "double", "description": "原始位置", "unit":""  }
+      { "index": 12, "name": "raw_position", "type": "double", "description": "原始位置", "unit":""  },
+      { "index": 13, "name": "calib", "type": "bool", "description": "标定", "unit":""  }
     ]
   },
   "SendDiffSteers": {
@@ -1160,6 +1227,32 @@
       {"name": "last_dsteer_angle", "type": "double", "unit":""  },
       {"name": "delta_vw", "type": "double", "unit":""  },
       {"name": "real_steer_angle", "type": "rad", "unit":""  }
+    ]
+  },
+  "cal_ref_speed": {
+    "type": "cal_ref_speed",
+    "content": [
+      {"name": "reach_dist", "type":"double", "description": "电机名称"},
+      {"name": "maxDcc", "type": "double", "unit":"" },
+      {"name": "maxAcc", "type": "double", "unit":""  },
+      {"name": "maxSpeed", "type": "double"},
+      {"name": "lateralAcc", "type": "double", "unit":""  },
+      {"name": "jerk", "type": "double", "unit":""  },
+      {"name": "jerk_step", "type": "double", "unit":""  },
+      {"name": "steer_speed", "type": "double", "unit":""  },
+      {"name": "slow_down_dist", "type": "double", "unit":""  },
+      {"name": "slow_speed", "type": "double", "unit":""  },
+      {"name": "dt", "type": "double", "unit":""  },
+      {"name": "start_vel", "type": "double", "unit":""  },
+      {"name": "start_acc", "type": "double", "unit":""  },
+      {"name": "goal_vel", "type": "double", "unit":""  },
+      {"name": "goal_dec", "type": "double", "unit":""  },
+      {"name": "rot_max", "type": "double", "unit":""  },
+      {"name": "rot_acc_max", "type": "double", "unit":""  },
+      {"name": "rot_dec_max", "type": "double", "unit":""  },
+      {"name": "path_data_size", "type": "double", "unit":""  },
+      {"name": "curvature_size", "type": "double", "unit":""  },
+      {"name": "dist2goal_size", "type": "double", "unit":""  }
     ]
   },
   "LastSendDiffSteers": {
@@ -1186,6 +1279,47 @@
     "content":[
       { "index":0, "name":"state", "type":"int64", "description": "state", "unit":"" },
       { "index":1, "name":"isforbiddenSpeed", "type":"bool", "description": "是否屏蔽速度", "unit":"" }
+    ]
+  },
+  "BuzzerLogic":{
+    "type":"BuzzerLogic",
+    "content":[
+      { "name":"org_state", "type":"str" },
+      { "name":"buzzer_state", "type":"str"},
+      { "name":"avoid_speed_flag", "type":"bool"},
+      { "name":"buzzer_do", "type":"double"},
+      { "name":"stop_time", "type":"double"},
+      { "name":"beep_time", "type":"double"},
+      { "name":"move_delay_time", "type":"double"},
+      { "name":"is2move", "type":"bool"},
+      { "name":"dt", "type":"double", "unit":"ms"},
+      { "name":"is_robot_stop", "type":"bool"}
+    ]
+  },
+  "filterVw":{
+    "type":"filterVw",
+    "content":[
+      { "name":"dt", "type":"double" },
+      { "name":"acc", "type":"rad"},
+      { "name":"maxwAcc", "type":"rad"},
+      { "name":"pre_vw", "type":"rad"},
+      { "name":"vw", "type":"rad"}
+    ]
+  },
+  "Rfid":{
+    "type":"Rfid",
+    "content":[
+      { "name":"id", "type":"double" },
+      { "name":"count", "type":"double"},
+      { "name":"has_header", "type":"bool"},
+      { "name":"strength", "type":"double"}
+    ]
+  },
+  "last_rfid":{
+    "type":"last_rfid",
+    "content":[
+      { "name":"last_rfid", "type":"double" },
+      { "name":"target_id", "type":"double"}
     ]
   },
   "DistanceNode0":{
@@ -1468,9 +1602,9 @@
       {"index":0, "name":"state", "type":"json"}
     ]
   },
-  "gantry_sensor_status":{
+  "periodRun_counter":{
     "type":"Text",
-    "textKey":"gantry_sensor_status",
+    "textKey":"periodRun_counter",
     "content":[
       {"index":0, "name":"state", "type":"json"}
     ]
@@ -1509,7 +1643,7 @@
       {"name":"dtheta", "type":"rad"},
       {"name":"is_dmt_detected", "type":"bool"},
       {"name":"uprad", "type":"rad", "unit":"deg"}
-    ]    
+    ]
   },
   "PGVReach":{
     "type":"PGVReach",
@@ -1552,6 +1686,26 @@
       {"index":0, "name":"charger_name", "type":"str"},
       {"index":1, "name":"is_push_di_tirggered", "type":"bool"},
       {"index":2, "name":"brand_specific_info", "type":"json"}
+    ]    
+  },
+  "ChargerOff":{
+    "type":"ChargerOff",
+    "content":[
+      {"name":"charger_name", "type":"str"},
+      {"name":"action_time", "type":"double"},
+      {"name":"count", "type":"double"},
+      {"name":"charge_status", "type":"double"},
+      {"name":"state", "type":"str"}
+    ]    
+  },
+  "ChargerOn":{
+    "type":"ChargerOn",
+    "content":[
+      {"name":"charger_name", "type":"str"},
+      {"name":"action_time", "type":"double"},
+      {"name":"count", "type":"double"},
+      {"name":"charge_status", "type":"double"},
+      {"name":"state", "type":"str"}
     ]    
   },
   "SmartState":{
@@ -1903,6 +2057,28 @@
       {"name":"delayt", "type":"double","description": "延迟时间", "unit":"ms"}
     ]   
   },
+  "TLinear":{
+    "type":"TLinear",
+    "content":[
+      {"name":"name", "type":"str"},
+      {"name":"ideal_v", "type":"double","description": "原始输入的速度","unit":"m/s"},
+      {"name":"u", "type":"double","description": "修改后输入速度","unit":"m/s"},
+      {"name":"cv", "type":"double","description": "里程速度","unit":"m/s"},
+      {"name":"dt", "type":"double","description": "时间差","unit":"s"},
+      {"name":"last_diff", "type":"double","unit":"m/s"},
+      {"name":"last_out", "type":"double","unit":"m/s"},
+      {"name":"integral", "type":"double"},
+      {"name":"upViscousSpeed", "type":"double","unit":"m/s"},
+      {"name":"min_up_speed", "type":"double","unit":"m/s"},
+      {"name":"min_down_speed", "type":"double","unit":"m/s"},
+      {"name":"up_Kp", "type":"double"},
+      {"name":"up_Ki", "type":"double"},
+      {"name":"up_Kd", "type":"double"},
+      {"name":"down_Kp", "type":"double"},
+      {"name":"down_Ki", "type":"double"},
+      {"name":"down_Kd", "type":"double"}
+    ]  
+  },
   "get_latency":{
     "type":"get_latency",
     "content":[
@@ -1957,10 +2133,9 @@
       {"name":"vx", "type":"double", "unit":"m/s"}
     ]    
   },
-  "trackWalkMotor":{
-    "type":"trackWalkMotor",
+  "trackWalkMotor_motor":{
+    "type":"trackWalkMotor_motor",
     "content":[
-      {"name":"name", "type":"str"},
       {"name":"e", "type":"double"},
       {"name":"sume","type":"double"},
       {"name":"kp","type":"double"},
@@ -1973,7 +2148,8 @@
       {"name":"vodo","type":"double"},
       {"name":"stop","type":"bool"},
       {"name":"last_idea_vel", "type":"double"},
-      {"name":"observerK","type":"double" }
+      {"name":"observerK","type":"double" },
+      {"name":"last_min_speed","type":"double" }
     ]
   },
   "NewSPID":{
@@ -2068,6 +2244,130 @@
       {"name":"delay_dist", "type":"double", "unit":""},
       {"name":"compensate_dist", "type":"double", "unit":""}
     ]    
-  }
+  },
+  "SmartRot":{
+    "type":"SmartRot",
+    "content":[
+      {"name":"smart_rotation", "type":"bool", "unit":""},
+      {"name":"real_rot_dir", "type":"double", "unit":""},
+      {"name":"rotdir", "type":"double"},
+      {"name":"sim_rot_dir", "type":"double", "unit":""},
+      {"name":"targetAngle", "type":"rad", "unit":""},
+      {"name":"collision_flag", "type":"bool", "unit":""}
+    ]    
+  },
+  "GetBattery":{
+    "type":"GetBattery",
+    "content":[
+      {"name":"org_state", "type":"double", "unit":""},
+      {"name":"state", "type":"double", "unit":""}
+    ]    
+  },
+  "pub_info":{
+    "type":"pub_info",
+    "content":[
+      {"name":"pub_head", "type":"double", "unit":"rad"},
+      {"name":"pub_neck", "type":"double", "unit":"rad"}
+    ]    
+  },
 
+  "return_info":{
+    "type":"return_info",
+    "content":[
+      {"name":"return_head", "type":"double", "unit":"rad"},
+      {"name":"return_neck", "type":"double", "unit":"rad"}
+    ]    
+  },
+
+  "headcontrolpub":{
+    "type":"headcontrolpub",
+    "content":[
+      {"name":"a", "type":"double", "unit":"rad"}
+    ]    
+  },
+  "neckcontrolpub":{
+    "type":"neckcontrolpub",
+    "content":[
+      {"name":"b", "type":"double", "unit":"rad"}
+    ]    
+  },
+  "GotoSpecifiedPoseState": {
+    "type": "GotoSpecifiedPoseState",
+    "content": [
+      {"name": "_state", "type": "int", "description": "当前状态", "unit":"" },
+      { "index": 1, "name": "_last_state", "type": "int", "description": "上一状态", "unit": "" },
+      { "index": 2, "name": "stop_collision_flag", "type": "bool", "description": "是否碰撞", "unit":"" },
+      { "index": 3, "name": "has_avoid_path", "type": "bool",  "description": "是否有绕行路径", "unit":""}
+    ]
+  },
+  "Axis":{
+    "type": ["Axis-007", "Axis-016", "Axis-018", "Axis-017", "Axis-013", "Axis-008", "Axis-009",
+    "Axis-011", "Axis-019", "Axis-010", "Axis-014", "Axis-006", "Axis-015", "Axis-012"],
+    "content":[
+      {"name":"send_csp_cmd", "type":"double", "unit":"cnt"},
+      {"name":"cur_csp_cmd", "type":"double", "unit":"cnt"},
+      {"name":"last_csp_cmd", "type":"double", "unit":"cnt"},
+      {"name":"maxdp", "type":"double", "unit":"cnt/s"},
+      {"name":"orgdp", "type":"double", "unit":"cnt/s"},
+      {"name":"dp", "type":"double", "unit":"cnt/s"},
+      {"name":"mutable_motor_max_speed", "type":"double", "unit":"cnt/s"},
+      {"name":"speed", "type":"double", "unit":"cnt/s"},
+      {"name": "timestamp", "type": "int64", "unit":""}
+    ]    
+  },
+  "ForkGoOut":{
+    "type": "ForkGoOut",
+    "content":[
+      {"name":"filtered_distance", "type":"double", "unit":""},
+      {"name":"last_distance", "type":"double", "unit":""},
+      {"name":"distance", "type":"double", "unit":""},
+      {"name":"error_flag", "type":"bool", "unit":""},
+      {"name":"unRec_flag", "type":"bool", "unit":""},
+      {"name":"first_unRec_flag", "type":"bool", "unit":""}
+    ]    
+  },
+  "local_path":{
+    "type":"local_path",
+    "content": "path"
+  },
+  "BatteryPathPlan":{
+    "type": "BatteryPathPlan",
+    "content":[
+      {"name":"dx", "type":"double", "unit":""},
+      {"name":"dy", "type":"double", "unit":""},
+      {"name":"dist", "type":"double", "unit":""},
+      {"name":"r2g", "type":"double", "unit":""},
+      {"name":"dtheta", "type":"rad", "unit":""},
+      {"name":"lateralD", "type":"double", "unit":""},
+      {"name":"goalD", "type":"double", "unit":""}
+    ]    
+  },
+"hand_pose_ik_update": {
+    "type": ["right_hand_pose_ik_update", "left_hand_pose_ik_update"],
+    "content": [
+      {"name": "x", "type": "double", "unit":""},
+      {"name": "y", "type": "double", "unit":""},
+      {"name": "z", "type": "double", "unit":""},
+      {"name": "roll", "type": "double", "unit":"rad"},
+      {"name": "pitch", "type": "double", "unit":"rad"},
+      {"name": "yaw", "type": "double", "unit":"rad"},
+      {"name": "cur_j0", "type": "double", "unit":"rad"},
+      {"name": "cur_j1", "type": "double", "unit":"rad"},
+      {"name": "cur_j2", "type": "double", "unit":"rad"},
+      {"name": "cur_j3", "type": "double", "unit":"rad"},
+      {"name": "cur_j4", "type":"double", "unit": "rad"},
+      {"name": "cur_j5", "type": "double", "unit":"rad"},
+      {"name": "cur_j6", "type": "double", "unit":"rad"},
+      {"name": "goal_j0", "type": "double", "unit":"rad"},
+      {"name": "goal_j1", "type": "double", "unit":"rad"},
+      {"name": "goal_j2", "type": "double", "unit":"rad"},
+      {"name": "goal_j3", "type": "double", "unit":"rad"},
+      {"name": "goal_j4", "type":"double", "unit": "rad"},
+      {"name": "goal_j5", "type": "double", "unit":"rad"},
+      {"name": "goal_j6", "type": "double", "unit":"rad"},
+      {"name": "right_ret", "type": "double", "unit":""},
+      {"name": "cmd_ts", "type": "int64", "unit":""},
+      {"name": "timestamp", "type": "int64", "unit":""}
+    ]
+  }
 }

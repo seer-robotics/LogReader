@@ -40,3 +40,15 @@
 * 图形界面截图
 
 ![screen shot](screen_shot.PNG)
+
+
+## 机械臂
+基于  [Robotics Toolbox for Python](https://github.com/petercorke/robotics-toolbox-python), python 版本 3.9.12, roboticstoolbox-python=1.1.1。
+
+1. windows 下 使用 swift 显示 3d 图形，需要修改：
+SwiftRoute.py 第 390 行 从
+                    self.path = urllib.parse.unquote(self.path[9:])
+变成
+                    self.path = urllib.parse.unquote(self.path[10:])
+2. 可以在 Lib\site-packages\rtbdata 中添加自己的 urdf 模型
+3. 可以在 Lib\site-packages\roboticstoolbox\models\URDF\seerArm.py 中加载自己的模型类

@@ -225,7 +225,7 @@ class ReadLog:
 
 
 class Data:
-    def __init__(self, info, key_name:str, text_key:str = None):
+    def __init__(self, info, key_name:str, text_key:str = None, path_flag:bool = False):
         if key_name == "Text":
             self.type = text_key
             self.text_key = text_key
@@ -238,6 +238,7 @@ class Data:
             self.regex = re.compile("\[(.*?)\].*\["+self.type+"\]\[(.*?)\]$")
             self.regex2 = re.compile("\[(.*?)\].*\["+self.type+"\|(.*?)\]$")
             self.short_regx = "["+self.type
+        self.path_flag = path_flag
         self.info = info['content']
         self.data = dict()
         self.data['t'] = []
@@ -246,6 +247,9 @@ class Data:
         self.parse_error = False
         self.parsed_flag = False
         self.line_num = []
+        self.path_x = []
+        self.path_y = []
+        print(key_name, self.type, self.path_flag)
         for tmp in self.info:
             if 'name' not in tmp:
                 continue
@@ -332,6 +336,21 @@ class Data:
         values = datas[1].split('|')
         self.data['t'].append(rbktimetodate(datas[0]))
         info = self.info
+        if self.path_flag and len(values) >= 2:
+            x_str = values[0].split(',')
+            y_str = values[1].split(',')
+            if len(x_str) != len(y_str):
+                print("x_str not equal to y_str", datas[0], len(x_str), len(y_str))
+            x = []
+            y = []
+            for (a,b) in zip(x_str, y_str):
+                if a != '' and b != '':
+                    x.append(float(a))
+                    y.append(float(b))
+            self.path_x.append(x)
+            self.path_y.append(y)
+            self.line_num.append(num)
+            return True
         if self.info == "key|value":
             info = []
             half_value = int(len(values)/2)
@@ -346,48 +365,49 @@ class Data:
                 # 对于奇数项的数据
                 for d in range(half_value*2, len(values)):
                     info.append({'name': "value_{}".format(d), "index": d, "type": "double"})
-        for (ind, tmp) in enumerate(info):
-            if 'index' not in tmp:
-                tmp["index"] = ind
-            if 'type' in tmp and 'index' in tmp and 'name' in tmp:
-                index = int(tmp['index'])
-                if index < 0:
-                    index = len(values) + index
-                name = tmp['name']
-                if name not in self.data:
-                    self.data[name] =[]
-                    if len(self.data['t']) > 0:
-                        for _ in range(len(self.data['t'])-1):
-                            self.data[name].append(None)
-                if name not in self.description:
-                    self.description[name] = name
-                if name in self.description:
-                    if type(self.description[name]) is int:
-                        if 'description' in tmp:
-                            tmp_type = type(tmp['description'])
-                            description = ""
-                            has_description = False
-                            if tmp_type is str:
-                                description = tmp['description']
-                                has_description = True
-                            elif tmp_type is int:
-                                if tmp['description'] < len(values) and index < len(values):
-                                    description = values[tmp['description']]
+        if isinstance(info, list):
+            for (ind, tmp) in enumerate(info):
+                if 'index' not in tmp:
+                    tmp["index"] = ind
+                if 'type' in tmp and 'index' in tmp and 'name' in tmp:
+                    index = int(tmp['index'])
+                    if index < 0:
+                        index = len(values) + index
+                    name = tmp['name']
+                    if name not in self.data:
+                        self.data[name] =[]
+                        if len(self.data['t']) > 0:
+                            for _ in range(len(self.data['t'])-1):
+                                self.data[name].append(None)
+                    if name not in self.description:
+                        self.description[name] = name
+                    if name in self.description:
+                        if type(self.description[name]) is int:
+                            if 'description' in tmp:
+                                tmp_type = type(tmp['description'])
+                                description = ""
+                                has_description = False
+                                if tmp_type is str:
+                                    description = tmp['description']
                                     has_description = True
-                            if has_description:
-                                self.description[name] = description + " " + self.unit[name]
-                            else:
-                                self.description[name] = name
-                    
-                if index < len(values) and index >=0 :
-                    self._storeData(tmp, index, values)
-                else:
-                    self.data[name].append(None)
+                                elif tmp_type is int:
+                                    if tmp['description'] < len(values) and index < len(values):
+                                        description = values[tmp['description']]
+                                        has_description = True
+                                if has_description:
+                                    self.description[name] = description + " " + self.unit[name]
+                                else:
+                                    self.description[name] = name
+                        
+                    if index < len(values) and index >=0 :
+                        self._storeData(tmp, index, values)
+                    else:
+                        self.data[name].append(None)
 
-            else:
-                if not self.parse_error:
-                    logging.error("Error in {} {} ".format(self.type, tmp.keys()))
-                    self.parse_error = True
+                else:
+                    if not self.parse_error:
+                        logging.error("Error in {} {} ".format(self.type, tmp.keys()))
+                        self.parse_error = True
         self.line_num.append(num)
         return True
     def parse_now(self, lines):
@@ -422,6 +442,8 @@ class Data:
         for key in other.description.keys():
             if key not in self.description.keys():
                 self.description[key] = other.description[key]                 
+        self.path_x.extend(other.path_x)
+        self.path_y.extend(other.path_y)
         self.line_num.extend(other.line_num)
     def isText(self):
         return self.text_key != None
@@ -649,6 +671,91 @@ class DepthCamera:
         for i in range(len(self.datas)):
             self.datas[i].extend(other.datas[i])
 
+class obsDetect:
+    """ 深度摄像头的数据
+    data[0]: t
+    data[1]: x m
+    data[2]: y m
+    data[3]: z m
+    data[4]: number
+    data[5]: ts
+    """
+    def __init__(self):
+        """ max_dist 为激光点的最远距离，大于此距离激光点无效"""
+        self.regex = re.compile('\[(.*?)\].* \[obsDetect\d*?\]\[(.*?)\]')
+        self.short_regx = "[obsDetect"
+        #self.data = [[] for _ in range(7)]
+        self.datas =  [[] for _ in range(11)]
+    def parse(self, line):
+        if self.short_regx in line:
+            out = self.regex.match(line)
+            if out:
+                datas = out.groups()
+                tmp_datas = datas[1].split('|')
+                if(len(tmp_datas) < 2):
+                    return True
+                self.datas[0].append(rbktimetodate(datas[0]))
+                ts = float(tmp_datas[0])
+                name = tmp_datas[1]
+                voxel = tmp_datas[2]
+                x = tmp_datas[3]
+                y = tmp_datas[4]
+                z = tmp_datas[5]
+                yaw = tmp_datas[6]
+                pitch = tmp_datas[7]
+                roll = tmp_datas[8]
+                install = [x,y,z,yaw,pitch,roll]
+                x0 = float(tmp_datas[9])
+                y0 = float(tmp_datas[10])
+                x1 = float(tmp_datas[11])
+                y1 = float(tmp_datas[12])
+                x2 = float(tmp_datas[13])
+                y2 = float(tmp_datas[14])
+                x3 = float(tmp_datas[15])
+                y3 = float(tmp_datas[16])
+                region = [[x0, x1, x2, x3], [y0, y1, y2, y3]]
+                dx = [float(tmp) for tmp in tmp_datas[17::4]]
+                dy = [float(tmp) for tmp in tmp_datas[18::4]]
+                dz = [float(tmp) for tmp in tmp_datas[19::4]]
+                dlabel = [float(tmp) for tmp in tmp_datas[20::4]]
+                self.datas[1].append(dx)
+                self.datas[2].append(dy)
+                self.datas[3].append(dz)
+                self.datas[4].append(len(tmp_datas))
+                self.datas[5].append(ts)
+                self.datas[6].append(dlabel)
+                self.datas[7].append(name)
+                self.datas[8].append(voxel)
+                self.datas[9].append(install)
+                self.datas[10].append(region)
+                return True
+            return False
+        return False
+    def t(self):
+        return self.datas[0]
+    def x(self):
+        return self.datas[1], self.datas[0]
+    def y(self):
+        return self.datas[2], self.datas[0]
+    def z(self):
+        return self.datas[3], self.datas[0]
+    def number(self):
+        return self.datas[4], self.datas[0]
+    def ts(self):
+        return self.datas[5], self.datas[0]
+    def label(self):
+        return self.datas[6], self.datas[0]
+    def device_name(self):
+        return self.datas[7], self.datas[0]
+    def voxel(self):
+        return self.datas[8], self.datas[0]
+    def install(self):
+        return self.datas[9], self.datas[0]
+    def region(self):
+        return self.datas[10], self.datas[0]
+    def insert_data(self, other):
+        for i in range(len(self.datas)):
+            self.datas[i].extend(other.datas[i])
 class ParticleState:
     """ 粒子滤波数据
     data[0]: t

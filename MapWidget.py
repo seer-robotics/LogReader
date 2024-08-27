@@ -727,6 +727,8 @@ class MapWidget(QtWidgets.QWidget):
         self.obs_points.set_zorder(40)
         self.depthCamera_hole_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='black')
         self.depthCamera_obs_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='gray')
+        self.obsdetect_points_human = lines.Line2D([],[], linestyle = '', marker = 'x', markersize = 4.0, color='green')
+        self.obsdetect_region = lines.Line2D([],[], linestyle = '-', marker = '.', markersize = 2.0, color='red')
         self.particle_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='b')
         self.particle_points.set_zorder(20)
         self.trajectory = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 2.0, color='m')
@@ -795,6 +797,7 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.obs_points)
         self.ax.add_line(self.depthCamera_hole_points)
         self.ax.add_line(self.depthCamera_obs_points)
+        self.ax.add_line(self.obsdetect_points_human)
         self.ax.add_line(self.particle_points)
         self.ax.add_line(self.trajectory)
         self.ax.add_line(self.trajectory_next)
@@ -1647,6 +1650,63 @@ class MapWidget(QtWidgets.QWidget):
             self.obs_points.set_xdata([])
             self.obs_points.set_ydata([])
     
+    def updateObsDetect(self):
+        if self.robot_log is None:
+            return
+        if self.robot_log.mid_line_t is None:
+            return
+        mid_line_t = self.robot_log.mid_line_t      
+        depthCamera_idx = 0
+        depth = self.robot_log.read_thread.obsDetect
+        depth_t = np.array(depth.t())
+        depth_pos = []
+        depth_region = []
+        label = None
+        if len(depth_t) > 0:
+            depthCamera_idx = (np.abs(depth_t- mid_line_t)).argmin()
+            dt = (depth_t[depthCamera_idx] - mid_line_t).total_seconds()
+            if abs(dt) < 0.5:
+                pos_x = depth.x()[0][depthCamera_idx]
+                pos_y = depth.y()[0][depthCamera_idx]
+                pos_z = depth.z()[0][depthCamera_idx]
+                depth_pos = np.array([pos_x, pos_y, pos_z])
+                label = depth.label()[0][depthCamera_idx]
+                depth_region = depth.region()[0][depthCamera_idx]
+
+        if len(depth_pos) > 0:
+            hole_points = [[],[]]
+            obs_points = [[],[]]
+            human_points = [[], []]
+            for ind, val in enumerate(depth_pos[2]):
+                if label == 0:
+                    hole_points[0].append(depth_pos[0][ind])
+                    hole_points[1].append(depth_pos[1][ind])
+                elif label == 1:
+                    obs_points[0].append(depth_pos[0][ind])
+                    obs_points[1].append(depth_pos[1][ind])
+                elif label == 2:
+                    human_points[0].append(depth_pos[0][ind])
+                    human_points[1].append(depth_pos[1][ind])
+            self.depthCamera_hole_points.set_xdata([hole_points[0]])
+            self.depthCamera_hole_points.set_ydata([hole_points[1]])
+            self.depthCamera_obs_points.set_xdata([obs_points[0]])
+            self.depthCamera_obs_points.set_ydata([obs_points[1]])
+            self.obsdetect_points_human.set_xdata([human_points[0]])
+            self.obsdetect_points_human.set_ydata([human_points[1]])
+        else:
+            self.depthCamera_hole_points.set_xdata([])
+            self.depthCamera_hole_points.set_ydata([])
+            self.depthCamera_obs_points.set_xdata([])
+            self.depthCamera_obs_points.set_ydata([])
+            self.obsdetect_points_human.set_xdata([])
+            self.obsdetect_points_human.set_ydata([])
+        if len(depth_region) > 0:
+            self.obsdetect_region.set_xdata([depth_region[0]])
+            self.obsdetect_region.set_ydata([depth_region[1]])
+        else:
+            self.obsdetect_region.set_xdata([])
+            self.obsdetect_region.set_ydata([])
+
     def updateDepth(self):
         if self.robot_log is None:
             return
@@ -2096,6 +2156,7 @@ class MapWidget(QtWidgets.QWidget):
                 self.mid_line_t = self.robot_log.mid_line_t
                 self.updateMapAndShape()
                 self.updateObs()
+                self.updateObsDetect()
                 self.updateDepth()
                 self.updateParticle()
                 self.updateLoc()

@@ -1025,8 +1025,8 @@ class Service:
     data[1]: 服务内容
     """
     def __init__(self):
-        self.regex = re.compile("\[(.*?)\].*\[Service\].*")
-        self.short_regx = "[Service"         
+        self.regex = re.compile("\[(.*?)\].*Service\].*")
+        self.short_regx = "Service]"         
         self.data = [[] for _ in range(2)]
     def parse(self, line):
         if self.short_regx in line:               

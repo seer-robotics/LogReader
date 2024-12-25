@@ -25,6 +25,7 @@ from matplotlib.collections import PatchCollection
 import zipfile
 from ExtendedComboBox import ExtendedComboBox
 from datetime import datetime
+from matplotlib import pyplot as plt
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -52,6 +53,7 @@ def Pos2Base(pos2world, base2world):
 
 def convert2LaserPoints(org_laser_data, org_laser_pos, robot_pos):
     laser_data = GetGlobalPos(org_laser_data, org_laser_pos)
+    laser_data2r = laser_data.T
     laser_data = GetGlobalPos(laser_data, robot_pos)
     laser_data = laser_data.T
     laser_pos = GetGlobalPos(org_laser_pos, robot_pos) # n*2
@@ -59,7 +61,7 @@ def convert2LaserPoints(org_laser_data, org_laser_pos, robot_pos):
     c = np.zeros(laser_data.shape) + laser_pos
     org_lines = np.concatenate((c,laser_data), axis=1) #水平扩展
     lines = org_lines.reshape(laser_data.shape[0],2,2)
-    return lines, circle_cs
+    return lines, circle_cs, laser_data2r
 
 def normalize_theta(theta):
     if theta >= -math.pi and theta < math.pi:
@@ -90,14 +92,14 @@ class Readcp (QThread):
         self.js = js.load(fid)
         fid.close()
         self.laser = dict()
-        x, y, r = 0, 0, 0
         try:
             if 'deviceTypes' in self.js:
                 for device in self.js['deviceTypes']:
                     if device['name'] == 'laser':
                         for laser in device['devices']:
+                            x, y, r = 0, 0, 0
                             for param in laser['deviceParams']:
-                                if param['key'] == 'basic':
+                                if param['key'] == 'basic'and 'arrayParam' in param and 'params' in param['arrayParam']:
                                     for p in param['arrayParam']['params']:
                                         if p['key'] == 'x':
                                             x = p['doubleValue']
@@ -212,6 +214,40 @@ class Readmap(QThread):
             Path.MOVETO,
             Path.LINETO ,
         ]
+        self.grid_map = dict()
+    def hash_value(self, x, y):
+        return (round(x*50), round(y*50))
+
+    def confidence(self, laser_pts):
+        total_size = len(laser_pts)
+        count = 0
+        map_p = []
+        unmap_p = []
+        for p in laser_pts:
+            if self.hash_value(p[0], p[1])  in self.grid_map:
+                map_p.append(p)
+                count += 1
+            else:
+                unmap_p.append(p)
+
+        def printPath(title, pts):
+            outdata = []
+            x,y = [],[]
+            for c in pts:
+                x.append(c[0])
+                y.append(c[1])
+            xdata = 'x='+str(x)
+            ydata = 'y='+str(y)
+            outdata.append(xdata)
+            outdata.append(ydata)
+            print(title, '\n', outdata[0], '\n', outdata[1])
+        # printPath("mapp", map_p)
+        # printPath("unmapp", unmap_p)
+        if total_size < 1:
+            return 0
+        else:
+            return (1.0*count)/total_size
+
     # run method gets called when we start the thread
     def run(self):
         print("map_name: ", self.map_name)
@@ -247,6 +283,7 @@ class Readmap(QThread):
         self.points = dict()
         self.p_names = dict()
         self.bin = dict()
+
         # print(self.js.keys())
         def addStr(startPos, endPos):
             x1 = 0
@@ -271,6 +308,7 @@ class Readmap(QThread):
                 self.map_y.append(float(pos['y']))
             else:
                 self.map_y.append(0.0)
+            self.grid_map[self.hash_value(self.map_x[-1], self.map_y[-1])] = True
         for pos in self.js.get('rssiPosList',[]):
             if 'x' in pos:
                 self.rssi_map_x.append(float(pos['x']))
@@ -280,6 +318,7 @@ class Readmap(QThread):
                 self.rssi_map_y.append(float(pos['y']))
             else:
                 self.rssi_map_y.append(0.0)
+            self.grid_map[self.hash_value(self.rssi_map_x[-1], self.rssi_map_y[-1])] = True
         def f3order(p0, p1, p2, p3):
             dt = 0.001
             t = 0
@@ -576,13 +615,42 @@ class CurveWidget(QtWidgets.QWidget):
     getdata = pyqtSignal('PyQt_PyObject')
     def __init__(self):
         super(QtWidgets.QWidget, self).__init__()
-        self.data_label = QtWidgets.QLabel('Script: x,y,linestype,marker,markersize,color:')
+        self.data_label = QtWidgets.QLabel('x,y')
         self.data_edit = QtWidgets.QTextEdit()
+
+        self.ls_msg = QtWidgets.QLabel("linestyle:")
+        self.ls = QtWidgets.QComboBox(self)
+        self.ls.addItems(["solid", "dotted", "dashed", "dashdot",""])
+        hbox1 = QtWidgets.QFormLayout()
+        hbox1.addRow(self.ls_msg, self.ls)
+
+        self.c_msg = QtWidgets.QLabel("color:")
+        self.c = QtWidgets.QComboBox(self)
+        self.c.addItems(["b", "g", "r", "c", "m", "y"])
+        hbox2 = QtWidgets.QFormLayout()
+        hbox2.addRow(self.c_msg, self.c)
+
+        self.m_msg = QtWidgets.QLabel("marker:")
+        self.m = QtWidgets.QComboBox(self)
+        self.m.addItems([".", ",", "o", "v", "^", "<", ">", "1", "2", "3", "4"])
+        hbox3 = QtWidgets.QFormLayout()
+        hbox3.addRow(self.m_msg, self.m)
+
+        self.msize_msg = QtWidgets.QLabel("markersize:")
+        self.msize = QtWidgets.QComboBox(self)
+        self.msize.addItems([str(i) for i in range(1,20)])
+        hbox4 = QtWidgets.QFormLayout()
+        hbox4.addRow(self.msize_msg, self.msize)
+
         self.btn = QtWidgets.QPushButton("Yes")
         self.btn.clicked.connect(self.getData)
         vbox = QtWidgets.QVBoxLayout(self)
         vbox.addWidget(self.data_label)
         vbox.addWidget(self.data_edit)
+        vbox.addLayout(hbox1)
+        vbox.addLayout(hbox2)
+        vbox.addLayout(hbox3)
+        vbox.addLayout(hbox4)
         vbox.addWidget(self.btn)
         self.setWindowTitle("Curve Input")
 
@@ -593,10 +661,10 @@ class CurveWidget(QtWidgets.QWidget):
             exec(code,globals(),l)
             self.hide()
             self.getdata.emit([l['x'],l['y'],
-            l.get('linestyle','--'),
-            l.get('marker','.'), 
-            l.get('markersize',6),
-            l.get('color','r')])
+            self.ls.currentText(),
+            self.m.currentText(),
+            self.msize.currentText(),
+            self.c.currentText()])
         except Exception as err:
             print(err.args)
             pass
@@ -685,6 +753,46 @@ class FindElement(QtWidgets.QWidget):
             print(err.args)
             pass
 
+class CalcConfidence(QtWidgets.QWidget):
+    """查找图元的对话窗口
+
+    Args:
+        QtWidgets (_type_): _description_
+    """
+    getdata = pyqtSignal('PyQt_PyObject')
+    def __init__(self, parent = None):
+        super(QtWidgets.QWidget, self).__init__()
+        self.x_label = QtWidgets.QLabel('x,y resolution (cm)')
+        self.y_label = QtWidgets.QLabel('angle resolution (deg)')
+        valid = QtGui.QDoubleValidator()
+        self.x_edit = QtWidgets.QLineEdit()
+        self.x_edit.setText(str(1.0))
+        self.x_edit.setValidator(valid)
+        self.y_edit = QtWidgets.QLineEdit()
+        self.y_edit.setText(str(1.0))
+        self.y_edit.setValidator(valid)
+        self.x_input = QtWidgets.QFormLayout()
+        self.x_input.addRow(self.x_label,self.x_edit)
+        self.y_input = QtWidgets.QFormLayout()
+        self.y_input.addRow(self.y_label,self.y_edit)
+        self.btn = QtWidgets.QPushButton("Yes")
+        self.btn.clicked.connect(self.getData)
+        vbox = QtWidgets.QVBoxLayout(self)
+        vbox.addLayout(self.x_input)
+        vbox.addLayout(self.y_input)
+        vbox.addWidget(self.btn)
+        self.setWindowTitle("confidence")
+
+    def getData(self):
+        try:
+            x = float(self.x_edit.text())
+            y = float(self.y_edit.text())
+            self.hide()
+            self.getdata.emit([x,y])
+        except:
+            pass
+
+
 class MapWidget(QtWidgets.QWidget):
     dropped = pyqtSignal('PyQt_PyObject')
     hiddened = pyqtSignal('PyQt_PyObject')
@@ -696,6 +804,7 @@ class MapWidget(QtWidgets.QWidget):
         self.model_name = None
         self.cp_name = None
         self.readingModelFlag = False
+        self.laser_info = ""
         self.draw_size = [] #xmin xmax ymin ymax
         self.map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0,color="gray")
         self.rssi_map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0,color="red")
@@ -703,18 +812,19 @@ class MapWidget(QtWidgets.QWidget):
         self.rssi_map_data.set_zorder(12)
         self.laser_data = LineCollection([], linewidths=3, linestyle='solid')
         self.laser_data_points = PatchCollection([])
-        self.org_laser_data = [] # 激光的原始数据，用于提取出来保存
+        self.org_laser_data = np.array([]) # 激光的原始数据，用于提取出来保存
+        self.laser2r = np.array([]) # 激光的原始数据，用于提取出来保存
         self.laser_org_color = np.array([1,0,0,0.2])
         self.laser_color = self.laser_org_color[:]
         self.laser_point_org_color = np.array([1,0,0,0.5])
         self.laser_point_color = self.laser_point_org_color[:]
         self.laser_data.set_color(self.laser_org_color)
-        self.laser_data.set_zorder(11)
+        self.laser_data.set_zorder(13)
         self.laser_data_points.set_color(self.laser_org_color)
         self.laser_data_points.set_linestyle('-')
         self.laser_data_points.set_edgecolor('r')
         self.laser_data_points.set_linewidth(2.0)
-        self.laser_data_points.set_zorder(10)
+        self.laser_data_points.set_zorder(13)
         self.robot_data = lines.Line2D([],[], linestyle = '-', color='k')
         self.robot_data.set_zorder(21)
         self.robot_data_c0 = lines.Line2D([],[], linestyle = '-', linewidth = 2, color='k')
@@ -844,12 +954,23 @@ class MapWidget(QtWidgets.QWidget):
         self.useLoc.setCheckable(True)
         self.useLoc.triggered.connect(self.useLocChange)
         self.useLoc.setChecked(True)
-        self.userToolbar.addActions([self.draw_center, self.find_element_bar, self.useLoc])
+
+        self.calc_confidence_bar = QtWidgets.QAction("Calc", self.userToolbar)
+        self.calc_confidence_bar.triggered.connect(self.calcConfidenceShow)
+
+        self.userToolbar.addActions([self.draw_center, self.find_element_bar, self.useLoc, self.calc_confidence_bar])
+
 
         self.find_element = FindElement(self)
         self.find_element.getdata.connect(self.getElement)
         self.find_element.hide()
         self.find_element.setWindowFlags(Qt.Window)
+
+
+        self.calc_confidence_fig = CalcConfidence(self)
+        self.calc_confidence_fig.getdata.connect(self.calcConfidence)
+        self.calc_confidence_fig.hide()
+        self.calc_confidence_fig.setWindowFlags(Qt.Window)
 
         self.getPoint = PointWidget()
         self.getPoint.getdata.connect(self.getPointData)
@@ -868,11 +989,11 @@ class MapWidget(QtWidgets.QWidget):
         self.autoMap.setChecked(True)
         self.fig_layout = QtWidgets.QVBoxLayout(self)
         self.timestamp_lable = QtWidgets.QLabel(self)
-        self.timestamp_lable.setText('当前激光时刻定位（实框）: ')
+        self.timestamp_lable.setText('激光时刻定位（实框）: ')
         self.timestamp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.timestamp_lable.setFixedHeight(16)
         self.logt_lable = QtWidgets.QLabel(self)
-        self.logt_lable.setText('当前时刻定位(虚框): ')
+        self.logt_lable.setText('里程时刻定位(虚框): ')
         self.logt_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.logt_lable.setFixedHeight(16)
         self.obs_lable = QtWidgets.QLabel(self)
@@ -1025,6 +1146,72 @@ class MapWidget(QtWidgets.QWidget):
 
     def findElement(self):
         self.find_element.show()
+    
+    def getLaserData(self, new2r):
+        # print("org_laser_data", self.laser2r.shape, new2r)
+        laser_data = GetGlobalPos(self.laser2r.T, new2r)
+        laser_data = GetGlobalPos(laser_data, self.robot_pos)
+        return laser_data.T
+    
+    def calcConfidenceShow(self):
+        self.calc_confidence_fig.show()
+
+    def calcConfidence(self, event:list):
+        dx = np.array([v*event[0] for v in range(-10, 11, 1)])
+        dy = dx
+        da = np.array([v*event[1] for v in range(-10, 11, 1)])
+        confidence = np.zeros((len(dx), len(dy), len(da)))
+        for i,x in enumerate(dx):
+            for j,y in enumerate(dy):
+                for k, a in enumerate(da):
+                    laser_data = self.getLaserData([x*0.01,y*0.01,a/180.0*math.pi])
+                    confidence[i][j][k] = self.read_map.confidence(laser_data)
+                    print("cal confidence", f"{i:3d}", f"{j:3d}", f"{k:3d}", f"{(i * len(dy) * len(da) + j *len(da) + k) * 1.0/ confidence.size:.2f}")
+        fig, axes = plt.subplots(2, 3)
+        fig.suptitle(f"loc: {self.laser_info}")
+        data = confidence[:,10,10]
+        aplt = axes[0,0]
+        aplt.plot(dx, data)
+        aplt.set_xlabel('dx cm')
+        aplt.set_ylabel('confidence')
+        aplt.set_title('dx, dy=0, da=0')
+        aplt = axes[0,1]
+        data = confidence[10,:,10] 
+        aplt.plot(dy, data)
+        aplt.set_xlabel('dy cm')
+        aplt.set_ylabel('confidence')
+        aplt.set_title('dx=0, dy, da=0')
+        aplt = axes[0,2]
+        data = confidence[10,10,:]
+        aplt.plot(da, data)
+        aplt.set_xlabel('da deg')
+        aplt.set_ylabel('confidence')
+        aplt.set_title('dx=0, dy=0, da')
+
+        aplt = axes[1,0]
+        data = confidence[:,:,10]
+        im = aplt.imshow(data, extent=[min(dx), max(dx), min(dy), max(dy)], aspect='auto', origin='lower', cmap='hot')
+        bar = fig.colorbar(im, ax=aplt)
+        aplt.set_xlabel('dy cm')
+        aplt.set_ylabel('dx cm')
+        aplt.set_title('dx, dy, da=0, confidence map ')
+        aplt = axes[1,1]
+        data = confidence[:,10,:] 
+        im = aplt.imshow(data, extent=[min(dx), max(dx), min(da), max(da)], aspect='auto', origin='lower', cmap='hot')
+        bar = fig.colorbar(im, ax=aplt)
+        aplt.set_xlabel('da deg')
+        aplt.set_ylabel('dx cm')
+        aplt.set_title('dx, dy=0, da, confidence map')
+        aplt = axes[1,2]
+        data = confidence[10,:,:] 
+        im = aplt.imshow(data, extent=[min(dy), max(dy), min(da), max(da)], aspect='auto', origin='lower', cmap='hot')
+        bar = fig.colorbar(im, ax=aplt)
+        aplt.set_xlabel('da deg')
+        aplt.set_ylabel('dy cm')
+        aplt.set_title('dx=0, dy, da confidence map')
+
+
+        plt.show()
 
     def getElement(self, event:list):
         """ 回调函数，查找图元所在位置
@@ -1592,7 +1779,7 @@ class MapWidget(QtWidgets.QWidget):
                     font.setBold(True)
                     self.cp_action.setFont(font)
                     if self.laser_org_data.any() and self.laser_index == key:
-                        lines, cs = convert2LaserPoints(self.laser_org_data, self.laser_pos[self.laser_index], self.robot_pos)
+                        lines, cs, self.laser2r = convert2LaserPoints(self.laser_org_data, self.laser_pos[self.laser_index], self.robot_pos)
                         self.laser_data.set_segments(lines)
                         self.laser_data.set_color(self.laser_color)
                         patches = []
@@ -1823,9 +2010,9 @@ class MapWidget(QtWidgets.QWidget):
             loc_idx = (np.abs(loc_ts - mid_line_t)).argmin()            
         print(self.useLoc.isChecked(), loc_idx, loc['theta'][loc_idx])
         self.robot_loc_pos = [loc['x'][loc_idx],loc['y'][loc_idx],np.deg2rad(loc['theta'][loc_idx])]
-        loc_info = "{},{},{},{},{}".format(loc['t'][loc_idx], int(loc['t'][loc_idx].timestamp() - mid_line_t.timestamp()), 
+        loc_info = "t {},dt {},x {:<4.3f}, y {:<4.3f},a {:<4.3f}".format(loc['t'][loc_idx], int(loc['t'][loc_idx].timestamp() - mid_line_t.timestamp()), 
             loc['x'][loc_idx], loc['y'][loc_idx], loc['theta'][loc_idx])
-        self.logt_lable.setText('当前时刻定位(虚框): '+ loc_info)
+        self.logt_lable.setText('里程时刻定位(虚框):   '+ loc_info)
 
         if self.laser_index in self.laser_pos.keys() \
          and self.read_model.tail and self.read_model.head and self.read_model.width:
@@ -1917,16 +2104,16 @@ class MapWidget(QtWidgets.QWidget):
             pos_idx = (np.abs(pos_ts - ts)).argmin()
             pos_idx = loc_min_ind + pos_idx
             self.robot_pos = [loc['x'][pos_idx], loc['y'][pos_idx], np.deg2rad(loc['theta'][pos_idx])]
-            laser_info = "{},{},{},{},{}".format(loc['t'][pos_idx], int(loc['timestamp'][pos_idx] - ts),
+            self.laser_info = "t {},dt {},x {:<4.3f},y {:<4.3f},a {:<4.3f}".format(loc['t'][pos_idx], int(loc['timestamp'][pos_idx] - ts),
                 loc['x'][pos_idx], loc['y'][pos_idx], loc['theta'][pos_idx])
-            self.timestamp_lable.setText('当前激光时刻定位（实框）: '+ laser_info)
+            self.timestamp_lable.setText('激光时刻定位（实框）:   '+ self.laser_info)
         else:
             self.robot_pos = [laser_data.loc_x(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_y(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_yaw(min_laser_channel)[0][laser_idx]]
-            laser_info = "{},{},{},{},{}".format(laser_data.t(min_laser_channel)[laser_idx], 0,
+            self.laser_info = "t {},dt {},x {:<4.3f},y {:<4.3f},a {:<4.3f}".format(laser_data.t(min_laser_channel)[laser_idx], 0,
                 self.robot_pos[0], self.robot_pos[1],  np.rad2deg(self.robot_pos[2]))
-            self.timestamp_lable.setText('当前激光时刻定位（实框）: '+ laser_info)
+            self.timestamp_lable.setText('当前激光时刻定位（实框）: '+ self.laser_info)
         self.laser_org_data = laser_points
         laser_rssi = rssi
         if len(laser_rssi) == len(self.laser_org_data.T) and len(laser_rssi) > 0:
@@ -1964,7 +2151,7 @@ class MapWidget(QtWidgets.QWidget):
             if len(self.laser_org_data) < 1:
                 print(" len(self.laser_org_data)", len(self.laser_org_data))
                 return
-            lines, cs = convert2LaserPoints(self.laser_org_data, self.laser_pos[self.laser_index], self.robot_pos)
+            lines, cs, self.laser2r = convert2LaserPoints(self.laser_org_data, self.laser_pos[self.laser_index], self.robot_pos)
             self.laser_data.set_segments(lines)
             self.laser_data.set_color(self.laser_color)
             patches = []

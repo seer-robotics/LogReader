@@ -30,7 +30,8 @@ from PyQt5.QtCore import pyqtSignal
 import MotorRead as mr
 from getMotorErr import MotorErrViewer 
 from TargetPrecision import TargetPrecision
-from ArmPlot import Arm
+# from ArmPlot import Arm
+import math
 
 
 
@@ -123,15 +124,16 @@ class SelectRegion:
     def setRegion(self, t0, t1):
         self.t0 = self.getRightT(t0)
         self.t1 = self.getRightT(t1)              
-        self.left_line.set_xdata(self.t0)
-        self.right_line.set_xdata(self.t1)
-        data = self.select_region.get_xy()
-        data[0][0] = data[1][0] = data[4][0] = self.t0
-        data[2][0] = data[3][0] = self.t1
+        self.left_line.set_xdata([self.t0])
+        self.right_line.set_xdata([self.t1])
+        self.select_region.remove()
+        self.select_region = self.ax.axvspan(self.t0, self.t1, facecolor='r', alpha = 0.3, picker = self.pickfunc) 
+        self.select_region.set_zorder(0)
 
     def setMidLine(self, tmid):
         self.tmid = self.getRightT(tmid)
-        self.mid_line.set_xdata(self.tmid)
+        print("tmid", self.tmid)
+        self.mid_line.set_xdata([self.tmid])
 
     def addAgain(self, ax):
         if ax is self.ax:
@@ -397,7 +399,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
 
         self.targetPrecision = TargetPrecision(self)
         self.targetPrecision.hide()
-        self.arm = Arm()
+        self.arm = None
         # dataView相关的初始化
         self.dataViewNewOne(None)
 
@@ -1026,7 +1028,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     tmpd = tmpd[~np.isnan(tmpd)]
                     if len(tmpd) > 0:
                         max_range = max(max(tmpd) - min(tmpd), 1e-6)
-                        ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd)  + 0.05 * max_range)
+                        if not math.isnan(max_range) and not math.isinf(max_range):
+                            ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd)  + 0.05 * max_range)
                         ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
         self.static_canvas.figure.canvas.draw()
 
@@ -1059,6 +1062,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log, *.gz);;All Files (*)", options=options)
         if self.filenames:
             self.finishReadFlag = False
+            self.read_thread = ReadThread()
+            self.read_thread.signal.connect(self.readFinished)
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
             logging.debug('Loading ' + str(len(self.filenames)) + ' Files:')
@@ -1097,6 +1102,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     return
         if self.filenames:
             self.finishReadFlag = False
+            self.read_thread = ReadThread()
+            self.read_thread.signal.connect(self.readFinished)
             self.read_thread.filenames = self.filenames
             self.read_thread.start()
             logging.debug('Loading' + str(len(self.filenames)) + 'Files:')
@@ -1298,8 +1305,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     print("len(tmpd)", len(tmpd))
                     if len(tmpd) > 0:
                         max_range = (max(tmpd) + min(tmpd))/2.0
-                        print("max_range:", max_range)
-                        ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd) + 0.05 * max_range)
+                        if not math.isnan(max_range) and not math.isinf(max_range):
+                            print("max_range:", max_range)
+                            ax.set_ylim(min(tmpd) - 0.05 * max_range, max(tmpd) + 0.05 * max_range)
             if resize:
                 ax.set_xlim(self.read_thread.tlist[0], self.read_thread.tlist[-1])
             else:
@@ -1486,7 +1494,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.static_canvas.figure.canvas.draw()
     
     def openArm(self, checked):
-        if checked:
+        if self.arm is None:
+            return
+        if checked :
             self.arm.show()
     
     def viewMotorErr(self, checked):
@@ -1858,6 +1868,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.drawdata(ax, (values, ts), y_label, False)
 
     def updateArmViews(self):
+        if self.arm is None:
+            return
         if not self.arm.isShow():
             return
         left_q = []

@@ -26,6 +26,36 @@ import zipfile
 from ExtendedComboBox import ExtendedComboBox
 from datetime import datetime
 from matplotlib import pyplot as plt
+from PIL import Image
+
+import hashlib
+
+def get_md5_pathlib(path: Path, block_size=65536):
+    """
+    使用 pathlib 计算文件的MD5值（分块读取）。
+
+    Args:
+        filepath (Path): 文件的Path对象。
+        block_size (int): 每次读取的字节数（默认64KB）。
+
+    Returns:
+        str: 文件的MD5哈希值，如果文件不存在则返回"文件未找到"，如果发生其他错误则返回错误信息。
+    """
+    from pathlib import Path
+    filepath = Path(path)
+    md5_hash = hashlib.md5()
+    try:
+        if not filepath.is_file():
+            return "文件未找到"
+        with filepath.open('rb') as f:
+            while True:
+                data = f.read(block_size)
+                if not data:
+                    break
+                md5_hash.update(data)
+        return md5_hash.hexdigest()
+    except Exception as e:
+        return f"发生错误: {e}"
 
 def GetGlobalPos(p2b, b2g):
     x = p2b[0] * np.cos(b2g[2]) - p2b[1] * np.sin(b2g[2])
@@ -188,6 +218,19 @@ class Readmodel(QThread):
                 logging.error('Cannot Open robot.model: ' + self.model_name)
             self.signal.emit(self.model_name)
 
+class GridMap:
+    def __init__(self, resolution):
+        self.grid_map = dict()
+        self.size = max(1.0, int(1/resolution))
+        print("gridMap ", self.size)
+    def hash_value(self, x, y):
+        return (round(x*self.size), round(y*self.size))
+    def contain(self, x, y):
+        return self.hash_value(x,y) in self.grid_map
+    def insert(self, x, y):
+        self.grid_map[self.hash_value(x,y)] = True
+
+
 class Readmap(QThread):
     signal = pyqtSignal('PyQt_PyObject')
     def __init__(self):
@@ -214,33 +257,34 @@ class Readmap(QThread):
             Path.MOVETO,
             Path.LINETO ,
         ]
-        self.grid_map = dict()
+        self.grid_map = GridMap(0.02)
     def hash_value(self, x, y):
         return (round(x*50), round(y*50))
-
-    def confidence(self, laser_pts):
+    def hash_value2(self, x, y):
+        return (round(x*25), round(y*25))
+    def confidence(self, laser_pts, min_resolution):
         total_size = len(laser_pts)
         count = 0
-        map_p = []
-        unmap_p = []
+        # map_p = []
+        # unmap_p = []
         for p in laser_pts:
-            if self.hash_value(p[0], p[1])  in self.grid_map:
-                map_p.append(p)
+            if self.grid_map.contain(p[0], p[1]):
+                # map_p.append(p)
                 count += 1
-            else:
-                unmap_p.append(p)
+            # else:
+            #     unmap_p.append(p)
 
-        def printPath(title, pts):
-            outdata = []
-            x,y = [],[]
-            for c in pts:
-                x.append(c[0])
-                y.append(c[1])
-            xdata = 'x='+str(x)
-            ydata = 'y='+str(y)
-            outdata.append(xdata)
-            outdata.append(ydata)
-            print(title, '\n', outdata[0], '\n', outdata[1])
+        # def printPath(title, pts):
+        #     outdata = []
+        #     x,y = [],[]
+        #     for c in pts:
+        #         x.append(c[0])
+        #         y.append(c[1])
+        #     xdata = 'x='+str(x)
+        #     ydata = 'y='+str(y)
+        #     outdata.append(xdata)
+        #     outdata.append(ydata)
+        #     print(title, '\n', outdata[0], '\n', outdata[1])
         # printPath("mapp", map_p)
         # printPath("unmapp", unmap_p)
         if total_size < 1:
@@ -308,7 +352,7 @@ class Readmap(QThread):
                 self.map_y.append(float(pos['y']))
             else:
                 self.map_y.append(0.0)
-            self.grid_map[self.hash_value(self.map_x[-1], self.map_y[-1])] = True
+            self.grid_map.insert(self.map_x[-1], self.map_y[-1])
         for pos in self.js.get('rssiPosList',[]):
             if 'x' in pos:
                 self.rssi_map_x.append(float(pos['x']))
@@ -318,7 +362,7 @@ class Readmap(QThread):
                 self.rssi_map_y.append(float(pos['y']))
             else:
                 self.rssi_map_y.append(0.0)
-            self.grid_map[self.hash_value(self.rssi_map_x[-1], self.rssi_map_y[-1])] = True
+            self.grid_map.insert(self.rssi_map_x[-1], self.rssi_map_y[-1])
         def f3order(p0, p1, p2, p3):
             dt = 0.001
             t = 0
@@ -853,7 +897,7 @@ class MapWidget(QtWidgets.QWidget):
                                             length_includes_head=True,# 增加的长度包含箭头部分
                                             width=0.05,
                                             head_width=0.1, head_length=0.16, fc='r', ec='b')
-        self.cur_arrow.set_zorder(20)
+        self.cur_arrow.set_zorder(0)
         self.org_arrow_xy = self.cur_arrow.get_xy().copy()
 
         self.robot_pos = [0., 0., 0.]
@@ -883,6 +927,9 @@ class MapWidget(QtWidgets.QWidget):
         self.left_idx = None
         self.right_idx = None
         self.useLocChangeFlag = False
+        self.map_md5 = None
+        self.model_md5 = None
+        self.cp_md5 = None
 
     def setupUI(self):
         self.static_canvas = FigureCanvas(Figure(figsize=(5,5)))
@@ -957,8 +1004,9 @@ class MapWidget(QtWidgets.QWidget):
 
         self.calc_confidence_bar = QtWidgets.QAction("Calc", self.userToolbar)
         self.calc_confidence_bar.triggered.connect(self.calcConfidenceShow)
-
-        self.userToolbar.addActions([self.draw_center, self.find_element_bar, self.useLoc, self.calc_confidence_bar])
+        self.md5_btn = QtWidgets.QAction("MD5", self.userToolbar)
+        self.md5_btn.triggered.connect(self.show_md5)
+        self.userToolbar.addActions([self.draw_center, self.find_element_bar, self.useLoc, self.calc_confidence_bar,self.md5_btn])
 
 
         self.find_element = FindElement(self)
@@ -989,7 +1037,7 @@ class MapWidget(QtWidgets.QWidget):
         self.autoMap.setChecked(True)
         self.fig_layout = QtWidgets.QVBoxLayout(self)
         self.timestamp_lable = QtWidgets.QLabel(self)
-        self.timestamp_lable.setText('激光时刻定位（实框）: ')
+        self.timestamp_lable.setText('激光时刻定位(实框): ')
         self.timestamp_lable.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
         self.timestamp_lable.setFixedHeight(16)
         self.logt_lable = QtWidgets.QLabel(self)
@@ -1050,6 +1098,23 @@ class MapWidget(QtWidgets.QWidget):
         self.check_odo.setChecked(False)
         self.static_canvas.mpl_connect('button_press_event', self.mouse_press)
         
+    def show_md5(self):
+        msg_box = QtWidgets.QMessageBox()
+        msg_box.setIcon(QtWidgets.QMessageBox.Information) # 设置图标
+        md5_str = f"""
+        map_md5: {self.map_md5}
+        model_md5: {self.model_md5}
+        cp_md5: {self.cp_md5}
+        """
+        msg_box.setSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        msg_box.setTextInteractionFlags(Qt.TextSelectableByMouse) # 使文本可选
+        msg_box.setText(md5_str) # 设置显示文本
+        msg_box.setWindowTitle("md5") # 设置窗口标题
+        msg_box.setStandardButtons(QtWidgets.QMessageBox.Ok) # 设置标准按钮
+
+        # 显示消息框并获取用户的点击结果
+        msg_box.exec_()
+
     def mouse_press(self, event):
         if event.button == 3:
             if not self.toolbar.isActive():
@@ -1157,60 +1222,71 @@ class MapWidget(QtWidgets.QWidget):
         self.calc_confidence_fig.show()
 
     def calcConfidence(self, event:list):
-        dx = np.array([v*event[0] for v in range(-10, 11, 1)])
+        max_num = 40
+        half_num = int(max_num/2)
+        dx = np.array([v*event[0] for v in range(-half_num, half_num+1, 1)])
         dy = dx
-        da = np.array([v*event[1] for v in range(-10, 11, 1)])
+        da = np.array([v*event[1] for v in range(-half_num, half_num+1, 1)])
         confidence = np.zeros((len(dx), len(dy), len(da)))
+        resolution = event[0] * 0.01
         for i,x in enumerate(dx):
             for j,y in enumerate(dy):
                 for k, a in enumerate(da):
-                    laser_data = self.getLaserData([x*0.01,y*0.01,a/180.0*math.pi])
-                    confidence[i][j][k] = self.read_map.confidence(laser_data)
-                    print("cal confidence", f"{i:3d}", f"{j:3d}", f"{k:3d}", f"{(i * len(dy) * len(da) + j *len(da) + k) * 1.0/ confidence.size:.2f}")
+                    if k == half_num or j == half_num or i == half_num:
+                        laser_data = self.getLaserData([x*0.01,y*0.01,a/180.0*math.pi])
+                        confidence[i][j][k] = self.read_map.confidence(laser_data, resolution)
+                        print("cal confidence", f"{i:3d}", f"{j:3d}", f"{k:3d}", f"{(i * len(dy) * len(da) + j *len(da) + k) * 1.0/ confidence.size:.2f}")
         fig, axes = plt.subplots(2, 3)
         fig.suptitle(f"loc: {self.laser_info}")
-        data = confidence[:,10,10]
+        data = confidence[:,half_num,half_num]
         aplt = axes[0,0]
         aplt.plot(dx, data)
         aplt.set_xlabel('dx cm')
         aplt.set_ylabel('confidence')
         aplt.set_title('dx, dy=0, da=0')
         aplt = axes[0,1]
-        data = confidence[10,:,10] 
+        data = confidence[half_num,:,half_num] 
         aplt.plot(dy, data)
         aplt.set_xlabel('dy cm')
         aplt.set_ylabel('confidence')
         aplt.set_title('dx=0, dy, da=0')
         aplt = axes[0,2]
-        data = confidence[10,10,:]
+        data = confidence[half_num,half_num,:]
         aplt.plot(da, data)
         aplt.set_xlabel('da deg')
         aplt.set_ylabel('confidence')
         aplt.set_title('dx=0, dy=0, da')
 
         aplt = axes[1,0]
-        data = confidence[:,:,10]
+        data = confidence[:,:,half_num]
         im = aplt.imshow(data, extent=[min(dx), max(dx), min(dy), max(dy)], aspect='auto', origin='lower', cmap='hot')
         bar = fig.colorbar(im, ax=aplt)
         aplt.set_xlabel('dy cm')
         aplt.set_ylabel('dx cm')
         aplt.set_title('dx, dy, da=0, confidence map ')
         aplt = axes[1,1]
-        data = confidence[:,10,:] 
-        im = aplt.imshow(data, extent=[min(dx), max(dx), min(da), max(da)], aspect='auto', origin='lower', cmap='hot')
+        data = confidence[:,half_num,:] 
+        im = aplt.imshow(data, extent=[min(da), max(da), min(dx), max(dx)], aspect='auto', origin='lower', cmap='hot')
         bar = fig.colorbar(im, ax=aplt)
         aplt.set_xlabel('da deg')
         aplt.set_ylabel('dx cm')
         aplt.set_title('dx, dy=0, da, confidence map')
         aplt = axes[1,2]
-        data = confidence[10,:,:] 
-        im = aplt.imshow(data, extent=[min(dy), max(dy), min(da), max(da)], aspect='auto', origin='lower', cmap='hot')
+        data = confidence[half_num,:,:] 
+        im = aplt.imshow(data, extent=[min(da), max(da), min(dy), max(dy)], aspect='auto', origin='lower', cmap='hot')
         bar = fig.colorbar(im, ax=aplt)
         aplt.set_xlabel('da deg')
         aplt.set_ylabel('dy cm')
         aplt.set_title('dx=0, dy, da confidence map')
-
-
+        plt.figure()
+        img_combined = np.stack((confidence[:,:,half_num], confidence[:,half_num,:], confidence[half_num,:,:]), axis=0)
+        max_value = np.max(img_combined)
+        data = np.transpose(img_combined, (1, 2, 0))/max_value
+        plt.imshow(data)
+        import datetime
+        now = datetime.datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        np.save(f"confidence_{timestamp}.npy", data)
         plt.show()
 
     def getElement(self, event:list):
@@ -1243,8 +1319,8 @@ class MapWidget(QtWidgets.QWidget):
 
     def getPointData(self, event):
         point = lines.Line2D([],[], linestyle = '', marker = 'x', markersize = 8.0, color='r')
-        point.set_xdata(event[0])
-        point.set_ydata(event[1])
+        point.set_xdata([event[0]])
+        point.set_ydata([event[1]])
         point.set_zorder(30)
         id = str(int(round(time.time()*1000)))
         if id not in self.pointLists or self.pointLists[id] is None:
@@ -1307,22 +1383,22 @@ class MapWidget(QtWidgets.QWidget):
             self.static_canvas.figure.canvas.draw()
 
     def getDataXYData(self, event):
-        datax = None
-        datay = None
-        datatheta = None
+        datax_str = None
+        datay_str = None
+        datatheta_str = None
         if event[0] == "TrackPath":
-            datax = "NearInd.px"
-            datay = "NearInd.py"
+            datax_str = "NearInd.px"
+            datay_str = "NearInd.py"
         else:
-            datax = event[0] + ".x"
-            datay = event[0] + ".y"
-            datatheta = event[0] + ".theta"
+            datax_str = event[0] + ".x"
+            datay_str = event[0] + ".y"
+            datatheta_str = event[0] + ".theta"
         based = event[4]
-        print("getDataXYData", event, datax, datay, datatheta, based)
-        datax = self.robot_log.read_thread.getData(datax)
-        datay = self.robot_log.read_thread.getData(datay)
-        if datatheta != None:
-            datatheta = self.robot_log.read_thread.getData(datatheta)
+        print("getDataXYData", event, datax_str, datay_str, datatheta_str, based)
+        datax = self.robot_log.read_thread.getData(datax_str)
+        datay = self.robot_log.read_thread.getData(datay_str)
+        if datatheta_str != None:
+            datatheta = self.robot_log.read_thread.getData(datatheta_str)
         ts = np.array(datax[1])
         if len(ts) < 1:
             return
@@ -1349,8 +1425,8 @@ class MapWidget(QtWidgets.QWidget):
             pgv2tag = [x[0],y[0],theta[0]]
             print("pgv2tag", pgv2tag)
 
-            _ = self.robot_log.read_thread.getData("m_pgv2robot.x")
-            p2r = content['m_pgv2robot']  
+            _ = self.robot_log.read_thread.getData(datax_str)
+            p2r = content[event[0]]  
             p2r_left_idx = (np.abs(np.array(p2r['t']) - self.left_line_t)).argmin()  
             p2r_x0 = p2r['x'][p2r_left_idx]
             p2r_y0 = p2r['y'][p2r_left_idx]
@@ -1617,6 +1693,7 @@ class MapWidget(QtWidgets.QWidget):
 
     def readMapFinished(self, result):
         if len(self.read_map.map_x) > 0:
+            self.map_md5 = get_md5_pathlib(self.read_map.map_name) 
             self.map_data.set_xdata(self.read_map.map_x)
             self.map_data.set_ydata(self.read_map.map_y)
             self.rssi_map_data.set_xdata(self.read_map.rssi_map_x)
@@ -1642,9 +1719,12 @@ class MapWidget(QtWidgets.QWidget):
                 path.set_zorder(19)
                 self.ax.add_patch(path)
             for circle in self.read_map.circles:
-                wedge = patches.Arc([circle[0], circle[1]], circle[2]*2, circle[2]*2, 0, circle[3], circle[4], facecolor = 'none', ec="orange", lw = 1)
-                wedge.set_zorder(19)
-                self.ax.add_patch(wedge)
+                continue
+                # if len(circle) != 5:
+                #     continue
+                # wedge = patches.Arc([circle[0], circle[1]], circle[2]*2, circle[2]*2, 0, circle[3], circle[4], facecolor = 'none', ec="orange", lw = 1)
+                # wedge.set_zorder(19)
+                # self.ax.add_patch(wedge)
             for vert in self.read_map.straights:
                 path = Path(vert, self.read_map.straight_codes)
                 patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=2)
@@ -1663,11 +1743,11 @@ class MapWidget(QtWidgets.QWidget):
                 text_path.set_zorder(19)
                 self.ax.add_patch(text_path)
                 if pt[2] != None:
-                    arrow = patches.Arrow(pt[0],pt[1], pr * np.cos(pt[2]), pr*np.sin(pt[2]), pr)
+                    arrow = patches.Arrow(pt[0],pt[1], pr * np.cos(pt[2]), pr*np.sin(pt[2]))
                     arrow.set_zorder(19)
                     self.ax.add_patch(arrow)
             self.ruler.add_ruler(self.ax)
-            self.setWindowTitle("{} : {}".format('MapViewer', os.path.split(self.map_name)[1]))
+            self.setWindowTitle("{} : {} md5: {}".format('MapViewer', os.path.split(self.map_name)[1], self.map_md5))
             font = QtGui.QFont()
             font.setBold(True)
             self.smap_action.setFont(font)
@@ -1678,6 +1758,7 @@ class MapWidget(QtWidgets.QWidget):
 
     def readModelFinished(self, result):
         self.readingModelFlag = True
+        self.model_md5 = get_md5_pathlib(self.read_model.model_name) 
         if self.read_model.head and self.read_model.tail and self.read_model.width:
             if self.laser_index == -1:
                 if len(self.read_model.laser) > 0:
@@ -1761,6 +1842,7 @@ class MapWidget(QtWidgets.QWidget):
         self.mid_line_t = None
 
     def readCPFinished(self, result):
+        self.cp_md5 = get_md5_pathlib(self.read_cp.cp_name) 
         if self.read_model.laser:
             if self.read_cp.laser:
                 for key in self.read_model.laser.keys():
@@ -2010,9 +2092,11 @@ class MapWidget(QtWidgets.QWidget):
             loc_idx = (np.abs(loc_ts - mid_line_t)).argmin()            
         print(self.useLoc.isChecked(), loc_idx, loc['theta'][loc_idx])
         self.robot_loc_pos = [loc['x'][loc_idx],loc['y'][loc_idx],np.deg2rad(loc['theta'][loc_idx])]
-        loc_info = "t {},dt {},x {:<4.3f}, y {:<4.3f},a {:<4.3f}".format(loc['t'][loc_idx], int(loc['t'][loc_idx].timestamp() - mid_line_t.timestamp()), 
-            loc['x'][loc_idx], loc['y'][loc_idx], loc['theta'][loc_idx])
-        self.logt_lable.setText('里程时刻定位(虚框):   '+ loc_info)
+        loc_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(loc['t'][loc_idx], 
+            loc['x'][loc_idx], loc['y'][loc_idx], loc['theta'][loc_idx],
+            int(loc['t'][loc_idx].timestamp() - mid_line_t.timestamp()))
+        title = "里程时刻定位(虚框):"
+        self.logt_lable.setText(f"{title:<15}{loc_info}")
 
         if self.laser_index in self.laser_pos.keys() \
          and self.read_model.tail and self.read_model.head and self.read_model.width:
@@ -2104,16 +2188,19 @@ class MapWidget(QtWidgets.QWidget):
             pos_idx = (np.abs(pos_ts - ts)).argmin()
             pos_idx = loc_min_ind + pos_idx
             self.robot_pos = [loc['x'][pos_idx], loc['y'][pos_idx], np.deg2rad(loc['theta'][pos_idx])]
-            self.laser_info = "t {},dt {},x {:<4.3f},y {:<4.3f},a {:<4.3f}".format(loc['t'][pos_idx], int(loc['timestamp'][pos_idx] - ts),
-                loc['x'][pos_idx], loc['y'][pos_idx], loc['theta'][pos_idx])
-            self.timestamp_lable.setText('激光时刻定位（实框）:   '+ self.laser_info)
+            self.laser_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(loc['t'][pos_idx],
+                loc['x'][pos_idx], loc['y'][pos_idx], loc['theta'][pos_idx],
+                int(loc['timestamp'][pos_idx] - ts))
+            title = "激光时刻定位(实框):"
+            self.timestamp_lable.setText(f"{title:<15}{self.laser_info}")
         else:
             self.robot_pos = [laser_data.loc_x(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_y(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_yaw(min_laser_channel)[0][laser_idx]]
-            self.laser_info = "t {},dt {},x {:<4.3f},y {:<4.3f},a {:<4.3f}".format(laser_data.t(min_laser_channel)[laser_idx], 0,
-                self.robot_pos[0], self.robot_pos[1],  np.rad2deg(self.robot_pos[2]))
-            self.timestamp_lable.setText('当前激光时刻定位（实框）: '+ self.laser_info)
+            self.laser_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(laser_data.t(min_laser_channel)[laser_idx],
+                self.robot_pos[0], self.robot_pos[1],  np.rad2deg(self.robot_pos[2]), 0)
+            title = "激光时刻定位(实框):"
+            self.timestamp_lable.setText(f"{title:<15}{self.laser_info}")
         self.laser_org_data = laser_points
         laser_rssi = rssi
         if len(laser_rssi) == len(self.laser_org_data.T) and len(laser_rssi) > 0:

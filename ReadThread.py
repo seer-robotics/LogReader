@@ -93,10 +93,15 @@ class ReadThread(QThread):
                 if k == "LocationEachFrame" or \
                 k == "StopPoints"  or \
                 k == "SlowDownPoints" or \
+                k == "MotorInfo" or \
                 (isinstance(self.js[k]['content'], str) and self.js[k]["content"] == "key|value") or \
                 (isinstance(self.js[k]['content'], str) and self.js[k]['content'] == "path"):
+                    print("type", self.js[k]["type"])
                     if isinstance(self.js[k]['content'], str) and self.js[k]['content'] == "path":
                         self.content[self.js[k]["type"]] = Data(self.js[k], self.js[k]["type"], None, True)
+                    if isinstance(self.js[k]['type'], list):
+                        for type in self.js[k]["type"]:
+                            self.content[type] = Data(self.js[k], type)
                     else:
                         self.content[self.js[k]["type"]] = Data(self.js[k], self.js[k]["type"])
                 else:
@@ -197,11 +202,15 @@ class ReadThread(QThread):
             fid.close()
         #creat dic
         for k in self.content.keys():
+            real_k = k
+            if "name" in self.content[k].data.keys() and len(self.content[k].data["name"]) > 0:
+                print(k)
+                real_k = k+"."+self.content[k].data["name"][0]
             for name in self.content[k].data.keys():
                 if name != 't':
-                    self.data[k+'.'+name] = (self.content[k][name], self.content[k]['t'])
-                    self.ylabel[k+'.'+name] = self.content[k].description[name]
-                    self.data_org_key[k+'.'+name] = k
+                    self.data[real_k+'.'+name] = (self.content[k][name], self.content[k]['t'])
+                    self.ylabel[real_k+'.'+name] = self.content[k].description[name]
+                    self.data_org_key[real_k+'.'+name] = k
         if 'IMU' in self.js:
             self.data["IMU.org_gx"] = ([i+j for (i,j) in zip(self.content['IMU']['gx'],self.content['IMU']['offx'])], self.content['IMU']['t'])
             self.data["IMU.org_gy"] = ([i+j for (i,j) in zip(self.content['IMU']['gy'],self.content['IMU']['offy'])], self.content['IMU']['t'])

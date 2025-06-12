@@ -155,6 +155,20 @@ class Readmodel(QThread):
         self.loc_laser_ind = 0
         self.laser = dict() #x,y,r
         self.laser_id2name = dict()
+        self.translate_x = 0
+    def getHead(self):
+        if self.head is None:
+            return None
+        return self.head + self.translate_x
+    def getTail(self):
+        if self.tail is None:
+            return None
+        return self.tail - self.translate_x
+    def getWidth(self):
+        return self.width
+    def setTranslateX(self, x):
+        print("set_tran_x", x)
+        self.translate_x = x
     # run method gets called when we start the thread
     def run(self):
         with open(self.model_name, 'r',encoding= 'UTF-8') as fid:
@@ -903,6 +917,7 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_pos = [0., 0., 0.]
         self.robot_loc_pos = []
         self.laser_pos = dict()
+        self.org_laser_pos = dict()
         self.laser_org_data = np.array([])
         self.laser_index = -1
         self.check_draw_flag = False
@@ -1337,11 +1352,11 @@ class MapWidget(QtWidgets.QWidget):
         if len(event) != 4:
             return
         robot_pos = [event[0], event[1], event[2]/180.0*math.pi]
-        if self.read_model.tail and self.read_model.head and self.read_model.width:
-            xdata = [-self.read_model.tail,   -self.read_model.tail,     self.read_model.head,  
-                     self.read_model.head, -self.read_model.tail, self.read_model.head, 
-                     0.0,0.0,self.read_model.head,
-                     self.read_model.head, -self.read_model.tail]
+        if self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
+            xdata = [-self.read_model.getTail(),   -self.read_model.getTail(),     self.read_model.getHead(),  
+                     self.read_model.getHead(), -self.read_model.getTail(), self.read_model.getHead(), 
+                     0.0,0.0,self.read_model.getHead(),
+                     self.read_model.getHead(), -self.read_model.getTail()]
             ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, 
                      0.0, 0.0, 0.0, 
                      -self.read_model.width/2, self.read_model.width/2.0,0.0,
@@ -1759,11 +1774,12 @@ class MapWidget(QtWidgets.QWidget):
     def readModelFinished(self, result):
         self.readingModelFlag = True
         self.model_md5 = get_md5_pathlib(self.read_model.model_name) 
-        if self.read_model.head and self.read_model.tail and self.read_model.width:
+        if self.read_model.getHead() and self.read_model.getTail() and self.read_model.width:
+            laser_info = self.read_model.laser
             if self.laser_index == -1:
-                if len(self.read_model.laser) > 0:
-                    self.laser_index = list(self.read_model.laser.keys())[0]
-            if self.laser_index in self.read_model.laser.keys():
+                if len(laser_info) > 0:
+                    self.laser_index = list(laser_info.keys())[0]
+            if self.laser_index in laser_info.keys():
                 for i in range(0, self.hbox.count()): 
                     self.hbox.itemAt(i).widget().deleteLater()
                 self.check_all = QtWidgets.QCheckBox('ALL',self)
@@ -1800,20 +1816,21 @@ class MapWidget(QtWidgets.QWidget):
                 self.check_traj.stateChanged.connect(self.changeCheckBox)
                 self.check_odo.stateChanged.connect(self.changeCheckBox)
                 self.check_lasers = dict()
-                for k in self.read_model.laser.keys():
+                for k in laser_info.keys():
                     self.add_laser_check(k)
                 self.check_all.setChecked(True)
                 self.check_partical.setChecked(False)
                 self.check_odo.setChecked(False)
 
 
-                xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
+                xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
                 ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
                 robot_shape = np.array([xdata, ydata])
                 xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
                 xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
                 cross_shape = np.array([xxdata,xydata])
-                self.laser_pos = copy.deepcopy(self.read_model.laser)
+                self.laser_pos = copy.deepcopy(laser_info)
+                self.org_laser_pos = copy.deepcopy(self.laser_pos)
                 # laser_data = [[self.laser_pos[self.laser_index][0], self.laser_pos[self.laser_index][1]]]
                 self.updateRobotData()
 
@@ -1833,8 +1850,8 @@ class MapWidget(QtWidgets.QWidget):
                 self.cp_action.setFont(font)
                 self.static_canvas.figure.canvas.draw()
             else:
-                print("read laser error! laser_index: ", self.laser_index, "; laser index in model: ", self.read_model.laser.keys())
-                logging.debug("read laser error! laser_index: " + str(self.laser_index) +" "+ str(self.read_model.laser.keys()))
+                print("read laser error! laser_index: ", self.laser_index, "; laser index in model: ", laser_info.keys())
+                logging.debug("read laser error! laser_index: " + str(self.laser_index) +" "+ str(laser_info.keys()))
         else:
             print("readModel error!")
             logging.debug("readModel error!")
@@ -1843,19 +1860,20 @@ class MapWidget(QtWidgets.QWidget):
 
     def readCPFinished(self, result):
         self.cp_md5 = get_md5_pathlib(self.read_cp.cp_name) 
-        if self.read_model.laser:
+        laser_info = self.read_model.laser
+        if laser_info:
             if self.read_cp.laser:
-                for key in self.read_model.laser.keys():
+                for key in laser_info.keys():
                     self.laser_pos[key] = [0,0,0]
                     laser_name = self.read_model.laser_id2name[key]
                     if laser_name in self.read_cp.laser.keys():
-                        self.laser_pos[key][0] = self.read_model.laser[key][0] + self.read_cp.laser[laser_name][0]
-                        self.laser_pos[key][1] = self.read_model.laser[key][1] + self.read_cp.laser[laser_name][1]
-                        self.laser_pos[key][2] = self.read_model.laser[key][2] + self.read_cp.laser[laser_name][2]
+                        self.laser_pos[key][0] = laser_info[key][0] + self.read_cp.laser[laser_name][0]
+                        self.laser_pos[key][1] = laser_info[key][1] + self.read_cp.laser[laser_name][1]
+                        self.laser_pos[key][2] = laser_info[key][2] + self.read_cp.laser[laser_name][2]
                     else:
-                        self.laser_pos[key][0] = self.read_model.laser[key][0]
-                        self.laser_pos[key][1] = self.read_model.laser[key][1]
-                        self.laser_pos[key][2] = self.read_model.laser[key][2]
+                        self.laser_pos[key][0] = laser_info[key][0]
+                        self.laser_pos[key][1] = laser_info[key][1]
+                        self.laser_pos[key][2] = laser_info[key][2]
                     laser_data = [self.laser_pos[key][0], self.laser_pos[key][1]]
                     font = QtGui.QFont()
                     font.setBold(True)
@@ -1872,6 +1890,7 @@ class MapWidget(QtWidgets.QWidget):
                         self.laser_data_points.set_paths(patches)
                         self.laser_data_points.set_color(self.laser_point_color)
                         self.mid_line_t = None
+                self.org_laser_pos = copy.deepcopy(self.laser_pos)
 
     def updateObs(self):
         if self.robot_log is None:
@@ -2047,6 +2066,25 @@ class MapWidget(QtWidgets.QWidget):
     def useLocChange(self):
         self.useLocChangeFlag = True
 
+    def updateTranslateX(self, mid_t):
+        trans_x = self.robot_log.read_thread.getData("translateAxis.x")
+        if len(trans_x[0]) < 1:
+           self.read_model.setTranslateX(0)
+           return 
+        ts = np.array(trans_x[1])
+        idx = (np.abs(ts - mid_t)).argmin()
+        shift_x = 0
+        if ts[idx] <= mid_t:
+            shift_x = trans_x[0][idx]
+        else:
+            if idx < 1:
+                shift_x = 0
+            else:
+                shift_x = trans_x[0][idx-1]
+        self.read_model.setTranslateX(shift_x)
+        for key in self.laser_pos.keys():
+            self.laser_pos[key][0] = self.org_laser_pos[key][0] + shift_x
+
     def getLoc(self):
         content = self.robot_log.read_thread.content
         loc = dict()
@@ -2076,6 +2114,7 @@ class MapWidget(QtWidgets.QWidget):
             return
         mid_line_t = self.robot_log.mid_line_t
         content = self.robot_log.read_thread.content
+        self.updateTranslateX(mid_line_t)
         loc = self.getLoc()
         if loc == None:
             return
@@ -2099,8 +2138,8 @@ class MapWidget(QtWidgets.QWidget):
         self.logt_lable.setText(f"{title:<15}{loc_info}")
 
         if self.laser_index in self.laser_pos.keys() \
-         and self.read_model.tail and self.read_model.head and self.read_model.width:
-            xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
+         and self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
+            xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
             ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
             robot_shape = np.array([xdata, ydata])
             xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
@@ -2215,8 +2254,8 @@ class MapWidget(QtWidgets.QWidget):
         self.laser_index = min_laser_channel
 
         if self.laser_index in self.laser_pos.keys() \
-         and self.read_model.tail and self.read_model.head and self.read_model.width:
-            xdata = [-self.read_model.tail, -self.read_model.tail, self.read_model.head, self.read_model.head, -self.read_model.tail]
+         and self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
+            xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
             ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
             robot_shape = np.array([xdata, ydata])
             xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]

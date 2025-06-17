@@ -378,7 +378,7 @@ class Readmap(QThread):
                 self.rssi_map_y.append(0.0)
             self.grid_map.insert(self.rssi_map_x[-1], self.rssi_map_y[-1])
         def f3order(p0, p1, p2, p3):
-            dt = 0.001
+            dt = 0.01
             t = 0
             v = []
             while(t < 1.0):
@@ -391,7 +391,7 @@ class Readmap(QThread):
                 t = t + dt
             return v 
         def f5order(p0, p1, p2, p3, p4, p5):
-            dt = 0.001
+            dt = 0.01
             t = 0
             v = []
             while(t < 1.0):
@@ -945,6 +945,27 @@ class MapWidget(QtWidgets.QWidget):
         self.map_md5 = None
         self.model_md5 = None
         self.cp_md5 = None
+        self.map_lines_collection = None
+        # Ensure artists are cleared if there are no points this time
+        self.map_text_artists = []
+        # Initialize attributes for dynamic scatter scaling
+        self._original_pr = 0.01 # Default radius in data units, adjust this to your actual 'pr'
+                                # If 'pr' comes from a config or varies, you'll need to set this
+                                # when that information becomes available.
+        self._num_scatter_points = 0
+        self.map_scatter_points = None
+        self.map_text_patches = [] # To store references to text patches for clearing
+        self.map_quiver_arrows = None # To store reference to quiver object for clearing
+
+        # Connect the figure to necessary events for updates
+        # Ensure that self.fig is already created at this point
+        self.fig = self.static_canvas.figure
+        # if hasattr(self, 'fig') and self.fig is not None:
+        #      self.static_canvas.mpl_connect('draw_event', self._on_draw_event)
+             # More specific callbacks could be xlim_changed/ylim_changed on ax.
+             # self.ax.callbacks.connect('xlim_changed', self._update_scatter_sizes_on_zoom)
+             # self.ax.callbacks.connect('ylim_changed', self._update_scatter_sizes_on_zoom)
+
 
     def setupUI(self):
         self.static_canvas = FigureCanvas(Figure(figsize=(5,5)))
@@ -1707,12 +1728,16 @@ class MapWidget(QtWidgets.QWidget):
             self.read_cp.start()
 
     def readMapFinished(self, result):
+        t0 = time.time()
         if len(self.read_map.map_x) > 0:
+            tp = time.time()
             self.map_md5 = get_md5_pathlib(self.read_map.map_name) 
             self.map_data.set_xdata(self.read_map.map_x)
             self.map_data.set_ydata(self.read_map.map_y)
             self.rssi_map_data.set_xdata(self.read_map.rssi_map_x)
             self.rssi_map_data.set_ydata(self.read_map.rssi_map_y)
+            print("map point cost", time.time()-tp)
+            tp = time.time()
             self.ax.grid(True)
             self.ax.axis('auto')
             xmin = min(self.read_map.map_x)
@@ -1729,10 +1754,46 @@ class MapWidget(QtWidgets.QWidget):
             [p.remove() for p in reversed(self.ax.patches)]
             [p.remove() for p in reversed(self.ax.texts)]
             self.ax.add_patch(self.cur_arrow) #add robot arrow again
-            for line in self.read_map.lines:
-                path = Polygon(line, closed=False, facecolor='none', edgecolor='orange', lw=1)
-                path.set_zorder(19)
-                self.ax.add_patch(path)
+            print("line size", len(self.read_map.lines))
+            print("circle size", len(self.read_map.circles))
+            print("vert size", len(self.read_map.straights))
+            print("point size", len(self.read_map.points))
+            print("points cost", time.time()-tp)
+            if hasattr(self, 'map_lines_collection') and self.map_lines_collection is not None:
+                try:
+                    self.map_lines_collection.remove()
+                except ValueError:
+                    pass # Already removed or not on the axes
+                self.map_lines_collection = None
+            if self.read_map.lines is not None and len(self.read_map.lines) > 0:
+                all_segments = []
+                for line in self.read_map.lines:
+                    # Ensure 'line' is a numpy array for easy slicing if it isn't already
+                    line_np = np.asarray(line)
+
+                    # A line like `[(x0,y0), (x1,y1), (x2,y2)]` needs to be converted into
+                    # segments: `[[(x0,y0), (x1,y1)], [(x1,y1), (x2,y2)]]`
+                    if line_np.shape[0] > 1: # Ensure there's at least one segment
+                        segments_for_this_line = np.array([line_np[:-1], line_np[1:]]).transpose(1, 0, 2)
+                        all_segments.extend(segments_for_this_line)
+
+                if all_segments:
+                    # Create the LineCollection
+                    # You can set colors, linewidths, and other properties here.
+                    # If you want different colors for different lines, you'd pass an array of colors
+                    # to `colors` argument of LineCollection.
+                    self.map_lines_collection = LineCollection(all_segments,
+                                                            colors='orange',
+                                                            linewidths=1,
+                                                            antialiased=True, # Improves appearance
+                                                            zorder=19) # Set zorder here
+                    self.ax.add_collection(self.map_lines_collection)
+            # for line in self.read_map.lines:
+            #     path = Polygon(line, closed=False, facecolor='none', edgecolor='orange', lw=1)
+            #     path.set_zorder(19)
+            #     self.ax.add_patch(path)
+            print("lines cost", time.time()-tp)
+            tp = time.time()
             for circle in self.read_map.circles:
                 continue
                 # if len(circle) != 5:
@@ -1745,22 +1806,128 @@ class MapWidget(QtWidgets.QWidget):
                 patch = patches.PathPatch(path, facecolor='none', edgecolor='orange', lw=2)
                 patch.set_zorder(19)
                 self.ax.add_patch(patch)
+            print("straights cost", time.time()-tp)
+            tp = time.time()
             pr = 0.25
-            for k in self.read_map.points:
-                pt = self.read_map.points[k][0:3]
-                name = self.read_map.points[k][-1]
-                circle = patches.Circle((pt[0], pt[1]), pr, facecolor='orange',
-                edgecolor=(0, 0.8, 0.8), linewidth=3, alpha=0.5)
-                circle.set_zorder(19)
-                self.ax.add_patch(circle)
-                text_path = TextPath((pt[0],pt[1]), name, size = 0.2)
-                text_path = patches.PathPatch(text_path, ec="none", lw=3, fc="k")
-                text_path.set_zorder(19)
-                self.ax.add_patch(text_path)
-                if pt[2] != None:
-                    arrow = patches.Arrow(pt[0],pt[1], pr * np.cos(pt[2]), pr*np.sin(pt[2]))
-                    arrow.set_zorder(19)
-                    self.ax.add_patch(arrow)
+            # --- Clear previous artists ---
+            if hasattr(self, 'map_scatter_points') and self.map_scatter_points is not None:
+                self.map_scatter_points.remove()
+                self.map_scatter_points = None
+
+            if hasattr(self, 'map_text_patches'):
+                for patch in self.map_text_patches:
+                    # Check if the patch is still on the axes before trying to remove it
+                    if patch.figure: # Check if it's associated with a figure
+                        patch.remove()
+                self.map_text_patches = []
+
+            if hasattr(self, 'map_quiver_arrows') and self.map_quiver_arrows is not None:
+                self.map_quiver_arrows.remove()
+                self.map_quiver_arrows = None
+
+
+            # 2. Prepare data for vectorized plotting
+            if self.read_map.points: # Check if points exist and is not empty
+                # Data for scatter plot (circles)
+                self._num_scatter_points = len(self.read_map.points) # Store count for dynamic sizing
+
+                x_coords = []
+                y_coords = []
+                # 's' for scatter is marker size in points^2. We'll use a constant for visual size.
+                # Adjust 200 to scale the visual size of the circles relative to 'pr'
+                # A typical 's' value might be around 50-200 for a noticeable dot.
+                                
+                # Data for quiver plot (arrows)
+                arrow_x = []
+                arrow_y = []
+                arrow_U = [] # x-component of vector
+                arrow_V = [] # y-component of vector
+
+                # Data for text (still needs a loop, but collected here)
+                text_data_for_loop = [] # Store (x, y, name)
+
+                for k in self.read_map.points:
+                    pt = self.read_map.points[k][0:3] # [x, y, angle]
+                    name = self.read_map.points[k][-1] # name
+
+                    # Collect data for scatter (circles)
+                    x_coords.append(pt[0])
+                    y_coords.append(pt[1])
+                    
+                    # Collect data for text
+                    text_data_for_loop.append((pt[0], pt[1], name))
+
+                    # Collect data for quiver (arrows) if angle exists
+                    if pt[2] is not None:
+                        angle = pt[2]
+                        # U = length * cos(angle), V = length * sin(angle)
+                        arrow_x.append(pt[0])
+                        arrow_y.append(pt[1])
+                        arrow_U.append(self._original_pr * 100 * np.cos(angle)) # pr used as arrow length
+                        arrow_V.append(self._original_pr * 100* np.sin(angle))
+
+                # Convert lists to NumPy arrays for efficient plotting
+                x_coords = np.array(x_coords)
+                y_coords = np.array(y_coords)
+                arrow_x = np.array(arrow_x)
+                arrow_y = np.array(arrow_y)
+                arrow_U = np.array(arrow_U)
+                arrow_V = np.array(arrow_V)
+
+                # 3. Plot circles using ax.scatter
+                if len(x_coords) > 0:
+                    # Calculate initial 's' sizes based on the current view
+                    initial_s_sizes = self._calculate_dynamic_s_sizes(self._original_pr, self._num_scatter_points)
+                    self.map_scatter_points = self.ax.scatter(
+                        x_coords, y_coords,
+                        s=initial_s_sizes,           # Marker size (proportional to area)
+                        facecolor='orange',   # Face color of the markers
+                        edgecolors=(0, 0.8, 0.8), # Edge color
+                        linewidths=3,         # Line width of marker edges
+                        alpha=0.5,            # Transparency
+                        zorder=19,
+                        # For extremely large datasets, consider rasterizing for performance
+                        # rasterized=True
+                    )
+
+                # 4. Plot arrows using ax.quiver
+                if len(arrow_x) > 0:
+                    self.map_quiver_arrows = self.ax.quiver(
+                        arrow_x, arrow_y,     # X, Y coordinates of the arrow bases
+                        arrow_U, arrow_V,     # U, V components of the arrow vectors
+                        color='k',            # Arrow color (e.g., black)
+                        angles='xy',          # Interpret U,V as (dx, dy) in data coordinates
+                        scale_units='xy',     # Scale arrows proportionally to data units
+                        scale=2.0,              # 1 data unit = 1 arrow unit
+                        zorder=19,
+                        # For large number of arrows, consider rasterizing
+                        # rasterized=True
+                    )
+
+                # Assuming pr is the radius of your points, adjust text_offset as needed
+                text_offset = 1.5 * self._original_pr * 2.0# Offset text from the center of the circle
+
+                # Clear previous text artists
+                if hasattr(self, 'map_text_artists'):
+                    self.map_text_artists = [] # Clear the list for new artists
+
+                # Plot text using ax.text
+                for x, y, name in text_data_for_loop:
+                    # Adjust position for the text to be beside the point, not on top
+                    # You might want to fine-tune the offset (e.g., pr * 1.5) and alignment
+                    text_artist = self.ax.text(
+                        x + text_offset, y,  # Offset the text horizontally
+                        name,
+                        color='b',           # Text color
+                        fontsize='medium',    # Adjust font size as needed (e.g., 8, 10, 'x-small', 'small', 'medium')
+                        ha='left',           # Horizontal alignment ('left', 'center', 'right')
+                        va='center',         # Vertical alignment ('top', 'center', 'bottom', 'baseline')
+                        zorder=20            # Ensure text is above points/lines
+                    )
+                    self.map_text_artists.append(text_artist) # Keep reference for removal
+
+            print("lms cost", time.time()-tp)
+            tp = time.time()
             self.ruler.add_ruler(self.ax)
             self.setWindowTitle("{} : {} md5: {}".format('MapViewer', os.path.split(self.map_name)[1], self.map_md5))
             font = QtGui.QFont()
@@ -1770,6 +1937,9 @@ class MapWidget(QtWidgets.QWidget):
             elements = list(self.read_map.p_names.keys())
             elements.extend(list(self.read_map.bin.keys()))
             self.find_element.addItems(set(elements))
+        t1 = time.time()
+        dt = t1 - t0
+        print("map cost", dt)
 
     def readModelFinished(self, result):
         self.readingModelFlag = True
@@ -2491,6 +2661,76 @@ class MapWidget(QtWidgets.QWidget):
         self.useLocChangeFlag = False
     def redraw(self):
         self.static_canvas.figure.canvas.draw()
+    # def _on_draw_event(self, event):
+    #     """
+    #     Callback triggered when the figure is drawn (including after zoom/pan).
+    #     This is a more general event, useful if multiple elements need re-evaluation.
+    #     """
+    #     self._update_scatter_sizes_on_zoom() # Call the size update function
+
+    def _calculate_dynamic_s_sizes(self, data_radius_pr, num_points):
+        """
+        Calculates marker sizes (s) for scatter plot to maintain a constant visual radius
+        in data units.
+
+        Args:
+            data_radius_pr (float): The desired radius for each point in data units (e.g., meters).
+            num_points (int): The total number of points to determine the array size.
+
+        Returns:
+            numpy.ndarray: An array of 's' values for the scatter plot.
+        """
+        if self.ax is None or self.fig is None:
+            return np.array([])
+
+        # Get the transformation from data coordinates to display coordinates (pixels)
+        # We need to know how many pixels correspond to one data unit.
+        # This is essentially the inverse of the data range divided by the pixel range.
+        
+        # Method 1: Using the inverse transform (robust)
+        # A point at (0,0) in data, and (data_radius_pr, 0) in data.
+        # Transform them to display coordinates (pixels)
+        p1_pixels = self.ax.transData.transform((0, 0))
+        p2_pixels = self.ax.transData.transform((data_radius_pr, 0))
+
+        # Calculate the radius in pixels
+        radius_pixels = np.sqrt((p2_pixels[0] - p1_pixels[0])**2 + (p2_pixels[1] - p1_pixels[1])**2)
+
+        # Convert radius from pixels to Matplotlib "points" (1 point = 1/72 inch)
+        # 1 inch = self.fig.dpi pixels. So 1 pixel = 72.0 / self.fig.dpi points.
+        radius_points = radius_pixels * (72.0 / self.fig.dpi)
+
+        # Matplotlib's 's' parameter is marker area in (points)^2.
+        # For a circular marker, if its visual radius is `radius_points`, its area is `pi * radius_points^2`.
+        # However, `scatter`'s `s` parameter often maps such that `s = (diameter_in_points)^2`
+        # or `s = (2 * radius_points)^2` to make the markers visually match.
+        # Let's use (diameter in points)^2 as a robust choice for `s`.
+        diameter_points = 2 * radius_points
+        calculated_s_value = diameter_points**2
+        
+        # Ensure a minimum size for visibility, especially when zoomed far out
+        min_s = 100 # Minimum s size in points^2, adjust as needed
+        calculated_s_value = max(calculated_s_value, min_s) 
+        print("calculated_s_value", calculated_s_value)
+        
+        return np.full(num_points, calculated_s_value) # Return an array of the same size
+
+    # def _update_scatter_sizes_on_zoom(self, event=None):
+    #     """
+    #     Callback function to update scatter point sizes when axis limits change (e.g., on zoom/pan).
+    #     """
+    #     # Only update if there are points plotted and the scatter artist exists
+    #     return 
+    #     if self.map_scatter_points is not None and self._num_scatter_points > 0:
+    #         # Recalculate sizes based on the current axis view
+    #         new_s_sizes = self._calculate_dynamic_s_sizes(self._original_pr, self._num_scatter_points)
+            
+    #         # Update the scatter plot artist's sizes
+    #         self.map_scatter_points.set_sizes(new_s_sizes)
+            
+    #         # Request a redraw of the canvas but only for the changed elements
+    #         self.fig.canvas.draw_idle()
+
 
 
 if __name__ == '__main__':

@@ -1061,6 +1061,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         options |= QtCore.Qt.WindowStaysOnTopHint
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log, *.gz);;All Files (*)", options=options)
         if self.filenames:
+            self.map_widget.hide()
             self.finishReadFlag = False
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
@@ -1101,6 +1102,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     logging.debug('fail to load {}'.format(file))
                     return
         if self.filenames:
+            self.map_widget.hide()
             self.finishReadFlag = False
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
@@ -1364,7 +1366,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if tfl:
                 legend_info.append(tfl)
                 legend_info.append('task finish')
-        if len(self.read_thread.service.t()) <= max_line:
+        if len(self.read_thread.service.t()) <= 1e6:
             for tmp in self.read_thread.service.t():
                 tse = ax.axvline(tmp, linestyle = '-', color = 'k', linewidth = lw, alpha = ap)
                 tsenum.append(line_num)

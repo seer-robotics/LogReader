@@ -204,8 +204,7 @@ class ReadThread(QThread):
         for k in self.content.keys():
             real_k = k
             if "name" in self.content[k].data.keys() and len(self.content[k].data["name"]) > 0:
-                print(k)
-                real_k = k+"."+self.content[k].data["name"][0]
+                real_k = k[:-1]+"."+self.content[k].data["name"][0]
             for name in self.content[k].data.keys():
                 if name != 't':
                     self.data[real_k+'.'+name] = (self.content[k][name], self.content[k]['t'])

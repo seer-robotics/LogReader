@@ -207,7 +207,7 @@
       {"name":"finishNavFile", "type":"str"},
       {"name":"soundName","type":"str", "description": "即将播放音频的名称"},
       {"name":"cur_soundName","type":"str", "description": "上次或者当前音频的名称"},
-      {"name": "scriptSound", "type": "int64", "description": "是否脚本播放音频", "unit":""   },
+      {"name": "scriptSound", "type": "bool", "description": "是否脚本播放音频", "unit":""   },
       {"name": "manual_sound", "type": "int64", "description": "手动音频状态", "unit":""   },
       {"name": "autoSound", "type": "bool", "description": "是否在自动播放音频", "unit":""   },
       {"name": "warnFile", "type": "str", "description": "是否在自动播放音频", "unit":""   },
@@ -700,7 +700,11 @@
       {"name": "wait_steer", "type": "double",  "desc": "等待舵角到位"},
       {"name": "delayTime", "type": "double",  "desc": "主从延时ms"},
       {"name": "status_ts", "type": "double",  "desc": "旧状态时间戳"},
-      {"name": "cur_ts", "type": "double",  "desc": "当前时间戳"}
+      {"name": "cur_ts", "type": "double",  "desc": "当前时间戳"},
+      {"name": "plan_dist", "type":"double"},
+      {"name":"x", "type":"double"},
+      {"name":"y", "type":"double"},
+      {"name":"theta", "type":"double"}
     ]
   },
   "FollowerStatus1": {
@@ -824,7 +828,8 @@
       {"name": "theta0", "type": "rad", "desc": "目标 pgv theta"},
       {"name": "kp", "type": "double"},
       {"name": "ratio", "type": "double"},
-      {"name": "dv", "type": "double"},
+      {"name": "dotv", "type": "double"},
+      {"name": "crossv", "type": "double"},
       {"name": "v", "type": "double"}
     ]
   },
@@ -2278,8 +2283,8 @@
       {"name":"delayt", "type":"double","description": "延迟时间", "unit":"ms"}
     ]   
   },
-  "TLinear_lift":{
-    "type":"TLinear_lift",
+  "TLinear_motor2":{
+    "type":"TLinear_motor2",
     "content":[
       {"name":"ideal_v", "type":"double","description": "原始输入的速度","unit":"m/s"},
       {"name":"u", "type":"double","description": "修改后输入速度","unit":"m/s"},
@@ -2684,7 +2689,8 @@
     "content": [
       {"name": "need_replan_P", "type": "bool", "unit":""},
       {"name": "need_replan_T", "type": "bool", "unit":""},
-      {"name": "has_last_avoid_path", "type": "bool", "unit":""}
+      {"name": "has_last_avoid_path", "type": "bool", "unit":""},
+      {"name": "maxDist", "type": "double", "unit":""}
     ]
   },
   "OmniSend":{
@@ -2742,5 +2748,19 @@
       {"name": "rotate", "type": "double", "unit":""},
       {"name": "ts", "type": "double", "unit":""}
     ] 
+  },
+  "Switchinglast_state":{
+    "type": "Switching last_state",
+    "content": [
+      {"name": "cur_state", "type": "str", "unit":""},
+      {"name": "last_state", "type": "str", "unit":""}
+    ] 
+  },
+  "pcd_obs_num":{
+    "type": "pcd_obs_num",
+    "content": [
+      {"name": "num", "type": "double", "unit":""}
+    ] 
+
   }
 }

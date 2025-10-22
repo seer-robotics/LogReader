@@ -548,11 +548,19 @@ class PointWidget(QtWidgets.QWidget):
         self.x_input.addRow(self.x_label,self.x_edit)
         self.y_input = QtWidgets.QFormLayout()
         self.y_input.addRow(self.y_label,self.y_edit)
+        
+        self.c_msg = QtWidgets.QLabel("color:")
+        self.c = QtWidgets.QComboBox(self)
+        self.c.addItems(["r", "g", "b", "c", "m", "y", "k"])
+        hbox2 = QtWidgets.QFormLayout()
+        hbox2.addRow(self.c_msg, self.c)
+
         self.btn = QtWidgets.QPushButton("Yes")
         self.btn.clicked.connect(self.getData)
         vbox = QtWidgets.QVBoxLayout(self)
         vbox.addLayout(self.x_input)
         vbox.addLayout(self.y_input)
+        vbox.addLayout(hbox2)
         vbox.addWidget(self.btn)
         self.setWindowTitle("Point Input")
 
@@ -561,7 +569,7 @@ class PointWidget(QtWidgets.QWidget):
             x = float(self.x_edit.text())
             y = float(self.y_edit.text())
             self.hide()
-            self.getdata.emit([x,y])
+            self.getdata.emit([x,y,self.c.currentText()])
         except:
             pass
 
@@ -571,7 +579,8 @@ class RobotWidget(QtWidgets.QWidget):
         super(QtWidgets.QWidget, self).__init__()
         self.x_label = QtWidgets.QLabel('x(m)')
         self.y_label = QtWidgets.QLabel('y(m)')
-        self.theta_label = QtWidgets.QLabel('theta(deg)')
+        self.theta_label = QtWidgets.QLabel('theta')
+        self.expansion_label = QtWidgets.QLabel('expansion(m)')
         valid = QtGui.QDoubleValidator()
         self.x_edit = QtWidgets.QLineEdit()
         self.x_edit.setValidator(valid)
@@ -579,12 +588,21 @@ class RobotWidget(QtWidgets.QWidget):
         self.y_edit.setValidator(valid)
         self.theta_edit = QtWidgets.QLineEdit()
         self.theta_edit.setValidator(valid)        
+        self.expansion_edit = QtWidgets.QLineEdit()
+        self.expansion_edit.setValidator(valid)        
         self.x_input = QtWidgets.QFormLayout()
         self.x_input.addRow(self.x_label,self.x_edit)
         self.y_input = QtWidgets.QFormLayout()
         self.y_input.addRow(self.y_label,self.y_edit)
         self.theta_input = QtWidgets.QFormLayout()
         self.theta_input.addRow(self.theta_label,self.theta_edit)
+        self.expansion_input = QtWidgets.QFormLayout()
+        self.expansion_input.addRow(self.expansion_label,self.expansion_edit)
+        self.unit_msg = QtWidgets.QLabel("unit:")
+        self.unit = QtWidgets.QComboBox(self)
+        self.unit.addItems(["deg", "rad"])
+        hbox_unit = QtWidgets.QFormLayout()
+        hbox_unit.addRow(self.unit_msg, self.unit)
 
         self.c_msg = QtWidgets.QLabel("color:")
         self.c = QtWidgets.QComboBox(self)
@@ -598,6 +616,8 @@ class RobotWidget(QtWidgets.QWidget):
         vbox.addLayout(self.x_input)
         vbox.addLayout(self.y_input)
         vbox.addLayout(self.theta_input)
+        vbox.addLayout(self.expansion_input)
+        vbox.addLayout(hbox_unit)
         vbox.addLayout(hbox2)
         vbox.addWidget(self.btn)
         self.setWindowTitle("Robot Input")
@@ -607,8 +627,12 @@ class RobotWidget(QtWidgets.QWidget):
             x = float(self.x_edit.text())
             y = float(self.y_edit.text())
             theta = float(self.theta_edit.text())
+            expansion = float(self.expansion_edit.text())
+            # Convert radians to degrees if radian unit is selected
+            if self.unit.currentText() == "rad":
+                theta = theta * 180.0 / math.pi
             self.hide()
-            self.getdata.emit([x,y,theta, self.c.currentText()])
+            self.getdata.emit([x,y,theta, expansion, self.c.currentText()])
         except:
             pass
 
@@ -863,6 +887,7 @@ class MapWidget(QtWidgets.QWidget):
         self.cp_name = None
         self.readingModelFlag = False
         self.laser_info = ""
+        self.draw_cnt = 0
         self.draw_size = [] #xmin xmax ymin ymax
         self.map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0,color="gray")
         self.rssi_map_data = lines.Line2D([],[], marker = '.', linestyle = '', markersize = 1.0,color="red")
@@ -1351,10 +1376,11 @@ class MapWidget(QtWidgets.QWidget):
             self.draw_size = [xmin,xmax, ymin, ymax]
             self.ax.set_xlim(xmin, xmax)
             self.ax.set_ylim(ymin, ymax)
-            self.static_canvas.figure.canvas.draw()
+            self.redraw()
 
     def getPointData(self, event):
-        point = lines.Line2D([],[], linestyle = '', marker = 'x', markersize = 8.0, color='r')
+        c = event[2] if len(event) > 2 else 'r'
+        point = lines.Line2D([],[], linestyle = '', marker = 'x', markersize = 8.0, color= c)
         point.set_xdata([event[0]])
         point.set_ydata([event[1]])
         point.set_zorder(30)
@@ -1362,30 +1388,36 @@ class MapWidget(QtWidgets.QWidget):
         if id not in self.pointLists or self.pointLists[id] is None:
             self.pointLists[id] = point
             self.ax.add_line(self.pointLists[id])
-            self.static_canvas.figure.canvas.draw() 
+            self.redraw()
 
     def getRobotPosData(self, event):
         """回调函数，绘制机器人形状
 
         Args:
-            event (_type_): [x,y,theta,color]
+            event (_type_): [x,y,theta,expansion, color]
         """
-        if len(event) != 4:
+        if len(event) != 5:
             return
         robot_pos = [event[0], event[1], event[2]/180.0*math.pi]
+        expansion = event[3]
         if self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
             xdata = [-self.read_model.getTail(),   -self.read_model.getTail(),     self.read_model.getHead(),  
                      self.read_model.getHead(), -self.read_model.getTail(), self.read_model.getHead(), 
                      0.0,0.0,self.read_model.getHead(),
                      self.read_model.getHead(), -self.read_model.getTail()]
-            ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, 
+            half_width = self.read_model.width/2 + expansion
+            ydata = [half_width, 
+                     -half_width, 
+                     -half_width, 
                      0.0, 0.0, 0.0, 
-                     -self.read_model.width/2, self.read_model.width/2.0,0.0,
-                     self.read_model.width/2, self.read_model.width/2]
+                     -half_width, 
+                     half_width,
+                     0.0,
+                     half_width, half_width]
             robot_shape = np.array([xdata, ydata])
 
             robot_shape = GetGlobalPos(robot_shape,robot_pos)
-            l = lines.Line2D([],[], linestyle = '--', marker = '.', markersize = 6.0, color=event[3])
+            l = lines.Line2D([],[], linestyle = '--', marker = '.', markersize = 6.0, color=event[4])
             l.set_xdata(robot_shape[0])
             l.set_ydata(robot_shape[1])
             l.set_zorder(30)
@@ -1393,7 +1425,7 @@ class MapWidget(QtWidgets.QWidget):
             if id not in self.lineLists or self.lineLists[id] is None:
                 self.lineLists[id] = l
                 self.ax.add_line(self.lineLists[id])
-                self.static_canvas.figure.canvas.draw()         
+                self.redraw()
 
     def getLineData(self, event):
         l = lines.Line2D([],[], linestyle = '--', marker = '.', markersize = 6.0, color='r')
@@ -1404,7 +1436,7 @@ class MapWidget(QtWidgets.QWidget):
         if id not in self.lineLists or self.lineLists[id] is None:
             self.lineLists[id] = l
             self.ax.add_line(self.lineLists[id])
-            self.static_canvas.figure.canvas.draw() 
+            self.redraw()
     
 
     def getCurveData(self, event):
@@ -1416,7 +1448,7 @@ class MapWidget(QtWidgets.QWidget):
         if id not in self.lineLists or self.lineLists[id] is None:
             self.lineLists[id] = l
             self.ax.add_line(self.lineLists[id])
-            self.static_canvas.figure.canvas.draw()
+            self.redraw()
 
     def getDataXYData(self, event):
         datax_str = None
@@ -1486,7 +1518,7 @@ class MapWidget(QtWidgets.QWidget):
         if id not in self.lineLists or self.lineLists[id] is None:
             self.lineLists[id] = l
             self.ax.add_line(self.lineLists[id])
-            self.static_canvas.figure.canvas.draw()
+            self.redraw()
 
     def drawClear(self):
         for p in self.pointLists:
@@ -1497,7 +1529,7 @@ class MapWidget(QtWidgets.QWidget):
             if self.lineLists[l] is not None:
                 self.lineLists[l].remove()
                 self.lineLists[l] = None
-        self.static_canvas.figure.canvas.draw()    
+        self.redraw()
 
     def drawCenter(self):
         if self.draw_center.isChecked():
@@ -1598,7 +1630,7 @@ class MapWidget(QtWidgets.QWidget):
                         self.laser_data_points.set_visible(cur_check.isChecked())
                     self.mid_line_t = None
                        
-        self.static_canvas.figure.canvas.draw() 
+        self.redraw()
 
     def closeEvent(self,event):
         if self.robot_log is not None and self.robot_log.in_close:
@@ -1619,7 +1651,7 @@ class MapWidget(QtWidgets.QWidget):
             xmin, xmax, ymin ,ymax = keepRatio(self.draw_size[0], self.draw_size[1], self.draw_size[2], self.draw_size[3], self.fig_ratio)
             self.ax.set_xlim(xmin,xmax)
             self.ax.set_ylim(ymin,ymax)
-            self.static_canvas.figure.canvas.draw()
+            self.redraw()
 
     def resize_fig(self, event):
         ratio = event.width/event.height
@@ -1635,7 +1667,7 @@ class MapWidget(QtWidgets.QWidget):
         xmin, xmax, ymin ,ymax = keepRatio(xmin, xmax, ymin, ymax, ratio, bigger)
         self.ax.set_xlim(xmin,xmax)
         self.ax.set_ylim(ymin,ymax)
-        self.static_canvas.figure.canvas.draw()
+        self.redraw()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls:
@@ -1895,7 +1927,7 @@ class MapWidget(QtWidgets.QWidget):
                     self.map_quiver_arrows = self.ax.quiver(
                         arrow_x, arrow_y,     # X, Y coordinates of the arrow bases
                         arrow_U, arrow_V,     # U, V components of the arrow vectors
-                        color='k',            # Arrow color (e.g., black)
+                        color='b',            # Arrow color (e.g., black)
                         angles='xy',          # Interpret U,V as (dx, dy) in data coordinates
                         scale_units='xy',     # Scale arrows proportionally to data units
                         scale=2.0,              # 1 data unit = 1 arrow unit
@@ -1918,8 +1950,9 @@ class MapWidget(QtWidgets.QWidget):
                     text_artist = self.ax.text(
                         x + text_offset, y,  # Offset the text horizontally
                         name,
-                        color='b',           # Text color
+                        color='k',           # Text color
                         fontsize='medium',    # Adjust font size as needed (e.g., 8, 10, 'x-small', 'small', 'medium')
+                        fontweight='heavy',
                         ha='left',           # Horizontal alignment ('left', 'center', 'right')
                         va='center',         # Vertical alignment ('top', 'center', 'bottom', 'baseline')
                         zorder=20            # Ensure text is above points/lines
@@ -2018,7 +2051,7 @@ class MapWidget(QtWidgets.QWidget):
                 font = QtGui.QFont()
                 font.setBold(False)
                 self.cp_action.setFont(font)
-                self.static_canvas.figure.canvas.draw()
+                self.redraw()
             else:
                 print("read laser error! laser_index: ", self.laser_index, "; laser index in model: ", laser_info.keys())
                 logging.debug("read laser error! laser_index: " + str(self.laser_index) +" "+ str(laser_info.keys()))
@@ -2375,7 +2408,10 @@ class MapWidget(QtWidgets.QWidget):
         self.key_laser_channel = min_laser_channel
 
         print("min_laser_channel", min_laser_channel, laser_idx)
-        laser_x = laser_data.x(min_laser_channel)[0][laser_idx]
+        try:
+            laser_x = laser_data.x(min_laser_channel)[0][laser_idx]
+        except:
+            return
         laser_y = laser_data.y(min_laser_channel)[0][laser_idx]
         laser_points = np.array([laser_x, laser_y])
         rssi = np.array(laser_data.rssi(min_laser_channel)[0][laser_idx])
@@ -2660,7 +2696,10 @@ class MapWidget(QtWidgets.QWidget):
                 self.redraw()
         self.useLocChangeFlag = False
     def redraw(self):
+        self.draw_cnt += 1
+        t0 = time.time()
         self.static_canvas.figure.canvas.draw()
+        print("draw_cnt",self.draw_cnt, time.time() - t0)
     # def _on_draw_event(self, event):
     #     """
     #     Callback triggered when the figure is drawn (including after zoom/pan).

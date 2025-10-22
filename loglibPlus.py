@@ -1036,6 +1036,8 @@ class Service:
         self.short_regx = "Service]"         
         self.data = [[] for _ in range(2)]
     def parse(self, line):
+        if "DO" in line:
+            return False
         if self.short_regx in line:               
             out = self.regex.match(line)
             if out:

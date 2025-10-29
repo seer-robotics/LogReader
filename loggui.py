@@ -1712,12 +1712,14 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.close()
 
     def updateDataView(self, d:DataView):
-        first_k = d.selection.y_combo.currentText()
+        org_key = d.selection.y_combo.currentText()
+        first_k = self.read_thread.name2orgKey.get(org_key, org_key)
         t = None
+        print("DataView", "updateDataView",org_key, first_k)
         if first_k in self.read_thread.content:
             for name in self.read_thread.content[first_k].data.keys():
                 if name != 't':
-                    k = first_k+'.'+name
+                    k = org_key+'.'+name
                     t = self.read_thread.getData(k)[1]
                     break
         if t is None or len(t) < 1:
@@ -1732,7 +1734,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             if k[0] == '_':
                 continue
             data_name = k
-            tmp_k = first_k+'.'+k
+            tmp_k = org_key+'.'+k
             if tmp_k in self.read_thread.ylabel:
                 data_name = self.read_thread.ylabel[tmp_k]
                 if tmp_k in data_name:
@@ -1765,7 +1767,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.updateDataView(dataView) 
 
     def initDataView(self, d:DataView):
-        d.setSelectionItems(list(self.read_thread.content.keys())) 
+        d.setSelectionItems(list(self.read_thread.name2orgKey.keys())) 
 
     def plotDataView(self, event):
         print("plotDataView:", event[0], event[1], event[2])

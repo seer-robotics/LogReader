@@ -48,6 +48,7 @@ class ReadThread(QThread):
         self.content = dict()
         self.data = dict()
         self.data_org_key = dict() # 用于动态解析日志文件
+        self.name2orgKey = dict() # 用于动态解析日志文件
         self.ylabel = dict()
         self.laser = Laser(1000.0)
         self.err = ErrorLine()
@@ -203,12 +204,23 @@ class ReadThread(QThread):
         #creat dic
         for k in self.content.keys():
             real_k = k
+            array_data_name = None
             if "name" in self.content[k].data.keys() and len(self.content[k].data["name"]) > 0:
-                real_k = k[:-1]+"."+self.content[k].data["name"][0]
+                array_data_name = self.content[k].data["name"][0] 
+                real_k = k[:-1]+"."+ array_data_name
+            self.name2orgKey[real_k] = k
             for name in self.content[k].data.keys():
                 if name != 't':
                     self.data[real_k+'.'+name] = (self.content[k][name], self.content[k]['t'])
-                    self.ylabel[real_k+'.'+name] = self.content[k].description[name]
+                    if array_data_name is not None:
+                        self.ylabel[real_k+'.'+name] = array_data_name + "." + self.content[k].description[name]
+                    else:
+                        decrip = self.content[k].description[name]
+                        data_key = real_k+'.'+name
+                        self.ylabel[data_key] = decrip
+                        if isinstance(decrip, str) and len(decrip) > 0:
+                            if decrip in data_key:
+                                self.ylabel[data_key] = data_key
                     self.data_org_key[real_k+'.'+name] = k
         if 'IMU' in self.js:
             self.data["IMU.org_gx"] = ([i+j for (i,j) in zip(self.content['IMU']['gx'],self.content['IMU']['offx'])], self.content['IMU']['t'])

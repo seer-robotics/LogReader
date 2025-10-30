@@ -1118,7 +1118,7 @@
       { "index": 14, "name": "do14", "type": "double", "description": "do14状态", "unit":""  },
       { "index": 15, "name": "do15", "type": "double", "description": "do15状态", "unit":""  },
       { "index": 16, "name": "do16", "type": "double", "description": "do16状态", "unit":""  },
-      { "index": 17, "name": "do16", "type": "double", "description": "do17状态", "unit":""  },
+      { "index": 17, "name": "do17", "type": "double", "description": "do17状态", "unit":""  },
       { "index": 18, "name": "do18", "type": "double", "description": "do18状态", "unit":""  },
       { "index": 19, "name": "do19", "type": "double", "description": "do19状态", "unit":""  }
     ]
@@ -2206,6 +2206,10 @@
   },
   "TCost":{
     "type":"TCost",
+    "content":"key|value"   
+  },
+  "script_cost":{
+    "type":"script_cost",
     "content":"key|value"   
   },
   "STCost":{

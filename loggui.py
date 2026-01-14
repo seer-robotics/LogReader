@@ -190,20 +190,33 @@ class MFTimeCostViewer(QtWidgets.QMainWindow):
         x_positions = range(num_points)
         bottom = np.zeros(num_points)
         
-        # 绘制每个字段的条形图
+        # 绘制每个字段的条形图并在色块上添加名字
         for field in data_fields:
             values = field_data[field]['values']
-            ax.bar(x_positions, values, 0.8, 
-                  bottom=bottom, label=field, 
-                  color=field_data[field]['color'], alpha=0.8)
+            bars = ax.bar(x_positions, values, 0.8, 
+                        bottom=bottom, 
+                        color=field_data[field]['color'], alpha=0.8)
+            
+            # 在每个色块上添加字段名称
+            for i, bar in enumerate(bars):
+                height = bar.get_height()
+                if height > 0:  # 只在有高度的色块上显示名称
+                    # 计算标签位置
+                    x = bar.get_x() + bar.get_width() / 2
+                    y = bar.get_y() + height / 2
+                    
+                    # 添加字段名称标签
+                    ax.text(x, y, field, 
+                          ha='center', va='center', 
+                          fontsize=8, color='black', 
+                          fontweight='bold', rotation=0)
+            
             bottom += values
+        
         # 设置坐标轴标签
         ax.set_xlabel('Time Index')
         ax.set_ylabel('Time Cost (ms)')
         ax.set_title('MF Time Cost Analysis by Components')
-        
-        # 添加图例
-        legend = ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
         
         # 处理时间戳显示
         if isinstance(timestamps[0], datetime):
@@ -223,64 +236,10 @@ class MFTimeCostViewer(QtWidgets.QMainWindow):
         # 添加网格
         ax.grid(True, alpha=0.3)
         
-        # 添加鼠标悬浮提示功能
-        self.annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points",
-                                bbox=dict(boxstyle="round", fc="w"),
-                                arrowprops=dict(arrowstyle="->"))
-        self.annot.set_visible(False)
-        
-        # 连接鼠标事件
-        self.canvas.mpl_connect("motion_notify_event", self.hover)
-        self.canvas.mpl_connect("figure_leave_event", self.leave_figure)
-        
-        # 存储条形图信息用于悬浮提示
-        self.ax = ax
-        self.field_info = {i: field for i, field in enumerate(data_fields)}
-        
         # 自动调整布局
-        # self.figure.tight_layout()
         self.canvas.draw()
 
-    def hover(self, event):
-        """鼠标悬浮事件处理 - 显示字段名称"""
-        if event.inaxes != self.ax or not hasattr(self, 'field_info'):
-            self.annot.set_visible(False)
-            self.canvas.draw_idle()
-            return
-        
-        # 检查鼠标是否在图例上
-        if hasattr(self, 'legend') and self.legend:
-            for handle, label in zip(self.legend.legendHandles, self.legend.get_texts()):
-                if handle.contains(event)[0]:
-                    field_name = label.get_text()
-                    self.annot.xy = (event.xdata, event.ydata)
-                    self.annot.set_text(field_name)
-                    self.annot.set_visible(True)
-                    self.canvas.draw_idle()
-                    return
-        
-        # 检查鼠标是否在条形图上
-        visible = False
-        for i, bar in enumerate(self.ax.patches):
-            if bar.contains(event)[0]:
-                # 计算这个条形图属于哪个字段
-                field_index = i % len(self.field_info)
-                field_name = list(self.field_info.values())[field_index]
-                value = bar.get_height()
-                
-                # 显示提示信息
-                self.annot.xy = (bar.get_x() + bar.get_width()/2, bar.get_y() + bar.get_height())
-                self.annot.set_text(f"{field_name}: {value:.2f} ms")
-                visible = True
-                break
-        
-        self.annot.set_visible(visible)
-        self.canvas.draw_idle()
-
-    def leave_figure(self, event):
-        """鼠标离开图表区域事件处理"""
-        self.annot.set_visible(False)
-        self.canvas.draw_idle()
+    # 已删除鼠标悬浮功能
 
 
 

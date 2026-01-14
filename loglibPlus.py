@@ -309,7 +309,7 @@ class Data:
                 self.data[name].append(0.0)                               
         elif tmp['type'] == 'bool':
             try:
-                if values[ind] == "true" or values[ind] == "1":
+                if values[ind] == "true" or values[ind] == "1" or values[ind] == "True":
                     self.data[name].append(1.0)
                 else:
                     self.data[name].append(0.0)
@@ -403,6 +403,10 @@ class Data:
                                     self.description[name] = name
                         
                     if index < len(values) and index >=0 :
+                        dlen = len(self.data['t']) - len(self.data[name])
+                        if dlen > 1:
+                            for _ in range(dlen-1):
+                                self.data[name].append(None)
                         self._storeData(tmp, index, values)
                     else:
                         self.data[name].append(None)
@@ -1036,7 +1040,7 @@ class Service:
         self.short_regx = "Service]"         
         self.data = [[] for _ in range(2)]
     def parse(self, line):
-        if "DO" in line:
+        if "DO" in line or "SoundPlayer" in line or "Charge" in line or "LaserRecogSync" in line:
             return False
         if self.short_regx in line:               
             out = self.regex.match(line)

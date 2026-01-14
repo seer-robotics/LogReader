@@ -33,6 +33,255 @@ from TargetPrecision import TargetPrecision
 # from ArmPlot import Arm
 import math
 
+class MFTimeCostViewer(QtWidgets.QMainWindow):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("MF Time Cost Viewer")
+        self.setGeometry(100, 100, 1200, 800)
+        
+        self.central_widget = QtWidgets.QWidget()
+        self.setCentralWidget(self.central_widget)
+        
+        self.layout = QtWidgets.QVBoxLayout(self.central_widget)
+        
+        # Create figure and canvas
+        self.figure = Figure(figsize=(12, 8))
+        self.canvas = FigureCanvas(self.figure)
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        
+        self.layout.addWidget(self.toolbar)
+        self.layout.addWidget(self.canvas)
+        
+    def plotMFTimeCost(self, tcost_data, time_range=None):
+        """绘制MF Time Cost数据 - 堆叠条形图显示各字段时间成本
+        time_range: (xmin, xmax) 时间范围，为None时显示所有数据
+        """
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        
+        # 检查数据有效性
+        if not tcost_data or not hasattr(tcost_data, 'data'):
+            ax.text(0.5, 0.5, 'No TCost data available', 
+                   horizontalalignment='center', verticalalignment='center',
+                   transform=ax.transAxes, fontsize=16)
+            self.canvas.draw()
+            return
+        
+        # 从loglibPlus.Data对象中提取数据字段，排除't', 'timestamp'和'total'
+        data_fields = [key for key in tcost_data.data.keys() 
+                      if key not in ['t', 'timestamp', 'total'] and 
+                      isinstance(tcost_data.data[key], (list, np.ndarray))]
+        
+        if not data_fields:
+            ax.text(0.5, 0.5, 'No time cost data fields found', 
+                   horizontalalignment='center', verticalalignment='center',
+                   transform=ax.transAxes, fontsize=16)
+            self.canvas.draw()
+            return
+        
+        # 获取时间戳数据
+        timestamps = tcost_data.data.get('t', [])
+        if not timestamps:
+            ax.text(0.5, 0.5, 'No timestamp data available', 
+                   horizontalalignment='center', verticalalignment='center',
+                   transform=ax.transAxes, fontsize=16)
+            self.canvas.draw()
+            return
+        # 处理时间范围过滤
+        if time_range is not None:
+            xmin, xmax = time_range
+            # 将matplotlib数值时间转换为datetime
+            time_min = num2date(xmin)
+            time_max = num2date(xmax)
+            print("time range", xmin, xmax, time_min, time_max, timestamps) 
+            # 过滤时间戳范围内的数据
+            valid_indices = []
+            for i, ts in enumerate(timestamps):
+                if time_min <= ts <= time_max:
+                    valid_indices.append(i)
+            print("choose_t", timestamps[valid_indices[0]])
+            
+            # 如果没有数据在时间范围内，显示提示
+            if not valid_indices:
+                ax.text(0.5, 0.5, 'No TCost data in current time range', 
+                       horizontalalignment='center', verticalalignment='center',
+                       transform=ax.transAxes, fontsize=16)
+                self.canvas.draw()
+                return
+            
+            # 更新为筛选后的时间戳和数据
+            timestamps = [timestamps[i] for i in valid_indices]
+            num_points = len(timestamps)
+            
+            # 准备堆叠条形图数据 - 使用筛选后的数据
+            field_data = {}
+            
+            # 使用对比度更高的颜色映射
+            high_contrast_colors = [
+                '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',  # 红绿蓝黄品青
+                '#FF8000', '#8000FF', '#00FF80', '#FF0080', '#80FF00', '#0080FF',  # 橙紫青绿粉黄青
+                '#FF4000', '#4000FF', '#00FF40', '#FF0040', '#40FF00', '#0040FF',  # 更深的对比色
+                '#FFC000', '#C000FF', '#00FFC0', '#FF00C0', '#C0FF00', '#00C0FF'   # 更亮的对比色
+            ]
+            
+            # 循环使用高对比度颜色
+            for i, field in enumerate(data_fields):
+                values = tcost_data.data[field]
+                # 处理None值，将其转换为0
+                processed_values = []
+                for val in values:
+                    if val is None:
+                        processed_values.append(0)
+                    elif isinstance(val, (int, float)):
+                        processed_values.append(val)
+                    else:
+                        processed_values.append(0)  # 处理其他非数值类型
+                
+                # 筛选时间范围内的数据
+                filtered_values = [processed_values[i] for i in valid_indices]
+                print("field", field, filtered_values)
+                
+                # 确保数据长度与时间戳一致
+                if len(filtered_values) < num_points:
+                    filtered_values = filtered_values + [0] * (num_points - len(filtered_values))
+                elif len(filtered_values) > num_points:
+                    filtered_values = filtered_values[:num_points]
+                
+                # 循环使用高对比度颜色
+                color_index = i % len(high_contrast_colors)
+                field_data[field] = {
+                    'values': filtered_values,
+                    'color': high_contrast_colors[color_index]
+                }
+        else:
+            # 如果没有提供时间范围，使用所有数据
+            num_points = len(timestamps)
+            field_data = {}
+            high_contrast_colors = [
+                '#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF',
+                '#FF8000', '#8000FF', '#00FF80', '#FF0080', '#80FF00', '#0080FF',
+                '#FF4000', '#4000FF', '#00FF40', '#FF0040', '#40FF00', '#0040FF',
+                '#FFC000', '#C000FF', '#00FFC0', '#FF00C0', '#C0FF00', '#00C0FF'
+            ]
+            
+            for i, field in enumerate(data_fields):
+                values = tcost_data.data[field]
+                processed_values = []
+                for val in values:
+                    if val is None:
+                        processed_values.append(0)
+                    elif isinstance(val, (int, float)):
+                        processed_values.append(val)
+                    else:
+                        processed_values.append(0)
+                
+                if len(processed_values) < num_points:
+                    processed_values = processed_values + [0] * (num_points - len(processed_values))
+                elif len(processed_values) > num_points:
+                    processed_values = processed_values[:num_points]
+                
+                color_index = i % len(high_contrast_colors)
+                field_data[field] = {
+                    'values': processed_values,
+                    'color': high_contrast_colors[color_index]
+                }
+        
+        # 创建堆叠条形图
+        x_positions = range(num_points)
+        bottom = np.zeros(num_points)
+        
+        # 绘制每个字段的条形图
+        for field in data_fields:
+            values = field_data[field]['values']
+            ax.bar(x_positions, values, 0.8, 
+                  bottom=bottom, label=field, 
+                  color=field_data[field]['color'], alpha=0.8)
+            bottom += values
+        # 设置坐标轴标签
+        ax.set_xlabel('Time Index')
+        ax.set_ylabel('Time Cost (ms)')
+        ax.set_title('MF Time Cost Analysis by Components')
+        
+        # 添加图例
+        legend = ax.legend(loc='upper right', bbox_to_anchor=(1.15, 1))
+        
+        # 处理时间戳显示
+        if isinstance(timestamps[0], datetime):
+            time_labels = [ts.strftime('%H:%M:%S') for ts in timestamps]
+        else:
+            time_labels = [str(i) for i in range(num_points)]
+        
+        # 设置x轴刻度
+        if len(time_labels) > 20:
+            step = max(1, len(time_labels) // 10)
+            ax.set_xticks(x_positions[::step])
+            ax.set_xticklabels(time_labels[::step], rotation=45, ha='right')
+        else:
+            ax.set_xticks(x_positions)
+            ax.set_xticklabels(time_labels, rotation=45, ha='right')
+        
+        # 添加网格
+        ax.grid(True, alpha=0.3)
+        
+        # 添加鼠标悬浮提示功能
+        self.annot = ax.annotate("", xy=(0,0), xytext=(20,20), textcoords="offset points",
+                                bbox=dict(boxstyle="round", fc="w"),
+                                arrowprops=dict(arrowstyle="->"))
+        self.annot.set_visible(False)
+        
+        # 连接鼠标事件
+        self.canvas.mpl_connect("motion_notify_event", self.hover)
+        self.canvas.mpl_connect("figure_leave_event", self.leave_figure)
+        
+        # 存储条形图信息用于悬浮提示
+        self.ax = ax
+        self.field_info = {i: field for i, field in enumerate(data_fields)}
+        
+        # 自动调整布局
+        # self.figure.tight_layout()
+        self.canvas.draw()
+
+    def hover(self, event):
+        """鼠标悬浮事件处理 - 显示字段名称"""
+        if event.inaxes != self.ax or not hasattr(self, 'field_info'):
+            self.annot.set_visible(False)
+            self.canvas.draw_idle()
+            return
+        
+        # 检查鼠标是否在图例上
+        if hasattr(self, 'legend') and self.legend:
+            for handle, label in zip(self.legend.legendHandles, self.legend.get_texts()):
+                if handle.contains(event)[0]:
+                    field_name = label.get_text()
+                    self.annot.xy = (event.xdata, event.ydata)
+                    self.annot.set_text(field_name)
+                    self.annot.set_visible(True)
+                    self.canvas.draw_idle()
+                    return
+        
+        # 检查鼠标是否在条形图上
+        visible = False
+        for i, bar in enumerate(self.ax.patches):
+            if bar.contains(event)[0]:
+                # 计算这个条形图属于哪个字段
+                field_index = i % len(self.field_info)
+                field_name = list(self.field_info.values())[field_index]
+                value = bar.get_height()
+                
+                # 显示提示信息
+                self.annot.xy = (bar.get_x() + bar.get_width()/2, bar.get_y() + bar.get_height())
+                self.annot.set_text(f"{field_name}: {value:.2f} ms")
+                visible = True
+                break
+        
+        self.annot.set_visible(visible)
+        self.canvas.draw_idle()
+
+    def leave_figure(self, event):
+        """鼠标离开图表区域事件处理"""
+        self.annot.set_visible(False)
+        self.canvas.draw_idle()
+
 
 
 class XYSelection:
@@ -275,6 +524,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.arm_aciton = QtWidgets.QAction('&Arm', self.tools_menu, checkable = True)
         self.arm_aciton.triggered.connect(self.openArm)
         self.tools_menu.addAction(self.arm_aciton)
+
+        self.mf_timecost_action = QtWidgets.QAction('&View MFTimeCost', self.tools_menu, checkable = True)
+        self.mf_timecost_action.triggered.connect(self.openMFTimeCostView)
+        self.tools_menu.addAction(self.mf_timecost_action)
 
         self.help_menu = QtWidgets.QMenu('&Help', self)
         self.help_menu.addAction('&About', self.about)
@@ -1016,6 +1269,27 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.mid_line_t = cur_t
             self.updateMap()
 
+    def openMFTimeCostView(self, checked):
+        """打开MF Time Cost查看窗口"""
+        if checked:
+            if not hasattr(self, 'mf_timecost_widget'):
+                self.mf_timecost_widget = MFTimeCostViewer(self)
+                self.mf_timecost_widget.setWindowIcon(QtGui.QIcon('rbk.ico'))
+            
+            # 获取TCost数据和时间范围
+            tcost_data = self.read_thread.content["TCost"]
+            print(tcost_data)
+            
+            # 获取当前时间轴范围
+            xmin, xmax = self.axs[0].get_xlim()
+            time_range = (xmin, xmax)
+            
+            self.mf_timecost_widget.plotMFTimeCost(tcost_data, time_range)
+            self.mf_timecost_widget.show()
+        else:
+            if hasattr(self, 'mf_timecost_widget') and self.mf_timecost_widget:
+                self.mf_timecost_widget.hide()
+
     def new_home(self, *args, **kwargs):
         for ax, xy in zip(self.axs, self.xys):
             text = xy.y_combo.currentText()
@@ -1122,7 +1396,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.log_info.append(tmps)
         logging.debug('read Finished')
         self.log_info.append('Finished')
-        max_line = 1000
+        max_line = 100
         if len(self.read_thread.fatal.t()) > max_line:
             logging.warning("FATALs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
             self.log_info.append("FATALs are too much to be ploted. Max Number is "+ str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
@@ -1730,6 +2004,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         ts = np.array(t)
         idx = (np.abs(ts - self.mid_line_t)).argmin()
         j = dict()
+        sum = 0
         for k in self.read_thread.content[first_k].data.keys():
             if k[0] == '_':
                 continue
@@ -1739,8 +2014,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 data_name = self.read_thread.ylabel[tmp_k]
                 if tmp_k in data_name:
                     data_name = k
-            print("data_name", data_name, first_k, k, idx, len(self.read_thread.content[first_k].data[k]))
+            print("data_name", data_name, first_k, k, idx, len(self.read_thread.content[first_k].data[k]), 
+                                                               self.read_thread.content[first_k].data[k][idx])
             j[data_name] = self.read_thread.content[first_k].data[k][idx]
+            if isinstance(j[data_name], float) and k != "total":
+                sum += j[data_name]
+        print("sum", sum)
         d.loadJson(j)
 
     def updateDataViews(self):

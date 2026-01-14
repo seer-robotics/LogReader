@@ -53,41 +53,40 @@
     "type": "moveTask",
     "content": [
       {"name": "cur_taskstatus", "type": "double"},
-      { "index": 1, "name": "running_status", "type": "double"},
-      { "index": 2, "name": "blocked", "type": "bool"},
-      { "index": 3, "name": "taskstatus", "type": "double"},
-      { "index": 4, "name": "task_type", "type": "double"},
-      { "index": 5, "name": "closest_target", "type": "str"},
-      { "index": 6, "name": "cur_source_name", "type": "str"},
-      { "index": 7, "name": "cur_target_name", "type": "str"},
-      { "index": 8, "name": "percentage", "type": "double"},
-      { "index": 9, "name": "dist2path", "type": "double"},
-      { "index": 10, "name": "last_upl_start_id", "type": "double"},
-      { "index": 11, "name": "last_upl_end_id", "type": "double"},
-      { "index": 12, "name": "last_task_target", "type": "str"},
-      { "index": 13, "name": "msg_move_target_name", "type": "str"},
-      { "index": 14, "name": "msg_move_target_laebl", "type": "str"},
-      { "index": 15, "name": "package_source_label", "type": "str"},
-      { "index": 16, "name": "package_target_label", "type": "str"},
-      { "index": 17, "name": "last_hasLoadedGoods", "type": "bool"},
-      { "index": 18, "name": "goods_name", "type": "str"},
-      { "index": 19, "name": "move_pos_x", "type": "double"},
-      { "index": 20, "name": "move_pos_y", "type": "double"},
-      { "index": 21, "name": "move_pos_theta", "type": "double"},
-      { "index": 22, "name": "switchMap", "type": "bool"},
-      { "index": 23, "name": "org_task_list_size", "type": "double"},
-      { "index": 24, "name": "locx", "type": "double"},
-      { "index": 25, "name": "locy", "type": "double"},
-      { "index": 26, "name": "loc_angle", "type": "rad"},
-      { "index": 27, "name": "loc_ts", "type": "int64"},
-      {"index": 28, "name": "stop_block", "type": "bool"},
-      {"index": 29, "name": "cur_block_id", "type": "str"},
-      {"index": 30, "name": "set_core_goods_id", "type": "str"},
-      {"index": 31, "name": "script_laser_width_size", "type": "double"},
-      {"index": 32, "name": "last_task_status", "type": "double"},
-      {"index": 33, "name": "tcp_x", "type": "double"},
-      {"index": 34, "name": "tcp_y", "type": "double"},
-      {"index": 35, "name": "tcp_theta", "type": "double"}
+      {"name": "running_status", "type": "double"},
+      {"name": "blocked", "type": "bool"},
+      {"name": "taskstatus", "type": "double"},
+      {"name": "task_type", "type": "double"},
+      {"name": "closest_target", "type": "str"},
+      {"name": "cur_source_name", "type": "str"},
+      {"name": "cur_target_name", "type": "str"},
+      {"name": "percentage", "type": "double"},
+      {"name": "dist2path", "type": "double"},
+      {"name": "last_upl_start_id", "type": "double"},
+      {"name": "last_upl_end_id", "type": "double"},
+      {"name": "last_task_target", "type": "str"},
+      {"name": "msg_move_target_name", "type": "str"},
+      {"name": "msg_move_target_laebl", "type": "str"},
+      {"name": "package_source_label", "type": "str"},
+      {"name": "package_target_label", "type": "str"},
+      {"name": "last_hasLoadedGoods", "type": "bool"},
+      {"name": "goods_name", "type": "str"},
+      {"name": "move_pos_x", "type": "double"},
+      {"name": "move_pos_y", "type": "double"},
+      {"name": "move_pos_theta", "type": "double"},
+      {"name": "switchMap", "type": "bool"},
+      {"name": "org_task_list_size", "type": "double"},
+      {"name": "locx", "type": "double"},
+      {"name": "locy", "type": "double"},
+      {"name": "loc_angle", "type": "rad"},
+      {"name": "loc_ts", "type": "int64"},
+      {"name": "stop_block", "type": "bool"},
+      {"name": "cur_block_id", "type": "str"},
+      {"name": "set_core_goods_id", "type": "str"},
+      {"name": "script_laser_width_size", "type": "double"},
+      {"name": "last_task_status", "type": "double"},
+      {"name": "multiRobotsType", "type": "double"},
+      {"name": "published_task_status", "type": "str"}
     ]
   },
   "Odometer": {
@@ -1243,7 +1242,35 @@
       {"name": "sum_e", "type": "rad", "unit":"degree"}
     ]
   },
-
+  "lock_stop": {
+    "type": "lock_stop",
+    "content": [
+      {"name": "lock_stop", "type": "bool"},
+      {"name": "s_lock_stop", "type": "bool"},
+      {"name": "s_collision_stop", "type": "bool"},
+      {"name": "s_ultrasonic_stop", "type": "bool"},
+      {"name": "s_infrared_stop", "type": "bool"},
+      {"name": "s_fallingdown_stop", "type": "bool"}
+    ]
+  },
+  "PathVis": {
+    "type": "PathVis",
+    "content": [
+      {"name": "id", "type": "double"}
+    ]
+  },
+  "DWA": {
+    "type": "DWA",
+    "content": [
+      {"name": "vx", "type": "double"},
+      {"name": "vy", "type": "double"},
+      {"name": "vw", "type": "double"},
+      {"name": "cmd_vx", "type": "double"},
+      {"name": "cmd_vy", "type": "double"},
+      {"name": "cmd_vw", "type": "double"},
+      {"name": "state", "type": "double"}
+    ]
+  },
 
   "ProbeCpu": {
     "type": "ProbeCpu",
@@ -1272,6 +1299,10 @@
   },
   "MotorCmd": {
     "type": "MotorCmd",
+    "content": "key|value"
+  },
+  "SteerWalk": {
+    "type": "SteerWalk",
     "content": "key|value"
   },
   "CLMotorSend": {
@@ -1394,9 +1425,19 @@
       {"name": "send_rot", "type": "rad", "unit":"degree"}
     ]
   },
+  "toGoalDist": {
+    "type": "toGoalDist",
+    "content": [
+      {"name": "x", "type": "double", "unit":""  },
+      {"name": "y", "type": "double", "unit":""  },
+      {"name": "dist", "type": "double", "unit":"" }
+    ]
+  },
   "MotorInfo": {
     "type": ["MotorInfo0", "MotorInfo1", "MotorInfo2", "MotorInfo3", "MotorInfo4", "MotorInfo5", "MotorInfo6",
-    "MotorInfo7", "MotorInfo8", "MotorInfo9", "MotorInfo10", "MotorInfo11", "MotorInfo12", "MotorInfo13"],
+    "MotorInfo7", "MotorInfo8", "MotorInfo9", "MotorInfo10", "MotorInfo11", "MotorInfo12", "MotorInfo13",
+     "MotorInfo14",  "MotorInfo15", "MotorInfo16", "MotorInfo17"
+  ],
     "content": [
       {"name": "timestamp", "type": "int64", "description": "里程时间戳", "unit":""  },
       { "index": 1, "name": "postion", "type": "double", "description": "位置", "unit":"" },
@@ -2216,12 +2257,29 @@
     "type":"STCost",
     "content":"key|value"   
   },
+  "updateCostMap":{
+    "type":"updateCostMap",
+    "content":"key|value"   
+  },
+  "Costmap2D_updateInflationCosts":{
+    "type":"Costmap2D_updateInflationCosts",
+    "content":"key|value"   
+  },
   "updateControlTime":{
     "type":"updateControlTime",
     "content":[
       {"name":"dt", "type":"double", "unit":"s"},
       {"name":"control_time", "type":"double","description": "当前数据库中的controlTime","unit":"s"},
       {"name":"control_time_size", "type":"double"}
+    ]    
+  },
+  "pubTaskStatus":{
+    "type":"pubTaskStatus",
+    "content":[
+      {"name":"chassisIsStop", "type":"bool"},
+      {"name":"last_pub_task_status", "type":"double"},
+      {"name":"task_status", "type":"double"},
+      {"name":"during_stop_period", "type":"bool"}
     ]    
   },
   "MRobotStatus0":{
@@ -2760,11 +2818,82 @@
       {"name": "last_state", "type": "str", "unit":""}
     ] 
   },
-  "pcd_obs_num":{
-    "type": "pcd_obs_num",
+  "dt_time_ms":{
+    "type": "dt_time_ms",
     "content": [
-      {"name": "num", "type": "double", "unit":""}
+      {"name": "dt", "type": "double", "unit":""},
+      {"name": "x", "type": "double", "unit":""},
+      {"name": "y", "type": "double", "unit":""},
+      {"name": "w", "type": "double", "unit":""}
     ] 
+  },
+  "shrink_task":{
+    "type": "shrink_task",
+    "content": [
+      {"name": "task_size", "type": "double"},
+      {"name": "map_size", "type": "double"},
+      {"name": "erase_size", "type": "double"}
+    ] 
+  },
+  "ScriptOpenSpeed":{
+    "type": "ScriptOpenSpeed",
+    "content": [
+      {"name": "in_vx", "type": "double"},
+      {"name": "in_vy", "type": "double"},
+      {"name": "in_vw", "type": "rad"},
+      {"name": "nav_vx", "type": "double"},
+      {"name": "nav_vy", "type": "double"},
+      {"name": "nav_vw", "type": "rad"},
+      {"name": "vx", "type": "double"},
+      {"name": "vy", "type": "double"},
+      {"name": "vw", "type": "rad"}
+    ] 
+  },
+  "MagNavIn":{
+    "type": "MagNavIn",
+    "content": [
+      {"name": "mag1x", "type": "double"},
+      {"name": "mag1y", "type": "double"},
+      {"name": "mag1detect", "type": "bool"},
+      {"name": "mag2x", "type": "double"},
+      {"name": "mag2y", "type": "double"},
+      {"name": "mag2detect", "type": "bool"},
+      {"name": "maxVx", "type": "double"},
+      {"name": "maxRot", "type": "double"},
+      {"name": "forward", "type": "bool"},
+      {"name": "kp", "type": "double"}
+    ] 
+  },
+  "MagDoubleNavOut":{
+    "type": "MagDoubleNavOut",
+    "content": [
+      {"name": "dy", "type": "double"},
+      {"name": "dtheta", "type": "rad"},
+      {"name": "vw", "type": "rad"},
+      {"name": "vy", "type": "double"},
+      {"name": "vx_final", "type": "double"},
+      {"name": "vy_final", "type": "double"},
+      {"name": "vw_final", "type": "rad"}
+    ] 
+  },
+  "MagSingleNavOut":{
+    "type": "MagSingleNavOut",
+    "content": [
+      {"name": "heading_error_rad", "type": "rad"},
+      {"name": "vw_raw", "type": "rad"},
+      {"name": "vw", "type": "rad"},
+      {"name": "vw_final", "type": "rad"},
+      {"name": "vx_final", "type": "double"}
+    ] 
+  },
+  "get_task":{
+    "type": "get_task",
+    "content": [
+      {"name": "task_size", "type": "double"},
+      {"name": "d2s", "type": "double"},
+      {"name": "has_task", "type": "double"},
+      {"name": "task_status", "type": "str"}
 
+    ] 
   }
 }

@@ -281,7 +281,7 @@ class Data:
                     d = "".join([i for i in values[ind] if i.isdigit() or i == "."])
                     self.data[name].append(float(d))
                 except:
-                    self.data[name].append(0.0)
+                    self.data[name].append(values[ind])
         elif tmp['type'] == 'mm':
             try:
                 self.data[name].append(float(values[ind])/1000.0)
@@ -1040,7 +1040,7 @@ class Service:
         self.short_regx = "Service]"         
         self.data = [[] for _ in range(2)]
     def parse(self, line):
-        if "DO" in line or "SoundPlayer" in line or "Charge" in line or "LaserRecogSync" in line:
+        if "DO" in line or "sendCan" in line or "SoundPlayer" in line or "Charge" in line or "LaserRecogSync" in line:
             return False
         if self.short_regx in line:               
             out = self.regex.match(line)

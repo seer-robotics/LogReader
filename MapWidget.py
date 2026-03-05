@@ -156,6 +156,7 @@ class Readmodel(QThread):
         self.laser = dict() #x,y,r
         self.laser_id2name = dict()
         self.translate_x = 0
+        self.shape_type = 'rectangle'  # 'rectangle' or 'circle'
     def getHead(self):
         if self.head is None:
             return None
@@ -168,7 +169,10 @@ class Readmodel(QThread):
         return self.width
     def setTranslateX(self, x):
         print("set_tran_x", x)
-        self.translate_x = x
+        if isinstance(x, float) or isinstance(x, int):
+            self.translate_x = x
+        else:
+            self.translate_x = 0
     # run method gets called when we start the thread
     def run(self):
         with open(self.model_name, 'r',encoding= 'UTF-8') as fid:
@@ -195,6 +199,7 @@ class Readmodel(QThread):
                                 for childparam in param['comboParam']['childParams']:
                                     if childparam['key'] == 'rectangle':
                                         if param['comboParam']['childKey'] == childparam['key']:
+                                            self.shape_type = 'rectangle'
                                             for p in childparam['params']:
                                                 if p['key'] == 'width':
                                                     self.width = p['doubleValue']
@@ -204,6 +209,7 @@ class Readmodel(QThread):
                                                     self.tail = p['doubleValue']
                                     elif childparam['key'] == 'circle':
                                         if param['comboParam']['childKey'] == childparam['key']:
+                                            self.shape_type = 'circle'
                                             for p in childparam['params']:
                                                 if p['key'] == 'radius':
                                                     self.width = p['doubleValue']
@@ -1401,19 +1407,25 @@ class MapWidget(QtWidgets.QWidget):
         robot_pos = [event[0], event[1], event[2]/180.0*math.pi]
         expansion = event[3]
         if self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
-            xdata = [-self.read_model.getTail(),   -self.read_model.getTail(),     self.read_model.getHead(),  
-                     self.read_model.getHead(), -self.read_model.getTail(), self.read_model.getHead(), 
-                     0.0,0.0,self.read_model.getHead(),
-                     self.read_model.getHead(), -self.read_model.getTail()]
-            half_width = self.read_model.width/2 + expansion
-            ydata = [half_width, 
-                     -half_width, 
-                     -half_width, 
-                     0.0, 0.0, 0.0, 
-                     -half_width, 
-                     half_width,
-                     0.0,
-                     half_width, half_width]
+            if self.read_model.shape_type == 'circle':
+                r = self.read_model.width + expansion
+                theta = np.linspace(0, 2 * np.pi, 33)
+                xdata = list(r * np.cos(theta)) + [float('nan'), 0.0, r]
+                ydata = list(r * np.sin(theta)) + [float('nan'), 0.0, 0.0]
+            else:
+                half_width = self.read_model.width/2 + expansion
+                xdata = [-self.read_model.getTail(),   -self.read_model.getTail(),     self.read_model.getHead(),
+                         self.read_model.getHead(), -self.read_model.getTail(), self.read_model.getHead(),
+                         0.0,0.0,self.read_model.getHead(),
+                         self.read_model.getHead(), -self.read_model.getTail()]
+                ydata = [half_width,
+                         -half_width,
+                         -half_width,
+                         0.0, 0.0, 0.0,
+                         -half_width,
+                         half_width,
+                         0.0,
+                         half_width, half_width]
             robot_shape = np.array([xdata, ydata])
 
             robot_shape = GetGlobalPos(robot_shape,robot_pos)
@@ -2025,13 +2037,6 @@ class MapWidget(QtWidgets.QWidget):
                 self.check_partical.setChecked(False)
                 self.check_odo.setChecked(False)
 
-
-                xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
-                ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
-                robot_shape = np.array([xdata, ydata])
-                xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
-                xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
-                cross_shape = np.array([xxdata,xydata])
                 self.laser_pos = copy.deepcopy(laser_info)
                 self.org_laser_pos = copy.deepcopy(self.laser_pos)
                 # laser_data = [[self.laser_pos[self.laser_index][0], self.laser_pos[self.laser_index][1]]]
@@ -2284,6 +2289,8 @@ class MapWidget(QtWidgets.QWidget):
                 shift_x = 0
             else:
                 shift_x = trans_x[0][idx-1]
+        if not isinstance(shift_x, float) and not isinstance(shift_x, int):
+            shift_x = 0
         self.read_model.setTranslateX(shift_x)
         for key in self.laser_pos.keys():
             self.laser_pos[key][0] = self.org_laser_pos[key][0] + shift_x
@@ -2342,13 +2349,10 @@ class MapWidget(QtWidgets.QWidget):
 
         if self.laser_index in self.laser_pos.keys() \
          and self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
-            xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
-            ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
+            xdata, ydata = self._makeRobotShapeXY()
             robot_shape = np.array([xdata, ydata])
-            xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
-            xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
-            cross_shape = np.array([xxdata,xydata])
-
+            xxdata, xydata = self._makeCrossShapeXY()
+            cross_shape = np.array([xxdata, xydata])
 
             cross_shape = GetGlobalPos(cross_shape,self.robot_loc_pos)
             robot_shape = GetGlobalPos(robot_shape,self.robot_loc_pos)
@@ -2461,12 +2465,10 @@ class MapWidget(QtWidgets.QWidget):
 
         if self.laser_index in self.laser_pos.keys() \
          and self.read_model.getTail() and self.read_model.getHead() and self.read_model.width:
-            xdata = [-self.read_model.getTail(), -self.read_model.getTail(), self.read_model.getHead(), self.read_model.getHead(), -self.read_model.getTail()]
-            ydata = [self.read_model.width/2, -self.read_model.width/2, -self.read_model.width/2, self.read_model.width/2, self.read_model.width/2]
+            xdata, ydata = self._makeRobotShapeXY()
             robot_shape = np.array([xdata, ydata])
-            xxdata = [-0.05, 0.05, 0.0, 0.0, 0.0]
-            xydata = [0.0, 0.0, 0.0, 0.05, -0.05]
-            cross_shape = np.array([xxdata,xydata])
+            xxdata, xydata = self._makeCrossShapeXY()
+            cross_shape = np.array([xxdata, xydata])
 
             robot_shape = GetGlobalPos(robot_shape,self.robot_pos)
             self.robot_data.set_xdata(robot_shape[0])
@@ -2668,6 +2670,28 @@ class MapWidget(QtWidgets.QWidget):
         self.odo.set_ydata(y)
         self.odo_next.set_xdata(xn)
         self.odo_next.set_ydata(yn)
+
+    def _makeRobotShapeXY(self, expansion=0.0):
+        """根据 shape_type 返回机器人轮廓的 (xdata, ydata)，坐标在机器人本体系中。"""
+        if self.read_model.shape_type == 'circle':
+            r = self.read_model.width + expansion
+            theta = np.linspace(0, 2 * np.pi, 33)
+            return (r * np.cos(theta)).tolist(), (r * np.sin(theta)).tolist()
+        else:
+            hw = self.read_model.width / 2 + expansion
+            head = self.read_model.getHead()
+            tail = self.read_model.getTail()
+            xdata = [-tail, -tail, head, head, -tail]
+            ydata = [hw, -hw, -hw, hw, hw]
+            return xdata, ydata
+
+    def _makeCrossShapeXY(self):
+        """返回机器人朝向指示器的 (xdata, ydata)，坐标在机器人本体系中。"""
+        if self.read_model.shape_type == 'circle':
+            r = self.read_model.width
+            return [0.0, r], [0.0, 0.0]
+        else:
+            return [-0.05, 0.05, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.05, -0.05]
 
     def updateRobotData(self):
         if self.robot_log is not None and not self.isHidden():

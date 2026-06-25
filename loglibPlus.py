@@ -3,14 +3,54 @@ import math
 from datetime import datetime, timezone
 import logging
 import gzip
+import zstandard as zstd
+import io
 from multiprocessing import Pool
 import json
 import matplotlib
 def date2num(d):
     return matplotlib.dates.date2num(d)
-    
+
 def num2date(n):
-    return matplotlib.dates.num2date(n).replace(tzinfo=None) 
+    return matplotlib.dates.num2date(n).replace(tzinfo=None)
+
+def open_log_file(file, mode='rb'):
+    """根据文件后缀打开日志文件,支持 .log/.gz/.zst 三种格式
+    返回一个可迭代行的二进制流上下文管理器
+    """
+    if file.endswith('.zst'):
+        return _ZstdLogReader(file)
+    elif file.endswith('.gz'):
+        return gzip.open(file, mode)
+    else:
+        return open(file, mode)
+
+class _ZstdLogReader:
+    """对 .zst 文件做按行迭代的二进制读取封装,接口与 gzip.open(..., 'rb') 兼容"""
+    def __init__(self, filename):
+        self._filename = filename
+        self._fp = None
+        self._reader = None
+
+    def __enter__(self):
+        self._fp = open(self._filename, 'rb')
+        dctx = zstd.ZstdDecompressor()
+        # stream_reader 返回的是二进制流,使用 BufferedReader 以支持按行迭代
+        self._reader = io.BufferedReader(dctx.stream_reader(self._fp))
+        return self._reader
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if self._reader is not None:
+                self._reader.close()
+        except Exception:
+            pass
+        try:
+            if self._fp is not None:
+                self._fp.close()
+        except Exception:
+            pass
+        return False
 
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
@@ -176,17 +216,17 @@ class ReadLog:
                     continue
             else:
                 try:
-                    with gzip.open(file,'rb') as f:
+                    with open_log_file(file, 'rb') as f:
                         st = self._startTime(f, file_ind)
                         if st != None:
                             file_ind.append(ind)
-                            file_stime.append(st) 
+                            file_stime.append(st)
                 except:
-                    continue       
-        
+                    continue
+
         max_location =sorted(enumerate(file_stime), key=lambda y:y[1])
         #print(max_location)
-        
+
         new_file_ind = []
         for i in range(len(max_location)):
             new_file_ind.append(file_ind[max_location[i][0]])
@@ -201,8 +241,8 @@ class ReadLog:
                     continue
             else:
                 try:
-                    with gzip.open(file,'rb') as f:
-                        self._readData(f, file)    
+                    with open_log_file(file, 'rb') as f:
+                        self._readData(f, file)
                 except:
                     continue
         self.t_and_num = []

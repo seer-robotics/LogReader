@@ -168,6 +168,14 @@
       { "index": 8, "name": "nav_vw", "type": "rad"}
     ]
   },
+  "real_speed": {
+    "type": "real_speed",
+    "content": [
+      {"name": "vx", "type": "double", "description": "DSP接收到的vx", "unit":"m/s" },
+      {"name": "vy", "type": "double", "description": "DSP接收到的vy", "unit":"m/s"  },
+      {"name": "vw", "type": "rad", "description": "DSP接收到的vw", "unit":"degree/s" }
+    ]
+  },
   "Speed2DSP": {
     "type": "Speed2DSP",
     "content": [
@@ -659,6 +667,10 @@
     "type": "MPCCost",
     "content": "key|value"
   },
+  "ByPassState": {
+    "type": "ByPassState",
+    "content": "key|value"
+  },
   "REFCost":{
     "type": "REFCost",
     "content": "key|value"
@@ -997,6 +1009,18 @@
       {"index": 0, "name": "x", "type":"double","description": "agv在世界坐标下的x", "unit":"m"},
       {"index": 1, "name": "y", "type":"double","description": "agv在世界坐标下的y", "unit":"m"},
       {"index": 2, "name": "theta", "type": "rad","description": "agv在世界坐标下的theta", "unit":"degree"}
+    ]
+  },
+  "SpinAngleFusion":{
+    "type": "SpinAngleFusion",
+    "content": [
+      {"name": "m_spin_fused_global_angle", "type":"rad", "unit":"degree"},
+      {"name": "cur_plate_global_loc_angle", "type":"rad","unit":"degree"},
+      {"name": "cur_plate_global_odo_angle", "type": "rad","unit":"degree"},
+      {"name": "predict_angle", "type": "rad", "unit":"degree"},
+      {"name": "loc_error", "type": "rad", "unit":"degree"},
+      {"name": "correction", "type": "rad", "unit":"degree"},
+      {"name": "alpha", "type": "double", "unit":""}
     ]
   },
   "OutputV":{

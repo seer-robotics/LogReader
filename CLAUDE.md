@@ -71,7 +71,7 @@ chcp 65001
 ### Data Flow
 
 1. User selects log files in GUI
-2. `ReadThread` spawns, reads files (supports .log and .gz)
+2. `ReadThread` spawns, reads files (supports .log, .gz and .zst)
 3. Files parsed using regex patterns from `log_config.json`
 4. Data stored in `Data` objects (one per log type: mcl, odo, imu, etc.)
 5. GUI components subscribe to data updates via Qt signals

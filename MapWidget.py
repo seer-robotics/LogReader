@@ -775,7 +775,7 @@ class DataWidget(QtWidgets.QWidget):
 
         self.c_msg = QtWidgets.QLabel("color:")
         self.c = QtWidgets.QComboBox(self)
-        self.c.addItems(["b", "g", "r", "c", "m", "y"])
+        self.c.addItems(["b", "g", "r", "c", "m", "y", "k"])
         hbox2 = QtWidgets.QFormLayout()
         hbox2.addRow(self.c_msg, self.c)
 

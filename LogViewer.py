@@ -3,7 +3,7 @@ from PyQt5.QtWidgets import QApplication, QWidget, QPlainTextEdit, QVBoxLayout, 
 from PyQt5 import QtGui, QtCore,QtWidgets
 import gzip
 import re
-from loglibPlus import rbktimetodate
+from loglibPlus import rbktimetodate, open_log_file
 
 class LogViewer(QWidget):
     hiddened = QtCore.pyqtSignal('PyQt_PyObject')
@@ -68,11 +68,11 @@ class LogViewer(QWidget):
                         continue
                 else:
                     try:
-                        with gzip.open(file,'rb') as f:
-                            self.readData(f, file) 
+                        with open_log_file(file, 'rb') as f:
+                            self.readData(f, file)
                     except:
                         continue
-        self.setText(self.lines)  
+        self.setText(self.lines)
 
     # def mousePressEvent(self, event):
     #     self.popMenu = self.plainText.createStandardContextMenu()

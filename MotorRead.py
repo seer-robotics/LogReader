@@ -1,5 +1,19 @@
 import json, gzip, re
 from os import close, name
+try:
+    from loglibPlus import open_log_file as _open_log_file
+except Exception:
+    _open_log_file = None
+
+
+def _open_motor_log(file_name):
+    """打开 motor 日志文件,支持 .log/.gz/.zst"""
+    if file_name.endswith(".log"):
+        return open(file_name, 'rb')
+    if file_name.endswith(".zst") and _open_log_file is not None:
+        # _ZstdLogReader 是上下文管理器,这里需要返回类文件对象
+        return _open_log_file(file_name, 'rb').__enter__()
+    return gzip.open(file_name, 'rb')
 
 def getMotorFromModel(model_path):
     path = model_path
@@ -48,16 +62,11 @@ def getMotorNames(model_path):
 
 def getNameMotorInfoDict(file_name, motor_name_list):
     name_motorinfo = {}
-    if file_name.endswith(".log"):
-        try:
-            file = open(file_name,'rb')
-        except:
-            print("fail")
-    else:
-        try:
-            file = gzip.open(file_name,'rb')
-        except:
-            print("fail")
+    try:
+        file = _open_motor_log(file_name)
+    except Exception:
+        print("fail")
+        return name_motorinfo
     
     match_dict = {}
     for i in motor_name_list:
@@ -92,16 +101,11 @@ def getNameMotorInfoDict(file_name, motor_name_list):
 
 def getNameMotorCmdDict(file_name, motor_name_list):
     name_motorcmd = {}
-    if file_name.endswith(".log"):
-        try:
-            file = open(file_name,'rb')
-        except:
-            print("fail")
-    else:
-        try:
-            file = gzip.open(file_name,'rb')
-        except:
-            print("fail")
+    try:
+        file = _open_motor_log(file_name)
+    except Exception:
+        print("fail")
+        return name_motorcmd
     
     match_dict = {}
     for i in motor_name_list:

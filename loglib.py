@@ -4,6 +4,10 @@ from datetime import datetime
 import logging
 import numpy as np
 import gzip
+try:
+    from loglibPlus import open_log_file as _open_log_file
+except Exception:
+    _open_log_file = None
 
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
@@ -64,6 +68,9 @@ class ReadLog:
             if file.endswith(".log"):
                 with open(file,'rb') as f:
                     self._readData(f,file, argv)
+            elif file.endswith(".zst") and _open_log_file is not None:
+                with _open_log_file(file, 'rb') as f:
+                    self._readData(f, file, argv)
             else:
                 with gzip.open(file,'rb') as f:
                     self._readData(f, file, argv)

@@ -298,6 +298,47 @@ class SelectEnum(Enum):
     Region = 3
     Mid = 4
 
+
+# 支持的日志文件后缀
+LOG_FILE_EXTS = ('.log', '.gz', '.zst')
+
+
+def _collect_logs_from_dir(dir_path):
+    """从目录中收集日志文件。
+    优先级:
+      1. 若目录下存在 d/ 子目录(新版 robokit Debug 日志),只从 d/ 中收集 *.zst/*.gz/*.log
+      2. 否则若存在 log/ 子目录,从 log/ 中收集 robokit_* 开头的日志(排除 kern/syslog 等)
+      3. 否则直接在该目录中收集 *.log/*.gz/*.zst
+    返回按文件名排序的绝对路径列表。
+    """
+    files = []
+    if not os.path.isdir(dir_path):
+        return files
+    d_subdir = os.path.join(dir_path, 'd')
+    log_subdir = os.path.join(dir_path, 'log')
+    target_dir = None
+    name_filter = None
+    if os.path.isdir(d_subdir):
+        target_dir = d_subdir
+    elif os.path.isdir(log_subdir):
+        target_dir = log_subdir
+        # log/ 目录中含 kern.log/syslog 等系统日志,只挑 robokit_ 开头的
+        name_filter = lambda n: n.lower().startswith('robokit_')
+    else:
+        target_dir = dir_path
+    for name in os.listdir(target_dir):
+        full = os.path.join(target_dir, name)
+        if not os.path.isfile(full):
+            continue
+        if not name.lower().endswith(LOG_FILE_EXTS):
+            continue
+        if name_filter is not None and not name_filter(name):
+            continue
+        files.append(full.replace('\\', '/'))
+    files.sort()
+    return files
+
+
 class SelectRegion:
     def __init__(self, ax, t0, t1, tmid) -> None:
         self.ax = ax
@@ -408,6 +449,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.file_menu = QtWidgets.QMenu('&File', self)
         self.file_menu.addAction('&Open', self.openLogFilesDialog,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_O)
+        self.file_menu.addAction('Open &Folder', self.openLogFolderDialog,
+                                 QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_O)
         self.file_menu.addAction('&Quit', self.fileQuit,
                                  QtCore.Qt.CTRL + QtCore.Qt.Key_Q)
         self.menuBar().addMenu(self.file_menu)
@@ -1292,7 +1335,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         options |= QtCore.Qt.WindowStaysOnTopHint
-        self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log, *.gz);;All Files (*)", options=options)
+        self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log *.gz *.zst);;All Files (*)", options=options)
         if self.filenames:
             self.map_widget.hide()
             self.finishReadFlag = False
@@ -1307,6 +1350,35 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 flink = Fdir2Flink(f)
                 self.log_info.append(str(ind+1)+':'+flink)
             self.setWindowTitle('Loading')
+
+    def openLogFolderDialog(self):
+        """打开一个日志目录(支持新版 robokit 调试日志: 自动从 d/ 子目录读取 .zst 文件)"""
+        options = QtWidgets.QFileDialog.Options()
+        options |= QtWidgets.QFileDialog.DontUseNativeDialog
+        options |= QtCore.Qt.WindowStaysOnTopHint
+        dir_path = QtWidgets.QFileDialog.getExistingDirectory(self, "选取log目录", "", options=options)
+        if not dir_path:
+            return
+        files = _collect_logs_from_dir(dir_path)
+        if not files:
+            logging.warning('No log files found in {}'.format(dir_path))
+            self.log_info.append('No log files (.log/.gz/.zst) found in: ' + dir_path)
+            return
+        self.filenames = files
+        self.map_widget.hide()
+        self.finishReadFlag = False
+        self.read_thread = ReadThread()
+        self.read_thread.signal.connect(self.readFinished)
+        self.read_thread.filenames = self.filenames
+        self.read_thread.start()
+        logging.debug('Loading ' + str(len(self.filenames)) + ' Files from ' + dir_path)
+        self.log_info.append('Loading ' + str(len(self.filenames)) + ' Files from: ' + dir_path)
+        for (ind, f) in enumerate(self.filenames):
+            logging.debug(str(ind+1)+':'+f)
+            flink = Fdir2Flink(f)
+            self.log_info.append(str(ind+1)+':'+flink)
+        self.setWindowTitle('Loading')
+
 
     def openModelFilesDialog(self):
         options = QtWidgets.QFileDialog.Options()
@@ -1323,7 +1395,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         for file in files:
             if os.path.exists(file):
                 subffix = os.path.splitext(file)[1]
-                if subffix == ".log" or subffix == ".gz":
+                if subffix == ".log" or subffix == ".gz" or subffix == ".zst":
                     if flag_first_in:
                         self.filenames = []
                         flag_first_in = False
@@ -1331,7 +1403,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 elif os.path.splitext(file)[1] == ".json":
                     logging.debug('Update log_config.json')
                     self.read_thread.log_config = file
-                else: 
+                elif os.path.isdir(file):
+                    # 拖入目录: 自动收集其中以及 d/ 子目录中的所有日志文件
+                    if flag_first_in:
+                        self.filenames = []
+                        flag_first_in = False
+                    self.filenames.extend(_collect_logs_from_dir(file))
+                else:
                     logging.debug('fail to load {}'.format(file))
                     return
         if self.filenames:

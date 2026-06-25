@@ -11,7 +11,7 @@ a = Analysis(
     datas=[('images/*','images'),
            ('log_config.json','.'),
            ('rbk.ico','.')],
-    hiddenimports=[],
+    hiddenimports=['zstandard'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

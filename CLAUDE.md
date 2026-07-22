@@ -22,6 +22,17 @@ python loggui.py
 python get_report.py <log_file_1> <log_file_2>
 ```
 
+## Running Tests
+
+```bash
+# Run the full unittest suite (pure-logic layer + log parsing smoke tests)
+python -m unittest discover -s tests -v
+```
+
+Tests use only the standard library `unittest` (no pytest). Files:
+- `tests/test_maputils.py`: coordinate transforms, theta normalization, curve parsing, `find_log_resource` (includes real-log cases that skip when the sample data is absent)
+- `tests/test_loglibPlus.py`: timestamp parsing, date round-trips, `open_log_file`, and a real-log `ReadLog` smoke test (skips when the sample data is absent)
+
 ## Building Executable
 
 ```bash
@@ -45,6 +56,9 @@ chcp 65001
 - `loglib.py`: Base log parsing with regex-based `ReadLog` and `Data` classes
 - `loglibPlus.py`: Extended parsing with multi-threading support, specialized data types (ErrorLine, WarningLine, FatalLine, NoticeLine, TaskStart, TaskFinish, Service, Laser, Memory, etc.)
 - `log_config.json`: Large JSON configuration defining all log parsing rules and data field structures
+
+**Pure Logic Layer**:
+- `maputils.py`: GUI-free pure functions extracted from `MapWidget.py` — coordinate-frame transforms (`GetGlobalPos`, `P2G`, `Pos2Base`, `convert2LaserPoints`), theta normalization (`normalize_theta`, `normalize_theta_deg`), curve-input parsing (`parse_curve_data` and helpers), log-resource lookup (`find_log_resource`), and file MD5 (`get_md5_pathlib`). No PyQt5/matplotlib imports, so it is unit-testable without a display. `MapWidget.py` re-exports all of these names, so existing imports like `from MapWidget import find_log_resource` keep working.
 
 **Threading & Data Loading**:
 - `ReadThread.py`: QThread-based asynchronous log reading, initializes all data parsers, manages multi-threaded parsing (default 4 threads)
@@ -102,7 +116,7 @@ The application parses and visualizes:
 - Each thread processes a chunk of log lines
 
 ### Coordinate Transformations
-- `MapWidget.py` contains utilities for coordinate frame transformations:
+- `maputils.py` contains utilities for coordinate frame transformations (re-exported by `MapWidget.py` for backward compatibility):
   - `GetGlobalPos()`: Point from body to global frame
   - `P2G()`: Pose from body to global frame
   - `Pos2Base()`: Pose from world to base frame

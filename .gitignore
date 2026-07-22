@@ -13,6 +13,9 @@ __pycache__/
 *.xml
 *.iml
 test*
+!tests/
+!tests/**
+
 
 # C extensions
 *.so
@@ -154,3 +157,7 @@ frontend/
 robot_logs/
 # Cleanup staging folder (pending manual deletion)
 tmp/
+
+# Test log archives (local test data)
+robokit-Debug-*/
+tests/__pycache__/

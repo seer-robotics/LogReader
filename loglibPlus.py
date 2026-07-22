@@ -8,6 +8,7 @@ import io
 from multiprocessing import Pool
 import json
 import matplotlib
+import matplotlib.dates
 def date2num(d):
     return matplotlib.dates.date2num(d)
 

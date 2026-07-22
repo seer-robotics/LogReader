@@ -2,6 +2,9 @@
 从log文件中读取IMU, Odometer, MCLoc, Send, Get, Laser, fatal, error, warning and notice信息
 
 使用环境**Python 3.9.12**, 推荐使用[Anaconda](https://www.anaconda.com/download/)
+
+运行单元测试（纯逻辑层 maputils 与日志解析冒烟测试，基于标准库 unittest）:
+<pre><code>python -m unittest discover -s tests -v</pre></code>
 * get_report.py 为生成错误报告的脚本。在命名窗口输入:<pre><code>python get_report.py <log文件1> <log文件2></pre></code>
 
   **将release中的get_report.exe置于rbk目录下，运行get_report.exe可以自动读取diagnosis\\log下的log文件，并生成报告**

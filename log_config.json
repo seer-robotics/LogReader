@@ -27,18 +27,22 @@
     "type": "IMU",
     "content": [
       {"name": "yaw", "type": "rad","description": "陀螺仪的测量的agv朝向", "unit":"degree" },
-      { "index": 1, "name": "pitch", "type": "rad", "description": "陀螺仪测量的agv倾斜角", "unit":"degree" },
-      { "index": 2, "name": "roll", "type": "rad", "description": "陀螺仪测量的agv倾斜角", "unit":"degree" },
-      { "index": 3, "name": "timestamp", "type": "int64","description": "时间戳", "unit":"" },
-      { "index": 4, "name": "ax", "type": "double", "description": "陀螺仪x轴加速度", "unit":"m/s^2"},
-      { "index": 5, "name": "ay", "type": "double", "description": "陀螺仪y轴加速度", "unit":"m/s^2" },
-      { "index": 6, "name": "az", "type": "double", "description": "陀螺仪z轴加速度", "unit":"m/s^2" },
-      { "index": 7, "name": "gx", "type": "LSB", "description": "陀螺仪x轴角速度", "unit":"degree/s" },
-      { "index": 8, "name": "gy", "type": "LSB", "description": "陀螺仪y轴角速度", "unit":"degree/s" },
-      { "index": 9, "name": "gz", "type": "LSB", "description": "陀螺仪z轴角速度", "unit":"degree/s" },
-      { "index": 10, "name": "offx", "type": "LSB", "description": "陀螺仪gx零位偏置", "unit":"degree/s" },
-      { "index": 11, "name": "offy", "type": "LSB", "description": "陀螺仪gy零位偏置", "unit":"degree/s" },
-      { "index": 12, "name": "offz", "type": "LSB", "description": "陀螺仪gz零位偏置", "unit":"degree/s"  }
+      { "name": "pitch", "type": "rad", "description": "pitch", "unit":"degree" },
+      { "name": "roll", "type": "rad", "description": "roll", "unit":"degree" },
+      { "name": "timestamp", "type": "int64","description": "时间戳", "unit":"" },
+      { "name": "ax", "type": "double", "description": "陀螺仪x轴加速度", "unit":"m/s^2"},
+      { "name": "ay", "type": "double", "description": "陀螺仪y轴加速度", "unit":"m/s^2" },
+      { "name": "az", "type": "double", "description": "陀螺仪z轴加速度", "unit":"m/s^2" },
+      { "name": "gx", "type": "LSB", "description": "陀螺仪x轴角速度", "unit":"degree/s" },
+      { "name": "gy", "type": "LSB", "description": "陀螺仪y轴角速度", "unit":"degree/s" },
+      { "name": "gz", "type": "LSB", "description": "陀螺仪z轴角速度", "unit":"degree/s" },
+      { "name": "offx", "type": "LSB", "description": "陀螺仪gx零位偏置", "unit":"degree/s" },
+      { "name": "offy", "type": "LSB", "description": "陀螺仪gy零位偏置", "unit":"degree/s" },
+      { "name": "offz", "type": "LSB", "description": "陀螺仪gz零位偏置", "unit":"degree/s"  },
+      { "name": "qw", "type": "double" },
+      { "name": "qx", "type": "double" },
+      { "name": "qy", "type": "double" },
+      { "name": "qz", "type": "double" }
     ]
   },
   "SwitchDO": {
@@ -738,13 +742,33 @@
     "type": "FallDown",
     "content": [
       {"name": "state", "type": "str"},
-      {"name": "m_filter_ind", "type": "double"},
-      {"name": "m_cur_filter_size", "type": "double"},
-      {"name": "theta0", "type": "rad"},
-      {"name": "angle", "type": "rad"},
+      {"name": "filter_ind", "type": "double"},
+      {"name": "cur_filter_size", "type": "double"},
+      {"name": "g0x", "type": "double"},
+      {"name": "g0y", "type": "double"},
+      {"name": "g0z", "type": "double"},
+      {"name": "gx", "type": "double"},
+      {"name": "gy", "type": "double"},
+      {"name": "gz", "type": "double"},
       {"name": "dtheta", "type": "rad"},
-      {"name": "dt", "type": "double"},
-      {"name": "detect_condition", "type": "double"}
+      {"name": "detect_dt", "type": "double"},
+      {"name": "detect_condition", "type": "double"},
+      {"name": "error_dt", "type": "double"}
+    ]
+  },
+  "CheckFallingDown": {
+    "type": "CheckFallingDown",
+    "content": [
+      {"name": "quaternion_valid", "type": "bool"},
+      {"name": "last_quaternion_valid", "type": "bool"},
+      {"name": "falling_down", "type": "bool"},
+      {"name": "task_active", "type": "bool"},
+      {"name": "qx", "type": "double"},
+      {"name": "qy", "type": "double"},
+      {"name": "qz", "type": "double"},
+      {"name": "qw", "type": "double"},
+      {"name": "no_speed", "type": "bool"},
+      {"name": "cur_vx", "type": "double"}
     ]
   },
   "followMode":{
@@ -1049,6 +1073,25 @@
       {"name": "jack_state", "type":"double"},
       {"name": "m_spin_zero_offset", "type": "rad","unit":"degree"},
       {"name": "rot_flag", "type": "bool"}
+    ]
+  },
+  "linearMotorFollowErr":{
+    "type": "linearMotorFollowErr",
+    "content": [
+      {"name": "name", "type":"str"},
+      {"name": "dt", "type":"double"},
+      {"name": "send_speed", "type": "double"},
+      {"name": "position", "type": "double"},
+      {"name": "start_pos", "type": "double"},
+      {"name": "no_move_dist", "type": "double"},
+      {"name": "integral", "type": "double"},
+      {"name": "distThresh", "type": "double"}
+    ]
+  },
+  "replyOK":{
+    "type": "replyOK",
+    "content": [
+      {"name": "state", "type":"str"}
     ]
   },
   "SpinState":{
@@ -2369,8 +2412,8 @@
       {"name":"delayt", "type":"double","description": "延迟时间", "unit":"ms"}
     ]   
   },
-  "TLinear_motor2":{
-    "type":"TLinear_motor2",
+  "TLinear_linear":{
+    "type":"TLinear_linear",
     "content":[
       {"name":"ideal_v", "type":"double","description": "原始输入的速度","unit":"m/s"},
       {"name":"u", "type":"double","description": "修改后输入速度","unit":"m/s"},
@@ -2908,6 +2951,20 @@
       {"name": "vw", "type": "rad"},
       {"name": "vw_final", "type": "rad"},
       {"name": "vx_final", "type": "double"}
+    ] 
+  },
+  "FallDown_pitch":{
+    "type": "FallDown_pitch",
+    "content": [
+      {"name": "state", "type": "str"},
+      {"name": "fileter_ind", "type": "double"},
+      {"name": "cur_filter_size", "type": "double"},
+      {"name": "theta0", "type": "double"},
+      {"name": "angle", "type": "double"},
+      {"name": "da", "type": "double"},
+      {"name": "dt", "type": "double"},
+      {"name": "dt_condition", "type": "double"},
+      {"name": "error_t", "type": "double"}
     ] 
   },
   "get_task":{

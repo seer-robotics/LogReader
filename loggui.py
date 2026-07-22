@@ -17,7 +17,7 @@ from Widget import Widget
 from ReadThread import ReadThread, Fdir2Flink
 from loglibPlus import ErrorLine, WarningLine, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
 from loglibPlus import date2num, num2date
-from MapWidget import MapWidget, Readmap
+from MapWidget import MapWidget, Readmap, find_log_resource
 from LogViewer import LogViewer
 from JsonView import JsonView, DataView
 from MyToolBar import MyToolBar, RulerShapeMap
@@ -307,8 +307,9 @@ def _collect_logs_from_dir(dir_path):
     """从目录中收集日志文件。
     优先级:
       1. 若目录下存在 d/ 子目录(新版 robokit Debug 日志),只从 d/ 中收集 *.zst/*.gz/*.log
-      2. 否则若存在 log/ 子目录,从 log/ 中收集 robokit_* 开头的日志(排除 kern/syslog 等)
-      3. 否则直接在该目录中收集 *.log/*.gz/*.zst
+      2. 否则若存在 log/d/ 子目录,只从 log/d/ 中收集 *.zst/*.gz/*.log
+      3. 否则若存在 log/ 子目录,从 log/ 中收集 robokit_* 开头的日志(排除 kern/syslog 等)
+      4. 否则直接在该目录中收集 *.log/*.gz/*.zst
     返回按文件名排序的绝对路径列表。
     """
     files = []
@@ -316,10 +317,13 @@ def _collect_logs_from_dir(dir_path):
         return files
     d_subdir = os.path.join(dir_path, 'd')
     log_subdir = os.path.join(dir_path, 'log')
+    log_d_subdir = os.path.join(log_subdir, 'd')
     target_dir = None
     name_filter = None
     if os.path.isdir(d_subdir):
         target_dir = d_subdir
+    elif os.path.isdir(log_d_subdir):
+        target_dir = log_d_subdir
     elif os.path.isdir(log_subdir):
         target_dir = log_subdir
         # log/ 目录中含 kern.log/syslog 等系统日志,只挑 robokit_ 开头的
@@ -1352,7 +1356,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.setWindowTitle('Loading')
 
     def openLogFolderDialog(self):
-        """打开一个日志目录(支持新版 robokit 调试日志: 自动从 d/ 子目录读取 .zst 文件)"""
+        """打开一个日志目录(支持从 d/ 或 log/d/ 子目录读取 robokit 调试日志)"""
         options = QtWidgets.QFileDialog.Options()
         options |= QtWidgets.QFileDialog.DontUseNativeDialog
         options |= QtCore.Qt.WindowStaysOnTopHint
@@ -1404,7 +1408,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     logging.debug('Update log_config.json')
                     self.read_thread.log_config = file
                 elif os.path.isdir(file):
-                    # 拖入目录: 自动收集其中以及 d/ 子目录中的所有日志文件
+                    # 拖入目录: 自动收集其中以及 d/、log/d/ 子目录中的所有日志文件
                     if flag_first_in:
                         self.filenames = []
                         flag_first_in = False
@@ -1819,18 +1823,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 self.motor_view_widget.setWindowIcon(QtGui.QIcon('rbk.ico'))
                 self.motor_view_widget.hiddened.connect(self.motorErrViewerClosed)
                 self.motor_view_widget.moveHereSignal.connect(self.moveHere)
-                dir_name, _ = os.path.split(self.filenames[0])
-                pdir_name, _ = os.path.split(dir_name)
-                model_dir = os.path.join(pdir_name,"models")
-                model_name = os.path.join(model_dir,"robot.model")
-                if not os.path.exists(model_name):
-                    model_dir = dir_name
-                    model_name = os.path.join(model_dir,"robot.model")
-                    if not os.path.exists(model_name):
-                        model_dir = os.path.join(dir_name,"models")
-                        model_name = os.path.join(model_dir,"robot.model")
-                        if not os.path.exists(model_name):
-                            model_name = None
+                model_name = find_log_resource(self.filenames[0], "models", "robot.model")
                 if not model_name:
                     model_name = self.openModelFilesDialog()
                 if model_name:
@@ -1923,18 +1916,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.targetPrecision.hide()
     # 画电机跟随曲线
     def drawMotorFollow(self, checked):
-        dir_name, _ = os.path.split(self.filenames[0])
-        pdir_name, _ = os.path.split(dir_name)
-        model_dir = os.path.join(pdir_name,"models")
-        model_name = os.path.join(model_dir,"robot.model")
-        if not os.path.exists(model_name):
-            model_dir = dir_name
-            model_name = os.path.join(model_dir,"robot.model")
-            if not os.path.exists(model_name):
-                model_dir = os.path.join(dir_name,"models")
-                model_name = os.path.join(model_dir,"robot.model")
-                if not os.path.exists(model_name):
-                    model_name = None
+        model_name = find_log_resource(self.filenames[0], "models", "robot.model")
         if not model_name:
             model_name = self.openModelFilesDialog()
         if model_name:

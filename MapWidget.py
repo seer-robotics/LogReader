@@ -29,6 +29,34 @@ from matplotlib import pyplot as plt
 from PIL import Image
 
 import hashlib
+import ast
+
+
+def find_log_resource(log_file, resource_dir, filename):
+    """查找与日志目录配套的地图、模型等资源文件。"""
+    log_dir = os.path.dirname(log_file)
+    parent_dir = os.path.dirname(log_dir)
+
+    # 新版目录可能为 <root>/log/d，资源仍位于 <root>/maps 或 <root>/models。
+    if (os.path.basename(log_dir).lower() == 'd'
+            and os.path.basename(parent_dir).lower() == 'log'):
+        root_dir = os.path.dirname(parent_dir)
+        candidates = [
+            os.path.join(root_dir, resource_dir, filename),
+            os.path.join(parent_dir, resource_dir, filename),
+        ]
+    else:
+        candidates = [os.path.join(parent_dir, resource_dir, filename)]
+
+    candidates.extend([
+        os.path.join(log_dir, filename),
+        os.path.join(log_dir, resource_dir, filename),
+    ])
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            return candidate
+    return None
+
 
 def get_md5_pathlib(path: Path, block_size=65536):
     """
@@ -699,6 +727,98 @@ class LineWidget(QtWidgets.QWidget):
         except:
             pass
 
+
+def _curve_points_to_xy(value):
+    """Return x/y sequences when *value* is an array of point objects."""
+    if not isinstance(value, (list, tuple)):
+        return None
+    if not value:
+        return [], []
+    if not all(isinstance(point, dict) and 'x' in point and 'y' in point
+               for point in value):
+        return None
+    return ([point['x'] for point in value],
+            [point['y'] for point in value])
+
+
+def _curve_xy_values(x, y):
+    """Validate and normalize two coordinate sequences for matplotlib."""
+    if isinstance(x, (str, bytes)) or isinstance(y, (str, bytes)):
+        raise ValueError("curve coordinates must be sequences")
+    try:
+        x = list(x)
+        y = list(y)
+    except TypeError:
+        raise ValueError("curve coordinates must be sequences")
+    if len(x) != len(y):
+        raise ValueError("x and y must contain the same number of points")
+    if not all(isinstance(value, (int, float, np.number)) for value in x + y):
+        raise ValueError("curve coordinates must be numeric")
+    return x, y
+
+
+def _find_curve_xy(namespace):
+    """Find x/y variables, including names such as ``pointx``/``pointy``."""
+    values = {name: value for name, value in namespace.items()
+              if isinstance(name, str) and not name.startswith('_')}
+    if 'x' in values and 'y' in values:
+        return values['x'], values['y']
+
+    x_names = [name for name in values if 'x' in name.lower()]
+    y_names = [name for name in values if 'y' in name.lower()]
+    # Prefer the natural counterpart formed by changing the final x/y.
+    for x_name in x_names:
+        lower_x = x_name.lower()
+        if lower_x.endswith('x'):
+            for y_name in y_names:
+                if y_name.lower() == lower_x[:-1] + 'y':
+                    return values[x_name], values[y_name]
+    # Fall back to a pair with the longest common prefix, which handles
+    # names such as ``point_x``/``point_y`` as well.
+    pairs = [(len(os.path.commonprefix((x_name.lower(), y_name.lower()))),
+              x_name, y_name)
+             for x_name in x_names for y_name in y_names]
+    if pairs:
+        _, x_name, y_name = max(pairs)
+        return values[x_name], values[y_name]
+    raise ValueError("curve input must define x/y coordinates")
+
+
+def parse_curve_data(text):
+    """Parse curve input in x/y-variable or JSON point-array form."""
+    source = text.strip()
+    if not source:
+        raise ValueError("curve input is empty")
+
+    # JSON point arrays are the most direct representation.  Try the whole
+    # input first, then the bracketed portion so pasted labels such as
+    # ``json: [...]`` do not prevent parsing.  literal_eval additionally
+    # accepts single-quoted keys and trailing commas.
+    json_candidates = [source]
+    start = source.find('[')
+    end = source.rfind(']')
+    if start > 0 and end > start:
+        json_candidates.append(source[start:end + 1])
+    for candidate in json_candidates:
+        for loader in (js.loads, ast.literal_eval):
+            try:
+                parsed = loader(candidate)
+            except (ValueError, SyntaxError, TypeError):
+                continue
+            point_data = _curve_points_to_xy(parsed)
+            if point_data is not None:
+                return _curve_xy_values(*point_data)
+
+    # Do not execute JSON-like input as Python.  Apart from being unsafe,
+    # this produces confusing annotation errors for malformed pasted JSON.
+    if source.startswith(('[', '{')):
+        raise ValueError("invalid JSON curve point array")
+
+    namespace = {}
+    exec(source, globals(), namespace)
+    return _curve_xy_values(*_find_curve_xy(namespace))
+
+
 class CurveWidget(QtWidgets.QWidget):
     getdata = pyqtSignal('PyQt_PyObject')
     def __init__(self):
@@ -745,10 +865,9 @@ class CurveWidget(QtWidgets.QWidget):
     def getData(self):
         code = self.data_edit.toPlainText()
         try:
-            l = locals()
-            exec(code,globals(),l)
+            x, y = parse_curve_data(code)
             self.hide()
-            self.getdata.emit([l['x'],l['y'],
+            self.getdata.emit([x, y,
             self.ls.currentText(),
             self.m.currentText(),
             self.msize.currentText(),
@@ -1452,9 +1571,10 @@ class MapWidget(QtWidgets.QWidget):
     
 
     def getCurveData(self, event):
+        xdata, ydata = _curve_xy_values(event[0], event[1])
         l = lines.Line2D([],[], linestyle = event[2], marker = event[3], markersize = event[4], color=event[5])
-        l.set_xdata(event[0])
-        l.set_ydata(event[1])     
+        l.set_xdata(xdata)
+        l.set_ydata(ydata)
         l.set_zorder(30)
         id = str(int(round(time.time()*1000)))
         if id not in self.lineLists or self.lineLists[id] is None:
@@ -2511,36 +2631,14 @@ class MapWidget(QtWidgets.QWidget):
                 map_name = map_name + ".smap"
         fs = self.robot_log.filenames
         if fs:
-            full_map_name = None
-            dir_name, _ = os.path.split(fs[0])
-            pdir_name, _ = os.path.split(dir_name)
-            if map_name:
-                map_dir = os.path.join(pdir_name,"maps")
-                full_map_name = os.path.join(map_dir,map_name)
-                if not os.path.exists(full_map_name):
-                    map_dir = dir_name
-                    full_map_name = os.path.join(map_dir,map_name)
-                    if not os.path.exists(full_map_name):
-                        map_dir = os.path.join(dir_name,"maps")
-                        full_map_name = os.path.join(map_dir,map_name)
-                        if not os.path.exists(full_map_name):
-                            full_map_name = None
+            full_map_name = find_log_resource(fs[0], "maps", map_name) if map_name else None
+            if full_map_name:
                 if full_map_name == self.map_name:
                     full_map_name = None
 
-            model_dir = os.path.join(pdir_name,"models")
-            model_name = os.path.join(model_dir,"robot.model")
-            cp_name = os.path.join(model_dir,"robot.cp")
-            if not os.path.exists(model_name):
-                model_dir = dir_name
-                model_name = os.path.join(model_dir,"robot.model")
-                cp_name = os.path.join(model_dir,"robot.cp")
-                if not os.path.exists(model_name):
-                    model_dir = os.path.join(dir_name,"models")
-                    model_name = os.path.join(model_dir,"robot.model")
-                    cp_name = os.path.join(model_dir,"robot.cp")
-                    if not os.path.exists(model_name):
-                        model_name = None      
+            model_name = find_log_resource(fs[0], "models", "robot.model")
+            cp_name = (os.path.join(os.path.dirname(model_name), "robot.cp")
+                       if model_name else None)
             if model_name == self.model_name:
                 model_name = None
             if cp_name == self.cp_name:

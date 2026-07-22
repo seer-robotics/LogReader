@@ -19,10 +19,7 @@ LogReader is a PyQt5-based GUI application for analyzing robot log files. It par
 python loggui.py
 
 # Run report generation script
-python get_report.py test1.log test2.log
-
-# Run test script
-python test.py test1.log test2.log
+python get_report.py <log_file_1> <log_file_2>
 ```
 
 ## Building Executable

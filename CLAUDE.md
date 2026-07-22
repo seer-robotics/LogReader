@@ -33,6 +33,13 @@ Tests use only the standard library `unittest` (no pytest). Files:
 - `tests/test_maputils.py`: coordinate transforms, theta normalization, curve parsing, `find_log_resource` (includes real-log cases that skip when the sample data is absent)
 - `tests/test_loglibPlus.py`: timestamp parsing, date round-trips, `open_log_file`, and a real-log `ReadLog` smoke test (skips when the sample data is absent)
 
+GUI end-to-end smoke script (not auto-discovered; requires PyQt5 environment):
+
+```bash
+# Offscreen GUI smoke test: create main window, load a real log, verify parsing
+python tests/smoke_gui.py [log_file]
+```
+
 ## Building Executable
 
 ```bash

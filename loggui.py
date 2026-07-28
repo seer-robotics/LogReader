@@ -18,6 +18,7 @@ from ReadThread import ReadThread, Fdir2Flink
 from loglibPlus import ErrorLine, WarningLine, FatalLine, NoticeLine, TaskStart, TaskFinish, Service
 from loglibPlus import date2num, num2date
 from MapWidget import MapWidget, Readmap, find_log_resource
+from ParamWidget import ParameterWidget
 from LogViewer import LogViewer
 from JsonView import JsonView, DataView
 from MyToolBar import MyToolBar, RulerShapeMap
@@ -506,6 +507,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.json_action.triggered.connect(self.openJsonView)
         self.tools_menu.addAction(self.json_action)
 
+        self.param_action = QtWidgets.QAction('&Open Parameters', self.tools_menu,
+                                               checkable=True)
+        self.param_action.setShortcut(QtCore.Qt.CTRL + QtCore.Qt.Key_P)
+        self.param_action.triggered.connect(self.openParameters)
+        self.tools_menu.addAction(self.param_action)
+
         self.motor_err_action = QtWidgets.QAction('&View Motor Err', self.tools_menu, checkable = True)
         self.motor_err_action.setShortcut(QtCore.Qt.CTRL + QtCore.Qt.Key_R)
         self.motor_err_action.triggered.connect(self.viewMotorErr)
@@ -655,6 +662,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.map_widget.setWindowIcon(QtGui.QIcon('rds.ico'))
         self.map_widget.hiddened.connect(self.mapClosed)
         self.map_widget.keyPressEvent = self.keyPressEvent
+
+        self.param_widget = ParameterWidget()
+        self.param_widget.setWindowIcon(QtGui.QIcon('rbk.ico'))
+        self.param_widget.hiddened.connect(self.parameterViewerClosed)
 
         self.targetPrecision = TargetPrecision(self)
         self.targetPrecision.hide()
@@ -1342,6 +1353,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.filenames, _ = QtWidgets.QFileDialog.getOpenFileNames(self,"选取log文件", "","Log Files (*.log *.gz *.zst);;All Files (*)", options=options)
         if self.filenames:
             self.map_widget.hide()
+            self._reloadParameterWidget()
             self.finishReadFlag = False
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
@@ -1370,6 +1382,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             return
         self.filenames = files
         self.map_widget.hide()
+        self._reloadParameterWidget()
         self.finishReadFlag = False
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
@@ -1418,6 +1431,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     return
         if self.filenames:
             self.map_widget.hide()
+            self._reloadParameterWidget()
             self.finishReadFlag = False
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
@@ -1809,6 +1823,19 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         else:
             self.map_widget.hide()
         self.static_canvas.figure.canvas.draw()
+
+    def _reloadParameterWidget(self):
+        if self.param_action.isChecked():
+            self.param_widget.loadFromLogFiles(self.filenames)
+
+    def openParameters(self, checked):
+        if checked:
+            self.param_widget.loadFromLogFiles(self.filenames)
+            self.param_widget.show()
+            self.param_widget.raise_()
+            self.param_widget.activateWindow()
+        else:
+            self.param_widget.hide()
     
     def openArm(self, checked):
         if self.arm is None:
@@ -1863,7 +1890,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                 self.log_widget.moveHereSignal.connect(self.moveHere)
             if self.read_thread.reader:
                 print("lines:", len(self.read_thread.reader.lines))
-                self.log_widget.setText(self.read_thread.reader.lines)
+                self.log_widget.setLines(self.read_thread.reader.lines)
             self.log_widget.show()
             self.updateLogView()
         else:
@@ -1985,6 +2012,10 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.json_action.setChecked(False)
         self.openJsonView(False)
 
+    def parameterViewerClosed(self, event):
+        self.param_action.setChecked(False)
+        self.param_widget.hide()
+
     def motorErrViewerClosed(self):
         self.motor_err_action.setChecked(False)
         self.viewMotorErr(False)
@@ -1997,6 +2028,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.log_widget.close()
         if self.sts_widget:
             self.sts_widget.close()
+        if self.param_widget:
+            self.param_widget.close()
         if self.motor_view_widget:
             self.motor_view_widget.close()
         for d in self.dataViews:

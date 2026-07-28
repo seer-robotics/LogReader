@@ -9,6 +9,7 @@ it stays unit-testable without a display.
 import os
 import math
 import ast
+from bisect import bisect_left
 import hashlib
 import json as js
 from pathlib import Path
@@ -40,6 +41,152 @@ def find_log_resource(log_file, resource_dir, filename):
         if os.path.exists(candidate):
             return candidate
     return None
+
+
+def find_goods_resource(model_file, goods_name):
+    """Find a goods definition below an ``objects`` directory near the model."""
+    if not model_file or not isinstance(goods_name, str):
+        return None
+
+    relative_name = goods_name.strip().replace('\\', '/')
+    drive, _ = os.path.splitdrive(relative_name)
+    parts = relative_name.split('/')
+    if (not relative_name or drive or relative_name.startswith('/')
+            or any(part in ('', '.', '..') for part in parts)):
+        return None
+
+    model_dir = os.path.dirname(os.path.abspath(model_file))
+    search_dirs = (model_dir, os.path.dirname(model_dir))
+    for directory in search_dirs:
+        objects_dir = os.path.abspath(os.path.join(directory, 'objects'))
+        candidate = os.path.abspath(os.path.join(objects_dir, *parts))
+        try:
+            inside_objects = os.path.commonpath([objects_dir, candidate]) == objects_dir
+        except ValueError:
+            inside_objects = False
+        if inside_objects and os.path.isfile(candidate):
+            return candidate
+    return None
+
+
+def read_goods_dimensions(goods_file):
+    """Return ``(length, width)`` from a JSON goods definition."""
+    with open(goods_file, 'r', encoding='UTF-8') as fid:
+        data = js.load(fid)
+
+    dimensions = {}
+
+    def visit(value):
+        if isinstance(value, dict):
+            key = value.get('key')
+            if key in ('length', 'width') and key not in dimensions:
+                raw_value = value.get('doubleValue', value.get('value'))
+                try:
+                    dimensions[key] = float(raw_value)
+                except (TypeError, ValueError):
+                    pass
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+
+    visit(data)
+    length = dimensions.get('length')
+    width = dimensions.get('width')
+    if length is None or width is None or length <= 0 or width <= 0:
+        raise ValueError('goods definition has no valid length and width')
+    return length, width
+
+
+def _time_delta_seconds(left, right):
+    delta = left - right
+    if hasattr(delta, 'total_seconds'):
+        return delta.total_seconds()
+    return float(delta)
+
+
+def interpolate_pose_at_time(times, xs, ys, thetas_deg, target_time):
+    """Interpolate an x/y/degree pose at an exact target time.
+
+    Angles use the shortest path across the -180/180 degree boundary. Values
+    outside the sample range use the nearest endpoint.
+    """
+    if target_time is None:
+        return None
+    count = min(len(times), len(xs), len(ys), len(thetas_deg))
+    if count == 0:
+        return None
+
+    def pose_at(index):
+        try:
+            pose = (float(xs[index]), float(ys[index]), float(thetas_deg[index]))
+        except (TypeError, ValueError):
+            return None
+        if not all(math.isfinite(value) for value in pose):
+            return None
+        return pose
+
+    right = bisect_left(times, target_time, 0, count)
+    if right < count and times[right] == target_time:
+        exact_pose = pose_at(right)
+        if exact_pose is not None:
+            return (exact_pose[0], exact_pose[1],
+                    normalize_theta_deg(exact_pose[2]))
+
+    left = right - 1
+    while left >= 0 and pose_at(left) is None:
+        left -= 1
+    while right < count and pose_at(right) is None:
+        right += 1
+
+    if left < 0 and right >= count:
+        return None
+    if left < 0:
+        pose = pose_at(right)
+        return pose[0], pose[1], normalize_theta_deg(pose[2])
+    if right >= count:
+        pose = pose_at(left)
+        return pose[0], pose[1], normalize_theta_deg(pose[2])
+
+    left_pose = pose_at(left)
+    right_pose = pose_at(right)
+    duration = _time_delta_seconds(times[right], times[left])
+    if duration <= 0:
+        return (left_pose[0], left_pose[1],
+                normalize_theta_deg(left_pose[2]))
+    ratio = _time_delta_seconds(target_time, times[left]) / duration
+    ratio = min(1.0, max(0.0, ratio))
+    x = left_pose[0] + (right_pose[0] - left_pose[0]) * ratio
+    y = left_pose[1] + (right_pose[1] - left_pose[1]) * ratio
+    theta_delta = normalize_theta_deg(right_pose[2] - left_pose[2])
+    theta = normalize_theta_deg(left_pose[2] + theta_delta * ratio)
+    return x, y, theta
+
+
+def nearest_value_at_time(times, values, target_time):
+    """Return the nearest non-None sampled value for ``target_time``."""
+    if target_time is None:
+        return None
+    count = min(len(times), len(values))
+    if count == 0:
+        return None
+
+    right = bisect_left(times, target_time, 0, count)
+    left = right - 1
+    while left >= 0 and values[left] is None:
+        left -= 1
+    while right < count and values[right] is None:
+        right += 1
+    if left < 0 and right >= count:
+        return None
+    if left < 0:
+        return values[right]
+    if right >= count:
+        return values[left]
+    left_delta = abs(_time_delta_seconds(target_time, times[left]))
+    right_delta = abs(_time_delta_seconds(times[right], target_time))
+    return values[left] if left_delta <= right_delta else values[right]
 
 
 def get_md5_pathlib(path: Path, block_size=65536):

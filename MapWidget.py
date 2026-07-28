@@ -34,7 +34,11 @@ import ast
 
 from maputils import (
     find_log_resource,
+    find_goods_resource,
     get_md5_pathlib,
+    interpolate_pose_at_time,
+    nearest_value_at_time,
+    read_goods_dimensions,
     GetGlobalPos,
     P2G,
     Pos2Base,
@@ -864,6 +868,10 @@ class MapWidget(QtWidgets.QWidget):
         self.robot_loc_data.set_zorder(21)
         self.robot_loc_data_c0 = lines.Line2D([],[], linestyle = '--', linewidth = 2, color='gray')
         self.robot_loc_data_c0.set_zorder(21)
+        self.goods_data = lines.Line2D([], [], linestyle='-', linewidth=2, color='tab:orange')
+        self.goods_data.set_zorder(22)
+        self.goods_loc_data = lines.Line2D([], [], linestyle='--', linewidth=2, color='darkorange')
+        self.goods_loc_data.set_zorder(22)
         self.obs_points = lines.Line2D([],[], linestyle = '', marker = '*', markersize = 8.0, color='k')
         self.obs_points.set_zorder(40)
         self.depthCamera_hole_points = lines.Line2D([],[], linestyle = '', marker = 'o', markersize = 4.0, color='black')
@@ -889,6 +897,8 @@ class MapWidget(QtWidgets.QWidget):
 
         self.robot_pos = [0., 0., 0.]
         self.robot_loc_pos = []
+        self._goods_dimensions_cache = {}
+        self._missing_goods_resources = set()
         self.laser_pos = dict()
         self.org_laser_pos = dict()
         self.laser_org_data = np.array([])
@@ -958,6 +968,8 @@ class MapWidget(QtWidgets.QWidget):
         self.ax.add_line(self.robot_data_c0)
         self.ax.add_line(self.robot_loc_data)
         self.ax.add_line(self.robot_loc_data_c0)
+        self.ax.add_line(self.goods_data)
+        self.ax.add_line(self.goods_loc_data)
         self.ax.add_collection(self.laser_data)
         self.ax.add_collection(self.laser_data_points)
         self.ax.add_line(self.obs_points)
@@ -1555,9 +1567,11 @@ class MapWidget(QtWidgets.QWidget):
 
         cur_check = self.sender()
         if cur_check is self.check_robot:
-            self.robot_data.set_visible(cur_check.isChecked())
-            self.cur_arrow.set_visible(cur_check.isChecked())
-            self.cur_arrow.set_visible(cur_check.isChecked())
+            for artist in (self.robot_data, self.robot_data_c0,
+                           self.robot_loc_data, self.robot_loc_data_c0,
+                           self.goods_data, self.goods_loc_data,
+                           self.cur_arrow):
+                artist.set_visible(cur_check.isChecked())
         elif cur_check is self.check_map:
             self.map_data.set_visible(cur_check.isChecked())
             self.rssi_map_data.set_visible(cur_check.isChecked())
@@ -2270,6 +2284,7 @@ class MapWidget(QtWidgets.QWidget):
         self.updateTranslateX(mid_line_t)
         loc = self.getLoc()
         if loc == None:
+            self._clearGoodsShape(self.goods_loc_data)
             return
         loc_idx = self.robot_log.key_loc_idx
         if self.useLoc.isChecked():
@@ -2284,6 +2299,7 @@ class MapWidget(QtWidgets.QWidget):
             loc_idx = (np.abs(loc_ts - mid_line_t)).argmin()            
         print(self.useLoc.isChecked(), loc_idx, loc['theta'][loc_idx])
         self.robot_loc_pos = [loc['x'][loc_idx],loc['y'][loc_idx],np.deg2rad(loc['theta'][loc_idx])]
+        self._updateGoodsShape(loc['t'][loc_idx], self.goods_loc_data)
         loc_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(loc['t'][loc_idx], 
             loc['x'][loc_idx], loc['y'][loc_idx], loc['theta'][loc_idx],
             int(loc['t'][loc_idx].timestamp() - mid_line_t.timestamp()))
@@ -2307,6 +2323,7 @@ class MapWidget(QtWidgets.QWidget):
         self.updateLaser()
 
     def updateLaser(self):
+        self._clearGoodsShape(self.goods_data)
         if self.robot_log is None:
             return
         if self.robot_log.mid_line_t is None:
@@ -2380,6 +2397,7 @@ class MapWidget(QtWidgets.QWidget):
             pos_idx = (np.abs(pos_ts - ts)).argmin()
             pos_idx = loc_min_ind + pos_idx
             self.robot_pos = [loc['x'][pos_idx], loc['y'][pos_idx], np.deg2rad(loc['theta'][pos_idx])]
+            goods_target_time = loc['t'][pos_idx]
             self.laser_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(loc['t'][pos_idx],
                 loc['x'][pos_idx], loc['y'][pos_idx], loc['theta'][pos_idx],
                 int(loc['timestamp'][pos_idx] - ts))
@@ -2389,10 +2407,12 @@ class MapWidget(QtWidgets.QWidget):
             self.robot_pos = [laser_data.loc_x(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_y(min_laser_channel)[0][laser_idx], 
                               laser_data.loc_yaw(min_laser_channel)[0][laser_idx]]
+            goods_target_time = laser_data.t(min_laser_channel)[laser_idx]
             self.laser_info = "t {}, x {:<4.3f}, y {:<4.3f}, a {:<4.3f}, dt {}".format(laser_data.t(min_laser_channel)[laser_idx],
                 self.robot_pos[0], self.robot_pos[1],  np.rad2deg(self.robot_pos[2]), 0)
             title = "激光时刻定位(实框):"
             self.timestamp_lable.setText(f"{title:<15}{self.laser_info}")
+        self._updateGoodsShape(goods_target_time, self.goods_data)
         self.laser_org_data = laser_points
         laser_rssi = rssi
         if len(laser_rssi) == len(self.laser_org_data.T) and len(laser_rssi) > 0:
@@ -2605,6 +2625,64 @@ class MapWidget(QtWidgets.QWidget):
             xdata = [-tail, -tail, head, head, -tail]
             ydata = [hw, -hw, -hw, hw, hw]
             return xdata, ydata
+
+    @staticmethod
+    def _makeGoodsShapeXY(length, width):
+        half_length = length / 2.0
+        half_width = width / 2.0
+        return ([-half_length, -half_length, half_length, half_length, -half_length],
+                [half_width, -half_width, -half_width, half_width, half_width])
+
+    @staticmethod
+    def _clearGoodsShape(artist):
+        artist.set_xdata([])
+        artist.set_ydata([])
+
+    def _updateGoodsShape(self, target_time, artist):
+        self._clearGoodsShape(artist)
+        if target_time is None or not self.model_name or self.robot_log is None:
+            return
+
+        read_thread = self.robot_log.read_thread
+        goods_names, goods_name_times = read_thread.getData('moveTask.goods_name')
+        goods_name = nearest_value_at_time(goods_name_times, goods_names, target_time)
+        if not isinstance(goods_name, str) or not goods_name.strip() \
+                or goods_name.strip().lower() == 'none':
+            return
+        goods_name = goods_name.strip()
+
+        goods_file = find_goods_resource(self.model_name, goods_name)
+        if goods_file is None:
+            missing_key = (self.model_name, goods_name)
+            if missing_key not in self._missing_goods_resources:
+                logging.warning('Cannot find goods definition: %s', goods_name)
+                self._missing_goods_resources.add(missing_key)
+            return
+
+        if goods_file not in self._goods_dimensions_cache:
+            try:
+                self._goods_dimensions_cache[goods_file] = read_goods_dimensions(goods_file)
+            except (OSError, ValueError, js.JSONDecodeError) as error:
+                logging.warning('Cannot read goods definition %s: %s', goods_file, error)
+                self._goods_dimensions_cache[goods_file] = None
+        dimensions = self._goods_dimensions_cache[goods_file]
+        if dimensions is None:
+            return
+
+        goods_x, goods_times = read_thread.getData('GoodsPos.x')
+        goods_y = read_thread.getData('GoodsPos.y')[0]
+        goods_theta = read_thread.getData('GoodsPos.theta')[0]
+        goods_pose = interpolate_pose_at_time(
+            goods_times, goods_x, goods_y, goods_theta, target_time)
+        if goods_pose is None:
+            return
+
+        xdata, ydata = self._makeGoodsShapeXY(*dimensions)
+        goods_shape = GetGlobalPos(
+            np.array([xdata, ydata]),
+            [goods_pose[0], goods_pose[1], np.deg2rad(goods_pose[2])])
+        artist.set_xdata(goods_shape[0])
+        artist.set_ydata(goods_shape[1])
 
     def _makeCrossShapeXY(self):
         """返回机器人朝向指示器的 (xdata, ydata)，坐标在机器人本体系中。"""

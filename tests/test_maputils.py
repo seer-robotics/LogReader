@@ -5,6 +5,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -12,6 +13,7 @@ import numpy as np
 
 import maputils
 from maputils import (
+    find_goods_resource,
     find_log_resource,
     GetGlobalPos,
     P2G,
@@ -19,6 +21,9 @@ from maputils import (
     convert2LaserPoints,
     normalize_theta,
     normalize_theta_deg,
+    interpolate_pose_at_time,
+    nearest_value_at_time,
+    read_goods_dimensions,
     _curve_points_to_xy,
     _curve_xy_values,
     _find_curve_xy,
@@ -185,6 +190,64 @@ class TestFindLogResource(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertTrue(os.path.exists(result))
         self.assertEqual(os.path.basename(result), "robot.model")
+
+
+class TestGoodsHelpers(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = self._tmp.name
+        self.model = os.path.join(self.root, 'models', 'robot.model')
+        self.goods = os.path.join(self.root, 'objects', 'shelf', 'sg3.shelf')
+        os.makedirs(os.path.dirname(self.model), exist_ok=True)
+        os.makedirs(os.path.dirname(self.goods), exist_ok=True)
+        with open(self.model, 'w') as fid:
+            fid.write('{}')
+        with open(self.goods, 'w') as fid:
+            fid.write('''{
+                "deviceParams": [{"arrayParam": {"params": [
+                    {"key": "width", "doubleValue": 1.25},
+                    {"key": "length", "doubleValue": 1.15}
+                ]}}]
+            }''')
+
+    def test_find_goods_beside_models_directory(self):
+        self.assertEqual(
+            find_goods_resource(self.model, 'shelf/sg3.shelf'), self.goods)
+
+    def test_find_goods_rejects_parent_traversal(self):
+        self.assertIsNone(find_goods_resource(self.model, '../robot.model'))
+
+    def test_read_goods_dimensions(self):
+        self.assertEqual(read_goods_dimensions(self.goods), (1.15, 1.25))
+
+    def test_interpolate_goods_pose_at_localization_time(self):
+        start = datetime(2026, 7, 22, 8, 52, 54)
+        times = [start, start + timedelta(seconds=2)]
+        pose = interpolate_pose_at_time(
+            times, [1.0, 3.0], [2.0, 6.0], [10.0, 30.0],
+            start + timedelta(seconds=1))
+        self.assertEqual(pose, (2.0, 4.0, 20.0))
+
+    def test_interpolate_angle_across_180_degrees(self):
+        start = datetime(2026, 7, 22, 8, 52, 54)
+        pose = interpolate_pose_at_time(
+            [start, start + timedelta(seconds=2)],
+            [0.0, 0.0], [0.0, 0.0], [170.0, -170.0],
+            start + timedelta(seconds=1))
+        self.assertAlmostEqual(abs(pose[2]), 180.0)
+
+    def test_pose_outside_range_uses_nearest_endpoint(self):
+        start = datetime(2026, 7, 22, 8, 52, 54)
+        pose = interpolate_pose_at_time(
+            [start], [7.1], [2.2], [178.0], start - timedelta(seconds=1))
+        self.assertEqual(pose, (7.1, 2.2, 178.0))
+
+    def test_nearest_goods_name_supports_start_of_log(self):
+        start = datetime(2026, 7, 22, 8, 52, 54)
+        value = nearest_value_at_time(
+            [start + timedelta(milliseconds=893)], ['shelf/sg3.shelf'], start)
+        self.assertEqual(value, 'shelf/sg3.shelf')
 
 
 class TestCurveHelpers(unittest.TestCase):

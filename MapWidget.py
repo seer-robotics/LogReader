@@ -28,6 +28,7 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 from PIL import Image
 
+import matplotlib.patheffects as path_effects
 import hashlib
 import ast
 
@@ -830,6 +831,7 @@ class CalcConfidence(QtWidgets.QWidget):
 class MapWidget(QtWidgets.QWidget):
     dropped = pyqtSignal('PyQt_PyObject')
     hiddened = pyqtSignal('PyQt_PyObject')
+    LANDMARK_HOVER_RADIUS_PX = 24
     def __init__(self, loggui):
         super(QtWidgets.QWidget, self).__init__()
         self.setWindowTitle('MapViewer')
@@ -943,6 +945,24 @@ class MapWidget(QtWidgets.QWidget):
         # Connect the figure to necessary events for updates
         # Ensure that self.fig is already created at this point
         self.fig = self.static_canvas.figure
+        # Debounced landmark-label decluttering on zoom/pan
+        self._label_refresh_timer = QtCore.QTimer(self)
+        self._label_refresh_timer.setSingleShot(True)
+        self._label_refresh_timer.setInterval(150)
+        self._label_refresh_timer.timeout.connect(
+            self._update_landmark_label_visibility)
+        self.ax.callbacks.connect('xlim_changed', self._on_map_view_changed)
+        self.ax.callbacks.connect('ylim_changed', self._on_map_view_changed)
+        # Landmark hover highlight state
+        self._landmark_names = []
+        self._landmark_xy = np.empty((0, 2))
+        self._landmark_label_by_name = {}
+        self._landmark_info = {}
+        self._hovered_landmark = None
+        self._hover_label_backup = None
+        self._hover_annotation = None
+        self.static_canvas.mpl_connect(
+            'motion_notify_event', self._on_mouse_hover)
         # if hasattr(self, 'fig') and self.fig is not None:
         #      self.static_canvas.mpl_connect('draw_event', self._on_draw_event)
              # More specific callbacks could be xlim_changed/ylim_changed on ax.
@@ -1911,6 +1931,9 @@ class MapWidget(QtWidgets.QWidget):
                 # Clear previous text artists
                 if hasattr(self, 'map_text_artists'):
                     self.map_text_artists = [] # Clear the list for new artists
+                self._hovered_landmark = None
+                self._hover_label_backup = None
+                self._hover_annotation = None
 
                 # Plot text using ax.text
                 for x, y, name in text_data_for_loop:
@@ -1920,13 +1943,27 @@ class MapWidget(QtWidgets.QWidget):
                         x + text_offset, y,  # Offset the text horizontally
                         name,
                         color='k',           # Text color
-                        fontsize='medium',    # Adjust font size as needed (e.g., 8, 10, 'x-small', 'small', 'medium')
+                        fontsize=11,          # Larger font so names stay readable
                         fontweight='heavy',
                         ha='left',           # Horizontal alignment ('left', 'center', 'right')
                         va='center',         # Vertical alignment ('top', 'center', 'bottom', 'baseline')
                         zorder=20            # Ensure text is above points/lines
                     )
+                    # White halo keeps names readable over dense map points
+                    text_artist.set_path_effects([
+                        path_effects.Stroke(linewidth=3, foreground='white'),
+                        path_effects.Normal(),
+                    ])
                     self.map_text_artists.append(text_artist) # Keep reference for removal
+                self._label_refresh_timer.start()
+                self._landmark_names = [item[2] for item in text_data_for_loop]
+                self._landmark_xy = np.array(
+                    [(item[0], item[1]) for item in text_data_for_loop])
+                self._landmark_label_by_name = dict(
+                    zip(self._landmark_names, self.map_text_artists))
+                self._landmark_info = {
+                    pt[-1]: (pt[0], pt[1], pt[2])
+                    for pt in self.read_map.points.values()}
 
             print("lms cost", time.time()-tp)
             tp = time.time()
@@ -2729,6 +2766,106 @@ class MapWidget(QtWidgets.QWidget):
     #     This is a more general event, useful if multiple elements need re-evaluation.
     #     """
     #     self._update_scatter_sizes_on_zoom() # Call the size update function
+
+    def _on_mouse_hover(self, event):
+        """Highlight the landmark under the cursor and show its info."""
+        if self.toolbar.isActive():
+            return
+        name = None
+        if (event.inaxes is self.ax and event.xdata is not None
+                and len(self._landmark_names) > 0):
+            screen = self.ax.transData.transform(self._landmark_xy)
+            d2 = ((screen[:, 0] - event.x) ** 2
+                  + (screen[:, 1] - event.y) ** 2)
+            idx = int(np.argmin(d2))
+            if d2[idx] <= self.LANDMARK_HOVER_RADIUS_PX ** 2:
+                name = self._landmark_names[idx]
+        if name != self._hovered_landmark:
+            self._clear_landmark_hover()
+            if name is not None:
+                self._set_landmark_hover(name)
+
+    def _set_landmark_hover(self, name):
+        artist = self._landmark_label_by_name.get(name)
+        info = self._landmark_info.get(name)
+        if artist is None or info is None:
+            return
+        self._hovered_landmark = name
+        self._hover_label_backup = (
+            artist.get_fontsize(), artist.get_color(), artist.get_visible())
+        artist.set_visible(True)
+        artist.set_fontsize(15)
+        artist.set_color('tab:red')
+        artist.set_zorder(41)
+        x, y, theta = info
+        lines = [name, 'x: {:.3f}  y: {:.3f}'.format(x, y)]
+        if theta is not None:
+            lines.append('dir: {:.1f} deg'.format(np.rad2deg(theta)))
+        self._hover_annotation = self.ax.annotate(
+            '\n'.join(lines), xy=(x, y), xytext=(14, 14),
+            textcoords='offset points', fontsize=10, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.4', fc='lightyellow',
+                      ec='tab:red', lw=1.2, alpha=0.95),
+            arrowprops=dict(arrowstyle='-', color='tab:red', lw=1.0),
+            zorder=42)
+        self.static_canvas.draw_idle()
+
+    def _clear_landmark_hover(self):
+        cleared = False
+        if self._hovered_landmark is not None:
+            artist = self._landmark_label_by_name.get(self._hovered_landmark)
+            if artist is not None and self._hover_label_backup is not None:
+                fontsize, color, visible = self._hover_label_backup
+                artist.set_fontsize(fontsize)
+                artist.set_color(color)
+                artist.set_visible(visible)
+                artist.set_zorder(20)
+            self._hovered_landmark = None
+            self._hover_label_backup = None
+            cleared = True
+        if self._hover_annotation is not None:
+            try:
+                self._hover_annotation.remove()
+            except (ValueError, AttributeError):
+                pass
+            self._hover_annotation = None
+            cleared = True
+        if cleared:
+            self.static_canvas.draw_idle()
+
+    def _on_map_view_changed(self, _axes):
+        # Debounce zoom/pan driven landmark label decluttering.
+        self._label_refresh_timer.start()
+
+    def _update_landmark_label_visibility(self):
+        """Show only landmark labels that do not overlap on screen."""
+        artists = self.map_text_artists
+        if not artists:
+            return
+        canvas = self.static_canvas
+        canvas.draw()
+        renderer = canvas.get_renderer()
+        xmin, xmax = self.ax.get_xlim()
+        ymin, ymax = self.ax.get_ylim()
+        accepted_boxes = []
+        for artist in artists:
+            x, y = artist.get_position()
+            if not (xmin <= x <= xmax and ymin <= y <= ymax):
+                artist.set_visible(False)
+                continue
+            artist.set_visible(True)
+            bbox = artist.get_window_extent(renderer)
+            for accepted in accepted_boxes:
+                if bbox.overlaps(accepted):
+                    artist.set_visible(False)
+                    break
+            else:
+                accepted_boxes.append(bbox)
+        if self._hovered_landmark is not None:
+            hovered = self._landmark_label_by_name.get(self._hovered_landmark)
+            if hovered is not None:
+                hovered.set_visible(True)
+        canvas.draw_idle()
 
     def _calculate_dynamic_s_sizes(self, data_radius_pr, num_points):
         """

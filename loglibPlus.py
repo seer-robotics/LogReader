@@ -9,6 +9,13 @@ from multiprocessing import Pool
 import json
 import matplotlib
 import matplotlib.dates
+
+
+_LOG_TIMESTAMP_PATTERN = re.compile(
+    r'^\[((?:\d{6} \d{6}\.\d{1,6})|'
+    r'(?:\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{1,6}))\]')
+
+
 def date2num(d):
     return matplotlib.dates.date2num(d)
 
@@ -55,10 +62,42 @@ class _ZstdLogReader:
 
 def rbktimetodate(rbktime):
     """ 将rbk的时间戳转化为datatime """
-    if len(rbktime) == 17:
+    if len(rbktime) >= 7 and rbktime[6] == ' ':
         return datetime.strptime(rbktime, '%y%m%d %H%M%S.%f')
     else:
         return datetime.strptime(rbktime, '%Y-%m-%d %H:%M:%S.%f')
+
+
+def log_line_timestamp(line):
+    """Return the timestamp text at the beginning of a log line."""
+    match = _LOG_TIMESTAMP_PATTERN.match(line)
+    return match.group(1) if match else None
+
+
+def _timestamp_sort_key(timestamp):
+    """Normalize supported timestamp formats into a sortable string."""
+    if timestamp[6] == ' ':
+        short_year = int(timestamp[:2])
+        century = '20' if short_year <= 68 else '19'
+        return (century + timestamp[:6] + timestamp[7:13]
+                + timestamp[14:].ljust(6, '0'))
+    return (timestamp[:4] + timestamp[5:7] + timestamp[8:10]
+            + timestamp[11:13] + timestamp[14:16] + timestamp[17:19]
+            + timestamp[20:].ljust(6, '0'))
+
+
+def sort_log_lines_by_timestamp(lines):
+    """Stable-sort log lines by timestamp while retaining continuation lines."""
+    decorated_lines = []
+    last_timestamp_key = ''
+    for line in lines:
+        timestamp = log_line_timestamp(line)
+        if timestamp is not None:
+            last_timestamp_key = _timestamp_sort_key(timestamp)
+        decorated_lines.append((last_timestamp_key, line))
+
+    decorated_lines.sort(key=lambda item: item[0])
+    return [line for _timestamp, line in decorated_lines]
 
 def findrange(ts, t1, t2):
     """ 在ts中寻找大于t1小于t2对应的下标 """
@@ -246,17 +285,18 @@ class ReadLog:
                         self._readData(f, file)
                 except:
                     continue
+        self.lines = sort_log_lines_by_timestamp(self.lines)
         self.t_and_num = []
-        last_t_str = ''
+        last_t_str = None
         for ind, line in enumerate(self.lines):
-            if len(line) > 18 and line[0] == '[' and line[18] ==']':
-                if last_t_str != line[1:17]:
-                    last_t_str = line[1:17]
-                    try:
-                        t = rbktimetodate(line[1:18])
-                        self.t_and_num.append([t, ind])
-                    except:
-                        print("time error:", line)
+            timestamp = log_line_timestamp(line)
+            if timestamp is not None and last_t_str != timestamp:
+                last_t_str = timestamp
+                try:
+                    t = rbktimetodate(timestamp)
+                    self.t_and_num.append([t, ind])
+                except ValueError:
+                    print("time error:", line)
         self.t_and_num.sort(key = lambda y:y[0])
         if len(self.t_and_num) > 0:
             self.tmin = self.t_and_num[0][0]
@@ -462,6 +502,7 @@ class Data:
         if not self.parsed_flag:
             for ind, line in enumerate(lines):
                 self.parse(line, ind)
+            self.parsed_flag = True
                 
     def __getitem__(self,k):
         return self.data[k]
@@ -1251,4 +1292,4 @@ class RobotStatus:
         for i in range(len(self.data)):
             self.data[i].extend(other.data[i])
         for i in range(len(self.time)):
-            self.time[i].extend(other.time[i])    
+            self.time[i].extend(other.time[i])

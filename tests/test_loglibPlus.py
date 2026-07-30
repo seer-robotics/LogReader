@@ -13,7 +13,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # here explicitly to mirror that environment.
 import matplotlib.dates  # noqa: F401
 
-from loglibPlus import rbktimetodate, date2num, num2date, open_log_file, ReadLog
+from loglibPlus import (ReadLog, date2num, log_line_timestamp, num2date,
+                        open_log_file, rbktimetodate,
+                        sort_log_lines_by_timestamp)
 
 REAL_LOG = os.path.join(
     os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
@@ -50,6 +52,55 @@ class TestOpenLogFile(unittest.TestCase):
         with open_log_file(path, "rb") as f:
             data = f.read()
         self.assertEqual(data, content)
+
+
+class TestLogLineSorting(unittest.TestCase):
+    def test_stable_timestamp_sort_keeps_continuation_with_previous_line(self):
+        lines = [
+            '[260728 154405.500][1][R][d] later\n',
+            'continuation\n',
+            '[260728 154100.468][2][MF][d] target\n',
+            '[260728 154100.468][3][MF][d] same timestamp\n',
+        ]
+
+        result = sort_log_lines_by_timestamp(lines)
+
+        self.assertEqual([
+            '[260728 154100.468][2][MF][d] target\n',
+            '[260728 154100.468][3][MF][d] same timestamp\n',
+            '[260728 154405.500][1][R][d] later\n',
+            'continuation\n',
+        ], result)
+
+    def test_read_log_merges_overlapping_files_by_line_timestamp(self):
+        contents = (
+            ('[260728 154405.500][1][R][d] later file start\n'
+             '[260728 154448.385][2][R][d] later file end\n'),
+            ('[260728 152829.456][3][R][d] early file start\n'
+             '[260728 154100.468][4][MF][d] sectionParams\n'
+             '[260728 154600.048][5][R][d] early file end\n'),
+        )
+        paths = []
+        for content in contents:
+            with tempfile.NamedTemporaryFile(
+                    suffix='.log', delete=False) as stream:
+                stream.write(content.encode('utf-8'))
+                paths.append(stream.name)
+                self.addCleanup(os.remove, stream.name)
+
+        reader = ReadLog(paths)
+        reader.parse()
+
+        timestamps = [log_line_timestamp(line) for line in reader.lines]
+        self.assertEqual([
+            '260728 152829.456',
+            '260728 154100.468',
+            '260728 154405.500',
+            '260728 154448.385',
+            '260728 154600.048',
+        ], timestamps)
+        self.assertEqual(
+            list(range(5)), [item[1] for item in reader.t_and_num])
 
 
 @unittest.skipUnless(os.path.exists(REAL_LOG), "real robot log not available")

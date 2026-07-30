@@ -13,6 +13,7 @@
   * 使用方式：直接运行即可
   * 支持两条曲线比较
   * 支持时间窗口选取
+  * 日志加载完成后，可通过“Tools -> 添加日志解释规则...”粘贴或载入新的解释 JSON。规则会追加到 `log_config.json`，并立即出现在曲线数据下拉框中，无需重新加载日志。
   * 支持定位(mcl), 里程(odo), 惯性传感器(imu), 下发速度(send), 获取速度(get)
   * Evaluate可以输入的参数:
     * 定位: mcl.x, mcl.y, mcl.theta, mcl.confidence

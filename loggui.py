@@ -8,6 +8,7 @@ from matplotlib.backends.backend_qt5agg import (
     FigureCanvas, NavigationToolbar2QT as NavigationToolbar)
 from PyQt5 import QtCore, QtWidgets,QtGui
 from matplotlib.figure import Figure
+from matplotlib.lines import Line2D
 from matplotlib import pyplot as plt
 from datetime import datetime
 from datetime import timedelta
@@ -20,6 +21,7 @@ from loglibPlus import date2num, num2date
 from MapWidget import MapWidget, Readmap, find_log_resource
 from ParamWidget import ParameterWidget
 from LogViewer import LogViewer
+from EventViewer import EventViewer
 from JsonView import JsonView, DataView
 from MyToolBar import MyToolBar, RulerShapeMap
 import logging
@@ -31,8 +33,35 @@ from PyQt5.QtCore import pyqtSignal
 import MotorRead as mr
 from getMotorErr import MotorErrViewer 
 from TargetPrecision import TargetPrecision
+from eventutils import EventIndex, event_line_data
+from logconfig import LogConfigError, parse_log_config_text
 # from ArmPlot import Arm
 import math
+
+
+EVENT_LINE_STYLES = {
+    'taskstart': {
+        'label': 'task start', 'linestyle': '-', 'color': '#1976d2',
+        'lane': (0.04, 0.065), 'alpha': 0.8, 'linewidth': 1.0},
+    'taskfinish': {
+        'label': 'task finish', 'linestyle': '-', 'color': '#42a5f5',
+        'lane': (0.075, 0.10), 'alpha': 0.8, 'linewidth': 1.0},
+    'service': {
+        'label': 'service', 'linestyle': '-', 'color': '#607d8b',
+        'lane': (0.01, 0.03), 'alpha': 0.35, 'linewidth': 0.8},
+    'fatal': {
+        'label': 'fatal', 'linestyle': '-', 'color': '#ad1457',
+        'lane': (0.215, 0.245), 'alpha': 0.95, 'linewidth': 1.5},
+    'error': {
+        'label': 'error', 'linestyle': '-', 'color': '#d32f2f',
+        'lane': (0.18, 0.205), 'alpha': 0.9, 'linewidth': 1.3},
+    'warning': {
+        'label': 'warning', 'linestyle': '-', 'color': '#f9a825',
+        'lane': (0.145, 0.17), 'alpha': 0.9, 'linewidth': 1.2},
+    'notice': {
+        'label': 'notice', 'linestyle': '-', 'color': '#2e7d32',
+        'lane': (0.11, 0.135), 'alpha': 0.8, 'linewidth': 1.0},
+}
 
 class MFTimeCostViewer(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
@@ -292,6 +321,101 @@ class DataSelection(QtWidgets.QWidget):
         except:
             pass
 
+
+class LogConfigDialog(QtWidgets.QDialog):
+    def __init__(self, config_path, parent=None):
+        super().__init__(parent)
+        self._entries = None
+        self.setWindowTitle('添加日志解释规则')
+        self.resize(720, 560)
+
+        layout = QtWidgets.QVBoxLayout(self)
+        form = QtWidgets.QFormLayout()
+        self.path_edit = QtWidgets.QLineEdit(os.path.abspath(config_path))
+        self.path_edit.setReadOnly(True)
+        self.name_edit = QtWidgets.QLineEdit()
+        self.name_edit.setPlaceholderText('未填写时从 type 或 textKey 推断')
+        form.addRow('目标文件', self.path_edit)
+        form.addRow('配置名称', self.name_edit)
+        layout.addLayout(form)
+
+        self.json_edit = QtWidgets.QPlainTextEdit()
+        self.json_edit.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self.json_edit.setFont(QtGui.QFontDatabase.systemFont(
+            QtGui.QFontDatabase.FixedFont))
+        self.json_edit.setPlainText(json.dumps({
+            'type': 'NewLogType',
+            'content': [{
+                'name': 'value',
+                'type': 'double',
+                'description': 'NewLogType.value',
+                'unit': '',
+            }],
+        }, ensure_ascii=False, indent=2))
+        layout.addWidget(self.json_edit, 1)
+
+        tool_layout = QtWidgets.QHBoxLayout()
+        self.load_button = QtWidgets.QPushButton('从文件载入')
+        self.load_button.setIcon(self.style().standardIcon(
+            QtWidgets.QStyle.SP_DialogOpenButton))
+        self.load_button.clicked.connect(self.loadJsonFile)
+        self.format_button = QtWidgets.QPushButton('格式化 JSON')
+        self.format_button.clicked.connect(self.formatJson)
+        tool_layout.addWidget(self.load_button)
+        tool_layout.addWidget(self.format_button)
+        tool_layout.addStretch(1)
+        layout.addLayout(tool_layout)
+
+        self.button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.Save
+            | QtWidgets.QDialogButtonBox.Cancel)
+        self.button_box.button(
+            QtWidgets.QDialogButtonBox.Save).setText('保存并添加')
+        self.button_box.button(
+            QtWidgets.QDialogButtonBox.Cancel).setText('取消')
+        self.button_box.accepted.connect(self.validateAndAccept)
+        self.button_box.rejected.connect(self.reject)
+        layout.addWidget(self.button_box)
+
+    def entries(self):
+        return self._entries
+
+    def _showJsonError(self, message):
+        QtWidgets.QMessageBox.warning(self, '日志解释规则无效', message)
+
+    def loadJsonFile(self):
+        path, _selected_filter = QtWidgets.QFileDialog.getOpenFileName(
+            self, '载入日志解释 JSON', '',
+            'JSON Files (*.json);;All Files (*)')
+        if not path:
+            return
+        try:
+            with open(path, encoding='utf-8') as stream:
+                self.json_edit.setPlainText(stream.read())
+        except (OSError, UnicodeError) as exc:
+            self._showJsonError(str(exc))
+
+    def formatJson(self):
+        try:
+            payload = json.loads(self.json_edit.toPlainText())
+        except json.JSONDecodeError as exc:
+            self._showJsonError(
+                '第 {} 行，第 {} 列：{}'.format(
+                    exc.lineno, exc.colno, exc.msg))
+            return
+        self.json_edit.setPlainText(json.dumps(
+            payload, ensure_ascii=False, indent=2))
+
+    def validateAndAccept(self):
+        try:
+            self._entries = parse_log_config_text(
+                self.json_edit.toPlainText(), self.name_edit.text())
+        except LogConfigError as exc:
+            self._showJsonError(str(exc))
+            return
+        self.accept()
+
+
 class SelectEnum(Enum):
     NoSelect = 0
     Left = 1
@@ -429,7 +553,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.finishReadFlag = False
         self.filenames = []
-        self.lines_dict = {"fatal":[],"error":[],"warning":[],"notice":[], "taskstart":[], "taskfinish":[], "service":[]} 
+        self.event_artists = {key: {} for key in EVENT_LINE_STYLES}
+        self.event_indexes = {key: EventIndex() for key in EVENT_LINE_STYLES}
+        self.event_plot_data = {
+            key: event_line_data([]) for key in EVENT_LINE_STYLES}
+        self._updating_event_checks = False
         self.setWindowTitle('Log分析器')
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
@@ -440,6 +568,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.select_regions = []
         self.mouse_pressed = False
         self.log_widget = None
+        self.event_widget = None
         self.sts_widget = None
         self.motor_view_widget = None
         self.dataViews = [] #显示特定数据框
@@ -502,6 +631,13 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.view_action.triggered.connect(self.openViewer)
         self.tools_menu.addAction(self.view_action)
 
+        self.event_action = QtWidgets.QAction(
+            '&Open Events', self.tools_menu, checkable=True)
+        self.event_action.setShortcut(
+            QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_E)
+        self.event_action.triggered.connect(self.openEventViewer)
+        self.tools_menu.addAction(self.event_action)
+
         self.json_action = QtWidgets.QAction('&Open Status', self.tools_menu, checkable = True)
         self.json_action.setShortcut(QtCore.Qt.CTRL + QtCore.Qt.Key_J)
         self.json_action.triggered.connect(self.openJsonView)
@@ -523,6 +659,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.data_action.setChecked(True)
         self.data_action.triggered.connect(self.openDataView)
         self.tools_menu.addAction(self.data_action)
+
+        self.add_log_config_action = QtWidgets.QAction(
+            '添加日志解释规则...', self.tools_menu)
+        self.add_log_config_action.setShortcut(
+            QtCore.Qt.CTRL + QtCore.Qt.SHIFT + QtCore.Qt.Key_C)
+        self.add_log_config_action.setEnabled(False)
+        self.add_log_config_action.triggered.connect(
+            self.openLogConfigDialog)
+        self.tools_menu.addAction(self.add_log_config_action)
 
         self.motor_follow_action = QtWidgets.QAction('&View Motor Follow Cure', self.tools_menu, checkable = True)
         self.motor_follow_action.setShortcut(QtCore.Qt.CTRL + QtCore.Qt.Key_K)
@@ -634,6 +779,15 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.check_tstart = QtWidgets.QCheckBox('TASK START',self)
         self.check_tfinish = QtWidgets.QCheckBox('TASK FINISHED',self)
         self.check_service = QtWidgets.QCheckBox('SERVICE',self)
+        self.event_checkboxes = {
+            'fatal': self.check_fatal,
+            'error': self.check_err,
+            'warning': self.check_war,
+            'notice': self.check_notice,
+            'taskstart': self.check_tstart,
+            'taskfinish': self.check_tfinish,
+            'service': self.check_service,
+        }
         self.hbox.addWidget(self.check_all)
         self.hbox.addWidget(self.check_fatal)
         self.hbox.addWidget(self.check_err)
@@ -691,82 +845,46 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         font_width = 100.0
         self.static_canvas.figure.subplots_adjust(left = (font_width/(w*1.0)), right = 0.99, bottom = 0.05, top = 0.95, hspace = 0.1)
 
-    def get_content(self, mouse_time):
-        content = ""
-        dt_min = 1e10
-        if self.read_thread.fatal.t() and self.check_fatal.isChecked():
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
-            dt_min = min(vdt)
-        if self.read_thread.err.t() and self.check_err.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
-        if self.read_thread.war.t() and self.check_war.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
-        if self.read_thread.notice.t() and self.check_notice.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
-        if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
-        if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
-        if self.read_thread.service.t() and self.check_service.isChecked(): 
-            vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
-            tmp_dt = min(vdt)
-            if tmp_dt < dt_min:
-                dt_min = tmp_dt
+    def _event_sources(self):
+        return {
+            'fatal': self.read_thread.fatal,
+            'error': self.read_thread.err,
+            'warning': self.read_thread.war,
+            'notice': self.read_thread.notice,
+            'taskstart': self.read_thread.taskstart,
+            'taskfinish': self.read_thread.taskfinish,
+            'service': self.read_thread.service,
+        }
 
-        if dt_min < 10:
-            contents = []
-            if self.read_thread.fatal.t() and self.check_fatal.isChecked():
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.fatal.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.fatal.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.err.t() and self.check_err.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.err.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.err.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.war.t() and self.check_war.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.war.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.war.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.notice.t() and self.check_notice.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.notice.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.notice.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.taskstart.t() and self.check_tstart.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskstart.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.taskstart.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.taskfinish.t() and self.check_tfinish.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.taskfinish.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.taskfinish.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            if self.read_thread.service.t() and self.check_service.isChecked(): 
-                vdt = [abs((tmpt - mouse_time).total_seconds()) for tmpt in self.read_thread.service.t()]
-                tmp_dt = min(vdt)
-                if abs(tmp_dt - dt_min) < 2e-2:
-                    contents = contents + [self.read_thread.service.content()[0][i] for i,val in enumerate(vdt) if abs(val - dt_min) < 1e-3]
-            content = '\n'.join(contents)
-        return content
+    def _rebuild_event_indexes(self):
+        self.event_indexes = {}
+        self.event_plot_data = {}
+        for key, source in self._event_sources().items():
+            index = EventIndex(source.t(), source.content()[0])
+            self.event_indexes[key] = index
+            lane_bottom, lane_top = EVENT_LINE_STYLES[key]['lane']
+            self.event_plot_data[key] = event_line_data(
+                index.times, lane_bottom, lane_top)
+
+    def get_content(self, mouse_time):
+        nearest = []
+        for key, index in self.event_indexes.items():
+            checkbox = self.event_checkboxes.get(key)
+            if checkbox is not None and checkbox.isChecked() and len(index):
+                nearest.append((index.nearest_distance(mouse_time), index))
+
+        if not nearest:
+            return ''
+        minimum_distance = min(distance for distance, _index in nearest)
+        if minimum_distance >= 10:
+            return ''
+
+        contents = []
+        for distance, index in nearest:
+            if abs(distance - minimum_distance) < 2e-2:
+                contents.extend(index.contents_at_distance(
+                    mouse_time, minimum_distance))
+        return '\n'.join(contents)
 
     def updateMap(self):
         self.updateMapSelectLine()
@@ -1355,6 +1473,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_widget.hide()
             self._reloadParameterWidget()
             self.finishReadFlag = False
+            self.add_log_config_action.setEnabled(False)
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
             self.read_thread.filenames = self.filenames
@@ -1384,6 +1503,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.map_widget.hide()
         self._reloadParameterWidget()
         self.finishReadFlag = False
+        self.add_log_config_action.setEnabled(False)
         self.read_thread = ReadThread()
         self.read_thread.signal.connect(self.readFinished)
         self.read_thread.filenames = self.filenames
@@ -1433,6 +1553,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_widget.hide()
             self._reloadParameterWidget()
             self.finishReadFlag = False
+            self.add_log_config_action.setEnabled(False)
             self.read_thread = ReadThread()
             self.read_thread.signal.connect(self.readFinished)
             self.read_thread.filenames = self.filenames
@@ -1451,36 +1572,12 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.log_info.append(tmps)
         logging.debug('read Finished')
         self.log_info.append('Finished')
-        max_line = 100
-        if len(self.read_thread.fatal.t()) > max_line:
-            logging.warning("FATALs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
-            self.log_info.append("FATALs are too much to be ploted. Max Number is "+ str(max_line) + ". Current Number is " + str(len(self.read_thread.fatal.t())))
-            # self.read_thread.fatal = FatalLine()
-        if len(self.read_thread.err.t()) > max_line:
-            logging.warning("ERRORs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.err.t())))
-            self.log_info.append("ERRORs are too much to be ploted. Max Number is " + str(max_line)+". Current Number is "+str(len(self.read_thread.err.t())))
-            # self.read_thread.err = ErrorLine()
-        if len(self.read_thread.war.t()) > max_line:
-            logging.warning("WARNINGs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.war.t())))
-            self.log_info.append("WARNINGs are too much to be ploted. Max Number is " + str(max_line) +  ". Current Number is " + str(len(self.read_thread.war.t())))
-            # self.read_thread.war = WarningLine()
-        if len(self.read_thread.notice.t()) > max_line:
-            logging.warning("NOTICEs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.notice.t())))
-            self.log_info.append("NOTICEs are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.notice.t())))
-            # self.read_thread.notice = NoticeLine()
-        if len(self.read_thread.taskstart.t()) > max_line:
-            logging.warning("TASKSTART are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskstart.t())))
-            self.log_info.append("TASKSTART are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskstart.t())))
-            # self.read_thread.taskstart = TaskStart()
-        if len(self.read_thread.taskfinish.t()) > max_line:
-            logging.warning("TASKFINISH are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskfinish.t())))
-            self.log_info.append("TASKFINISH are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.taskfinish.t())))
-            # self.read_thread.taskfinish = TaskFinish()
-        if len(self.read_thread.service.t()) > max_line:
-            logging.warning("SERVICE are too much to be ploted. Max Number is " + str(max_line) +". Current Number is " + str(len(self.read_thread.service.t())))
-            self.log_info.append("SERVICE are too much to be ploted. Max Number is " + str(max_line) + ". Current Number is " + str(len(self.read_thread.service.t())))
-            # self.read_thread.service = Service()
+        self._rebuild_event_indexes()
+        if self.event_widget is not None:
+            self.event_widget.setEvents(self._event_sources())
         self.finishReadFlag = True
+        self.add_log_config_action.setEnabled(
+            self.read_thread.reader is not None)
         self.setWindowTitle('Log分析器: {0}'.format([f.split('/')[-1] for f in self.filenames]))
         if self.read_thread.filenames:
             #画图 mcl.t, mcl.x
@@ -1510,6 +1607,45 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.openJsonView(self.json_action.isChecked())
             self.openDataView(self.data_action.isChecked())
             self.updateMap()
+
+    def _refreshDynamicConfigViews(self, new_series):
+        for xy in self.xys:
+            xy.y_combo.addItems(new_series)
+
+        self.dataSelection.y_combo.addItems(new_series)
+        group_names = list(self.read_thread.name2orgKey.keys())
+        for data_view in self.dataViews:
+            combo = data_view.selection.y_combo
+            current_text = combo.currentText()
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItems(group_names)
+            current_index = combo.findText(current_text)
+            if current_index >= 0:
+                combo.setCurrentIndex(current_index)
+            combo.blockSignals(False)
+
+    def openLogConfigDialog(self):
+        dialog = LogConfigDialog(self.read_thread.log_config, self)
+        if dialog.exec_() != QtWidgets.QDialog.Accepted:
+            return
+        try:
+            new_series = self.read_thread.add_log_configs(dialog.entries())
+        except Exception as exc:
+            logging.exception('Failed to add log config')
+            QtWidgets.QMessageBox.critical(
+                self, '添加日志解释规则失败', str(exc))
+            return
+
+        self._refreshDynamicConfigViews(new_series)
+        message = 'Added {} config(s), {} curve field(s): {}'.format(
+            len(dialog.entries()), len(new_series),
+            ', '.join(dialog.entries().keys()))
+        self.log_info.append(message)
+        QtWidgets.QMessageBox.information(
+            self, '日志解释规则已添加',
+            '已添加 {} 条规则、{} 个曲线字段。'.format(
+                len(dialog.entries()), len(new_series)))
 
 
     def fileQuit(self):
@@ -1570,6 +1706,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         xmin, xmax = self.axs[0].get_xlim()
         for ax in self.axs:
             self.static_canvas.figure.delaxes(ax)
+        self.event_artists = {key: {} for key in EVENT_LINE_STYLES}
 
         # self.static_canvas.figure.subplots_adjust(left = 0.2/new_fig_num, right = 0.99, bottom = 0.05, top = 0.99, hspace = 0.1)
         self.static_canvas.figure.set_figheight(new_fig_num*self.fig_height)
@@ -1665,123 +1802,64 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                         art_list[0].append(art)
                         art_list[1].append(art.get_url())
                 ax.legend(art_list[0], art_list[1], loc='upper right')
-        self.static_canvas.figure.canvas.draw()
+        self.static_canvas.figure.canvas.draw_idle()
 
-    def drawFEWN(self,ax):
-        """ 绘制 Fatal, Error, Warning在坐标轴上"""
-        fl, el, wl,nl = None, None, None, None
-        self.lines_dict = dict()
-        line_num = 0
-        legend_info = []
-        fnum, ernum, wnum, nnum = [], [], [], [] 
-        tsnum, tfnum, tsenum = [],[], []
-        tsl, tfl, tse = None, None, None
-        lw = 1.5
-        ap = 0.8
-        max_line = 1000
-        if len(self.read_thread.taskstart.t()) <= max_line:
-            for tmp in self.read_thread.taskstart.t():
-                tsl = ax.axvline(tmp, linestyle = '-', color = 'b', linewidth = lw, alpha = ap)
-                tsnum.append(line_num)
-                line_num = line_num + 1
-            if tsl:
-                legend_info.append(tsl)
-                legend_info.append('task start')
-        if len(self.read_thread.taskfinish.t()) <= max_line:
-            for tmp in self.read_thread.taskfinish.t():
-                tfl = ax.axvline(tmp, linestyle = '--', color = 'b', linewidth = lw, alpha = ap)
-                tfnum.append(line_num)
-                line_num = line_num + 1
-            if tfl:
-                legend_info.append(tfl)
-                legend_info.append('task finish')
-        if len(self.read_thread.service.t()) <= 1e6:
-            for tmp in self.read_thread.service.t():
-                tse = ax.axvline(tmp, linestyle = '-', color = 'k', linewidth = lw, alpha = ap)
-                tsenum.append(line_num)
-                line_num = line_num + 1
-            if tse:
-                legend_info.append(tse)
-                legend_info.append('service')
-        if len(self.read_thread.fatal.t()) <= max_line:
-            for tmp in self.read_thread.fatal.t():
-                fl= ax.axvline(tmp, linestyle='-',color = 'm', linewidth = lw, alpha = ap)
-                fnum.append(line_num)
-                line_num = line_num + 1
-            if fl:
-                legend_info.append(fl)
-                legend_info.append('fatal')
-        if len(self.read_thread.err.t()) <= max_line:
-            for tmp in self.read_thread.err.t():
-                el= ax.axvline(tmp, linestyle = '-.', color='r', linewidth = lw, alpha = ap)
-                ernum.append(line_num)
-                line_num = line_num + 1
-            if el:
-                legend_info.append(el)
-                legend_info.append('error')
-        if len(self.read_thread.war.t()) <= max_line:
-            for tmp in self.read_thread.war.t():
-                wl = ax.axvline(tmp, linestyle = '--', color = 'y', linewidth = lw, alpha = ap)
-                wnum.append(line_num)
-                line_num = line_num + 1
-            if wl:
-                legend_info.append(wl)
-                legend_info.append('warning')
-        if len(self.read_thread.notice.t()) <= max_line:
-            for tmp in self.read_thread.notice.t():
-                nl = ax.axvline(tmp, linestyle = ':', color = 'g', linewidth = lw, alpha = ap)
-                nnum.append(line_num)
-                line_num = line_num + 1
-            if nl:
-                legend_info.append(nl)
-                legend_info.append('notice')
-        if legend_info:
-            ax.legend(legend_info[0::2], legend_info[1::2], loc='upper right')
-        self.lines_dict['fatal'] = fnum
-        self.lines_dict['error'] = ernum
-        self.lines_dict['warning'] = wnum
-        self.lines_dict['notice'] = nnum
-        self.lines_dict['taskstart'] = tsnum
-        self.lines_dict['taskfinish'] = tfnum
-        self.lines_dict['service'] = tsenum
-        lines = ax.get_lines()
-        for n in fnum:
-            lines[n].set_visible(self.check_fatal.isChecked())
-        for n in ernum:
-            lines[n].set_visible(self.check_err.isChecked())
-        for n in wnum:
-            lines[n].set_visible(self.check_war.isChecked())
-        for n in nnum:
-            lines[n].set_visible(self.check_notice.isChecked())
-        for n in tsnum:
-            lines[n].set_visible(self.check_tstart.isChecked())
-        for n in tfnum:
-            lines[n].set_visible(self.check_tfinish.isChecked())
-        for n in tsenum:
-            lines[n].set_visible(self.check_service.isChecked())
+    def drawFEWN(self, ax):
+        """Draw each event category as one compound Matplotlib artist."""
+        for artists in self.event_artists.values():
+            artists.pop(ax, None)
+
+        legend_artists = []
+        legend_labels = []
+        for key, style in EVENT_LINE_STYLES.items():
+            plot_data = self.event_plot_data.get(key)
+            if plot_data is None:
+                continue
+            xdata, ydata = plot_data
+            if len(xdata) == 0:
+                continue
+            artist = Line2D(
+                xdata, ydata,
+                transform=ax.get_xaxis_transform(),
+                linestyle=style['linestyle'],
+                color=style['color'],
+                linewidth=style['linewidth'],
+                alpha=style['alpha'],
+                label=style['label'])
+            artist.set_visible(self.event_checkboxes[key].isChecked())
+            ax.add_line(artist)
+            self.event_artists[key][ax] = artist
+            legend_artists.append(artist)
+            legend_labels.append(style['label'])
+
+        if legend_artists:
+            ax.legend(legend_artists, legend_labels, loc='upper right')
         
     def updateCheckInfoLine(self,key):
-        for ax in self.axs:
-            lines = ax.get_lines()
-            for num in self.lines_dict[key]:
-                vis = not lines[num].get_visible()
-                lines[num].set_visible(vis)
-        self.static_canvas.figure.canvas.draw()
+        visible = self.event_checkboxes[key].isChecked()
+        for artist in self.event_artists[key].values():
+            artist.set_visible(visible)
+        self.static_canvas.figure.canvas.draw_idle()
 
 
     def changeCheckBox(self):
-        if self.check_err.isChecked() and self.check_fatal.isChecked() and self.check_notice.isChecked() and \
-        self.check_war.isChecked() and self.check_tstart.isChecked() and self.check_tfinish.isChecked() and \
-        self.check_service.isChecked():
+        if self._updating_event_checks:
+            return
+
+        checked_count = sum(
+            checkbox.isChecked()
+            for checkbox in self.event_checkboxes.values())
+        blocker = QtCore.QSignalBlocker(self.check_all)
+        if checked_count == len(self.event_checkboxes):
+            self.check_all.setTristate(False)
             self.check_all.setCheckState(QtCore.Qt.Checked)
-        elif self.check_err.isChecked() or self.check_fatal.isChecked() or self.check_notice.isChecked() or \
-        self.check_war.isChecked() or self.check_tstart.isChecked() and self.check_tfinish.isChecked() or \
-        self.check_service.isChecked():
-            self.check_all.setTristate()
+        elif checked_count:
+            self.check_all.setTristate(True)
             self.check_all.setCheckState(QtCore.Qt.PartiallyChecked)
         else:
             self.check_all.setTristate(False)
             self.check_all.setCheckState(QtCore.Qt.Unchecked)
+        del blocker
 
         cur_check = self.sender()
         if cur_check is self.check_fatal:
@@ -1800,22 +1878,25 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.updateCheckInfoLine('service')
 
     def changeCheckBoxAll(self):
-        if self.check_all.checkState() == QtCore.Qt.Checked:
-            self.check_fatal.setChecked(True)
-            self.check_err.setChecked(True)
-            self.check_war.setChecked(True)
-            self.check_notice.setChecked(True)
-            self.check_tstart.setChecked(True)
-            self.check_tfinish.setChecked(True)
-            self.check_service.setChecked(True)
-        elif self.check_all.checkState() == QtCore.Qt.Unchecked:
-            self.check_fatal.setChecked(False)
-            self.check_err.setChecked(False)
-            self.check_war.setChecked(False)
-            self.check_notice.setChecked(False)
-            self.check_tstart.setChecked(False)
-            self.check_tfinish.setChecked(False)
-            self.check_service.setChecked(False)
+        if self._updating_event_checks:
+            return
+        state = self.check_all.checkState()
+        if state == QtCore.Qt.PartiallyChecked:
+            return
+
+        checked = state == QtCore.Qt.Checked
+        self._updating_event_checks = True
+        try:
+            for checkbox in self.event_checkboxes.values():
+                checkbox.setChecked(checked)
+        finally:
+            self._updating_event_checks = False
+
+        for key in self.event_checkboxes:
+            visible = self.event_checkboxes[key].isChecked()
+            for artist in self.event_artists[key].values():
+                artist.set_visible(visible)
+        self.static_canvas.figure.canvas.draw_idle()
 
     def openMap(self, checked):
         if checked:
@@ -1855,8 +1936,9 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     model_name = self.openModelFilesDialog()
                 if model_name:
                     self.motor_view_widget.setModelPath(model_name)
-                    self.motor_view_widget.setReportPath(self.read_thread.getReportFileAddr())
-                    self.motor_view_widget.listMotorErr()
+            if self.read_thread.reader is not None:
+                self.motor_view_widget.setLines(self.read_thread.reader.lines)
+            self.motor_view_widget.listMotorErr()
             self.motor_view_widget.show()
             (xmin,xmax) = self.axs[0].get_xlim()
             tmid = (xmin+xmax)/2.0 
@@ -1896,6 +1978,20 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         else:
             if self.log_widget:
                 self.log_widget.hide()      
+
+    def openEventViewer(self, checked):
+        if checked:
+            if self.event_widget is None:
+                self.event_widget = EventViewer()
+                self.event_widget.setWindowIcon(QtGui.QIcon('rbk.ico'))
+                self.event_widget.hiddened.connect(self.eventViewerClosed)
+                self.event_widget.moveHereSignal.connect(self.moveHere)
+            self.event_widget.setEvents(self._event_sources())
+            self.event_widget.show()
+            self.event_widget.raise_()
+            self.event_widget.activateWindow()
+        elif self.event_widget is not None:
+            self.event_widget.hide()
     
     def updateLogView(self):
         if self.log_widget is not None \
@@ -2008,6 +2104,11 @@ class ApplicationWindow(QtWidgets.QMainWindow):
         self.view_action.setChecked(False)
         self.openViewer(False)
 
+    def eventViewerClosed(self, event):
+        self.event_action.setChecked(False)
+        if self.event_widget is not None:
+            self.event_widget.hide()
+
     def jsonViewerClosed(self, event):
         self.json_action.setChecked(False)
         self.openJsonView(False)
@@ -2026,6 +2127,8 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             self.map_widget.close()
         if self.log_widget:
             self.log_widget.close()
+        if self.event_widget:
+            self.event_widget.close()
         if self.sts_widget:
             self.sts_widget.close()
         if self.param_widget:

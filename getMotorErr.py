@@ -15,7 +15,6 @@ class MotorErrViewer(QWidget):
         self.InitWindow()
         self.resize(1200,800)
         self.moveHere_flag = False
-        self.report_path = ""
         self.mode_path = ""
 
     def InitWindow(self):
@@ -53,70 +52,75 @@ class MotorErrViewer(QWidget):
     def setModelPath(self, path):
         self.mode_path = path
     
-    def setReportPath(self, path):
-        self.report_path = path
+    def setLines(self, lines):
+        self.lines = lines if lines is not None else []
 
     def clearPlainText(self):
         self.plainText.appendPlainText("")
     
     def listMotorErr(self):
-        if self.mode_path != "" and self.report_path != "":
-            reg = re.compile("(.[a-zA-Z0-9]*-0x[a-zA-Z0-9]*)")
-            model_m_b_dict = mr.getMotorNameBrandDict(self.mode_path)
-            fid = open(self.report_path,"rb")
-            for line in fid.readlines(): 
-                    try:
-                        line = line.decode('utf-8')
-                    except UnicodeDecodeError:
-                        try:
-                            line = line.decode('gbk')
-                        except UnicodeDecodeError:
-                            line = ""
-                    if "52135|Motor Error:" in line and "|0]" not in line:
-                            self.plainText.appendPlainText(line.replace('\n', '').replace('\r', ''))
-                            motor_code_str = reg.findall(line)
-                            cnt = 1
-                            for pair in motor_code_str:
-                                motor_code_list = re.split("\W", pair)
-                                motor_name = motor_code_list[1]
-                                motor_code = motor_code_list[2]
-                                motor_code2num = int(motor_code, 16)
-                                motor_brand = model_m_b_dict[motor_name]
-                                index = str(cnt) + "名字:"
-                                cnt = cnt + 1
-                                self.plainText.appendPlainText("电机"+index+motor_name+" 品牌:"+motor_brand+" 错误码:"+motor_code)
-                                with open("ErrTab.json", "r", encoding='utf-8') as f:
-                                    err_tab = json.loads(f.read())
-                                    all_err_in_brand = err_tab[motor_brand]
-                                    cnt2 = 1
-                                    if all_err_in_brand["match_bit"]:
-                                        for key, err_info in all_err_in_brand.items():
-                                            if key != "match_bit":
-                                                key2num = int(key, 16)
-                                                if key2num & motor_code2num:
-                                                    index2 = "对应错误"+str(cnt2)+":"
-                                                    cnt2 = cnt2 + 1
-                                                    self.plainText.appendPlainText("    "+index2+ key + " ")
-                                                    self.plainText.appendPlainText("        错误描述:" + err_info["des"])
-                                                    self.plainText.appendPlainText("        错误原因:" + err_info["reason"])
-                                                    self.plainText.appendPlainText("        解决方法:" + err_info["method"])
-                                    else:
-                                        for key, err_info in all_err_in_brand.items():
-                                            if key != "match_bit":
-                                                key2num = int(key, 16)
-                                                if key2num == motor_code2num:
-                                                    index2 = "对应错误"+str(cnt2)+":"
-                                                    cnt2 = cnt2 + 1
-                                                    self.plainText.appendPlainText("    "+index2+ key + " ")
-                                                    self.plainText.appendPlainText("        错误描述:" + err_info["des"])
-                                                    self.plainText.appendPlainText("        错误原因:" + err_info["reason"])
-                                                    self.plainText.appendPlainText("        解决方法:" + err_info["method"])
-                                f.close()
-                                self.plainText.appendPlainText("")
-            fid.close()
-            self.cursor_finish = True
-        else:
-            self.plainText.setPlainText(''.join("The model should be add!"))
+        self.plainText.clear()
+        if not self.mode_path:
+            self.plainText.setPlainText("The model should be add!")
+            return
+        if not self.lines:
+            self.plainText.setPlainText("No log data available!")
+            return
+
+        reg = re.compile("(.[a-zA-Z0-9]*-0x[a-zA-Z0-9]*)")
+        model_m_b_dict = mr.getMotorNameBrandDict(self.mode_path)
+        with open("ErrTab.json", "r", encoding='utf-8') as stream:
+            err_tab = json.loads(stream.read())
+
+        for raw_line in self.lines:
+            if isinstance(raw_line, bytes):
+                try:
+                    line = raw_line.decode('utf-8')
+                except UnicodeDecodeError:
+                    line = raw_line.decode('gbk', errors='ignore')
+            else:
+                line = raw_line
+            if "52135|Motor Error:" not in line or "|0]" in line:
+                continue
+
+            self.plainText.appendPlainText(
+                line.replace('\n', '').replace('\r', ''))
+            for count, pair in enumerate(reg.findall(line), 1):
+                motor_code_list = re.split("\W", pair)
+                if len(motor_code_list) < 3:
+                    continue
+                motor_name = motor_code_list[1]
+                motor_code = motor_code_list[2]
+                motor_brand = model_m_b_dict.get(motor_name)
+                if motor_brand is None or motor_brand not in err_tab:
+                    continue
+                motor_code_number = int(motor_code, 16)
+                self.plainText.appendPlainText(
+                    "电机{}名字:{} 品牌:{} 错误码:{}".format(
+                        count, motor_name, motor_brand, motor_code))
+
+                brand_errors = err_tab[motor_brand]
+                matched_count = 1
+                for key, error_info in brand_errors.items():
+                    if key == "match_bit":
+                        continue
+                    key_number = int(key, 16)
+                    matched = ((key_number & motor_code_number) != 0
+                               if brand_errors["match_bit"]
+                               else key_number == motor_code_number)
+                    if not matched:
+                        continue
+                    self.plainText.appendPlainText(
+                        "    对应错误{}:{} ".format(matched_count, key))
+                    self.plainText.appendPlainText(
+                        "        错误描述:" + error_info["des"])
+                    self.plainText.appendPlainText(
+                        "        错误原因:" + error_info["reason"])
+                    self.plainText.appendPlainText(
+                        "        解决方法:" + error_info["method"])
+                    matched_count += 1
+                self.plainText.appendPlainText("")
+        self.cursor_finish = True
                 
     def setLineNum(self, ln):
         if not self.moveHere_flag:

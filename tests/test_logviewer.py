@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import os
 import re
+import tempfile
 import unittest
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from PyQt5 import QtGui, QtWidgets
+from PyQt5 import QtCore, QtGui, QtTest, QtWidgets
 
 from LogViewer import (LogViewer, compile_search_pattern,
                        find_match_ranges)
@@ -70,6 +71,13 @@ class TestLogViewerSearch(unittest.TestCase):
                 return
         self.fail('incremental search did not finish')
 
+    def _finish_filter(self):
+        for _ in range(100):
+            self.app.processEvents()
+            if self.viewer._filter_state is None:
+                return
+        self.fail('incremental filter did not finish')
+
     def test_default_search_is_case_insensitive_and_wraps(self):
         self.viewer.find_edit.setText('alpha')
 
@@ -130,6 +138,108 @@ class TestLogViewerSearch(unittest.TestCase):
             if image.pixel(x, y) == highlight)
 
         self.assertGreater(highlighted_pixels, 0)
+
+    def test_ctrl_click_selects_non_contiguous_lines(self):
+        self.viewer.resize(700, 300)
+        self.viewer.show()
+        self.app.processEvents()
+        first = self.viewer.line_model.index(0, 0)
+        third = self.viewer.line_model.index(2, 0)
+
+        QtTest.QTest.mouseClick(
+            self.viewer.list_view.viewport(), QtCore.Qt.LeftButton,
+            QtCore.Qt.NoModifier,
+            self.viewer.list_view.visualRect(first).center())
+        QtTest.QTest.mouseClick(
+            self.viewer.list_view.viewport(), QtCore.Qt.LeftButton,
+            QtCore.Qt.ControlModifier,
+            self.viewer.list_view.visualRect(third).center())
+
+        self.assertEqual([0, 2], self.viewer.selectedSourceRows())
+        self.assertIn('2 selected', self.viewer.position_label.text())
+
+    def test_copy_selected_lines_uses_original_log_order(self):
+        selection_model = self.viewer.list_view.selectionModel()
+        for row in (2, 0):
+            selection_model.select(
+                self.viewer.line_model.index(row, 0),
+                QtCore.QItemSelectionModel.Select)
+
+        self.viewer.copySelectedLines()
+
+        self.assertEqual(
+            'Alpha first\nthird ALPHA',
+            QtWidgets.QApplication.clipboard().text())
+
+    def test_filter_only_shows_case_insensitive_matches(self):
+        self.viewer.find_edit.setText('alpha')
+        self.viewer.filter_checkbox.setChecked(True)
+        self._finish_filter()
+
+        self.assertEqual(3, self.viewer.line_model.rowCount())
+        self.assertEqual([0, 1, 2],
+                         self.viewer.line_model.visibleSourceRows())
+        self.assertEqual('3 / 4 lines', self.viewer.position_label.text())
+
+    def test_filter_keeps_original_line_numbers(self):
+        self.viewer.find_edit.setText('GoodsPos')
+        self.viewer.filter_checkbox.setChecked(True)
+        self._finish_filter()
+
+        display = self.viewer.line_model.index(0, 0).data(
+            QtCore.Qt.DisplayRole)
+
+        self.assertTrue(display.lstrip().startswith('4  GoodsPos'))
+
+    def test_filter_respects_case_and_regex_options(self):
+        self.viewer.find_edit.setText('alpha$')
+        self.viewer.regex_checkbox.setChecked(True)
+        self.viewer.case_checkbox.setChecked(True)
+        self.viewer.filter_checkbox.setChecked(True)
+        self._finish_filter()
+
+        self.assertEqual([1], self.viewer.line_model.visibleSourceRows())
+
+    def test_disabling_filter_restores_all_lines(self):
+        self.viewer.find_edit.setText('GoodsPos')
+        self.viewer.filter_checkbox.setChecked(True)
+        self._finish_filter()
+        self.viewer.filter_checkbox.setChecked(False)
+
+        self.assertIsNone(self.viewer.line_model.visibleSourceRows())
+        self.assertEqual(4, self.viewer.line_model.rowCount())
+
+    def test_search_navigates_filtered_rows(self):
+        self.viewer.find_edit.setText('alpha')
+        self.viewer.filter_checkbox.setChecked(True)
+        self._finish_filter()
+
+        self.viewer.findDown()
+        self.assertEqual(0, self.viewer._currentSourceRow())
+        self.viewer.findDown()
+        self.assertEqual(1, self.viewer._currentSourceRow())
+
+    def test_read_files_orders_overlapping_logs_by_timestamp(self):
+        paths = []
+        for content in (
+                ('[260728 154405.500][1][R][d] later\n'
+                 '[260728 154448.385][2][R][d] later end\n'),
+                ('[260728 152829.456][3][R][d] early\n'
+                 '[260728 154100.468][4][MF][d] target\n')):
+            with tempfile.NamedTemporaryFile(
+                    suffix='.log', delete=False) as stream:
+                stream.write(content.encode('utf-8'))
+                paths.append(stream.name)
+                self.addCleanup(os.remove, stream.name)
+
+        self.viewer.readFilies(paths)
+
+        self.assertEqual([
+            '[260728 152829.456]',
+            '[260728 154100.468]',
+            '[260728 154405.500]',
+            '[260728 154448.385]',
+        ], [line[:19] for line in self.viewer.lines])
 
 
 if __name__ == '__main__':

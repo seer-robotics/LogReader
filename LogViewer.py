@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 """Virtualized log viewer with incremental search."""
+from bisect import bisect_left
 import os
 import re
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from loglibPlus import rbktimetodate, open_log_file
+from loglibPlus import (open_log_file, rbktimetodate,
+                        sort_log_lines_by_timestamp)
 
 
 RAW_LINE_ROLE = QtCore.Qt.UserRole + 1
@@ -34,6 +36,7 @@ class LogLineModel(QtCore.QAbstractListModel):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.lines = []
+        self._visible_rows = None
         self._line_number_width = 1
         font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.FixedFont)
         metrics = QtGui.QFontMetrics(font)
@@ -44,19 +47,55 @@ class LogLineModel(QtCore.QAbstractListModel):
     def setLines(self, lines):
         self.beginResetModel()
         self.lines = lines if lines is not None else []
+        self._visible_rows = None
         self._line_number_width = max(1, len(str(len(self.lines))))
         self.endResetModel()
 
+    def setVisibleRows(self, source_rows):
+        self.beginResetModel()
+        self._visible_rows = (None if source_rows is None
+                              else list(source_rows))
+        self.endResetModel()
+
+    def sourceRow(self, index):
+        if not index.isValid():
+            return -1
+        row = index.row()
+        if self._visible_rows is None:
+            return row if row < len(self.lines) else -1
+        if 0 <= row < len(self._visible_rows):
+            return self._visible_rows[row]
+        return -1
+
+    def indexForSourceRow(self, source_row):
+        if not 0 <= source_row < len(self.lines):
+            return QtCore.QModelIndex()
+        if self._visible_rows is None:
+            return self.index(source_row, 0)
+        position = bisect_left(self._visible_rows, source_row)
+        if (position < len(self._visible_rows)
+                and self._visible_rows[position] == source_row):
+            return self.index(position, 0)
+        return QtCore.QModelIndex()
+
+    def visibleSourceRows(self):
+        return self._visible_rows
+
     def rowCount(self, parent=QtCore.QModelIndex()):
-        return 0 if parent.isValid() else len(self.lines)
+        if parent.isValid():
+            return 0
+        if self._visible_rows is None:
+            return len(self.lines)
+        return len(self._visible_rows)
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
-        if not index.isValid() or not 0 <= index.row() < len(self.lines):
+        source_row = self.sourceRow(index)
+        if source_row < 0:
             return None
-        line = self.lines[index.row()]
+        line = self.lines[source_row]
         if role == QtCore.Qt.DisplayRole:
             return '{:>{width}}  {}'.format(
-                index.row() + 1,
+                source_row + 1,
                 line.rstrip('\r\n'),
                 width=self._line_number_width)
         if role in (RAW_LINE_ROLE, QtCore.Qt.ToolTipRole):
@@ -137,6 +176,7 @@ class LogViewer(QtWidgets.QWidget):
     moveHereSignal = QtCore.pyqtSignal('PyQt_PyObject')
 
     SEARCH_BATCH_SIZE = 20000
+    FILTER_BATCH_SIZE = 20000
 
     def __init__(self):
         super().__init__()
@@ -148,6 +188,8 @@ class LogViewer(QtWidgets.QWidget):
         self._last_search_signature = None
         self._search_pattern = None
         self._search_error = None
+        self._filter_generation = 0
+        self._filter_state = None
         self.InitWindow()
         self.resize(900, 800)
 
@@ -173,6 +215,10 @@ class LogViewer(QtWidgets.QWidget):
         self.case_checkbox = QtWidgets.QCheckBox('Case sensitive', self)
         self.case_checkbox.setToolTip('Match uppercase and lowercase exactly')
         self.case_checkbox.toggled.connect(self._searchOptionsChanged)
+        self.filter_checkbox = QtWidgets.QCheckBox('Only matches', self)
+        self.filter_checkbox.setToolTip(
+            'Only show lines matching the search text')
+        self.filter_checkbox.toggled.connect(self._filterToggled)
 
         self.find_up = QtWidgets.QToolButton(self)
         self.find_up.setIcon(self.style().standardIcon(QtWidgets.QStyle.SP_ArrowUp))
@@ -183,12 +229,13 @@ class LogViewer(QtWidgets.QWidget):
         self.find_down.setToolTip('Next match')
         self.find_down.clicked.connect(self.findDown)
         self.position_label = QtWidgets.QLabel('0 lines', self)
-        self.position_label.setMinimumWidth(150)
+        self.position_label.setMinimumWidth(220)
         self.position_label.setAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter)
 
         search_layout.addWidget(self.find_edit, 1)
         search_layout.addWidget(self.regex_checkbox)
         search_layout.addWidget(self.case_checkbox)
+        search_layout.addWidget(self.filter_checkbox)
         search_layout.addWidget(self.find_up)
         search_layout.addWidget(self.find_down)
         search_layout.addWidget(self.position_label)
@@ -204,18 +251,21 @@ class LogViewer(QtWidgets.QWidget):
         self.list_view.setUniformItemSizes(True)
         self.list_view.setWordWrap(False)
         self.list_view.setTextElideMode(QtCore.Qt.ElideNone)
-        self.list_view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
+        self.list_view.setSelectionMode(
+            QtWidgets.QAbstractItemView.ExtendedSelection)
         self.list_view.setHorizontalScrollMode(QtWidgets.QAbstractItemView.ScrollPerPixel)
         self.list_view.setVerticalScrollMode(QtWidgets.QAbstractItemView.ScrollPerItem)
         self.list_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.list_view.customContextMenuRequested.connect(self._showContextMenu)
         self.list_view.selectionModel().currentChanged.connect(self._currentChanged)
+        self.list_view.selectionModel().selectionChanged.connect(
+            self._selectionChanged)
         layout.addWidget(self.list_view)
 
         QtWidgets.QShortcut(QtGui.QKeySequence.Find, self,
                             activated=self._focusSearch)
         QtWidgets.QShortcut(QtGui.QKeySequence.Copy, self.list_view,
-                            activated=self.copyCurrentLine)
+                            activated=self.copySelectedLines)
         QtWidgets.QShortcut(QtGui.QKeySequence(QtCore.Qt.Key_F3), self,
                             activated=self.findDown)
         QtWidgets.QShortcut(
@@ -226,11 +276,15 @@ class LogViewer(QtWidgets.QWidget):
         if lines is self.lines and self.line_model.lines is lines:
             return
         self._cancelSearch()
+        self._cancelFilter()
         self._last_search_signature = None
         self.lines = lines if lines is not None else []
         self.line_model.setLines(self.lines)
         self.setWindowTitle('{} - {} lines'.format(self.title, len(self.lines)))
-        self.position_label.setText('{} lines'.format(len(self.lines)))
+        if self.filter_checkbox.isChecked():
+            self._startFilter()
+        else:
+            self.position_label.setText('{} lines'.format(len(self.lines)))
 
     def setText(self, lines):
         """Backward-compatible alias for callers that previously loaded text."""
@@ -246,11 +300,15 @@ class LogViewer(QtWidgets.QWidget):
         if not self.lines:
             return
         line_number = max(0, min(int(line_number), len(self.lines) - 1))
-        index = self.line_model.index(line_number, 0)
-        self.list_view.setCurrentIndex(index)
+        index = self.line_model.indexForSourceRow(line_number)
+        if not index.isValid():
+            return
+        selection_model = self.list_view.selectionModel()
+        selection_model.setCurrentIndex(
+            index, QtCore.QItemSelectionModel.ClearAndSelect
+            | QtCore.QItemSelectionModel.Rows)
         self.list_view.scrollTo(index, QtWidgets.QAbstractItemView.PositionAtCenter)
-        self.position_label.setText(
-            'Line {} / {}'.format(line_number + 1, len(self.lines)))
+        self._updatePosition()
 
     def closeEvent(self, event):
         event.ignore()
@@ -273,7 +331,7 @@ class LogViewer(QtWidgets.QWidget):
                 continue
         lines = self.lines
         self.lines = []
-        self.setLines(lines)
+        self.setLines(sort_log_lines_by_timestamp(lines))
 
     def readData(self, stream, file):
         for line in stream:
@@ -291,24 +349,55 @@ class LogViewer(QtWidgets.QWidget):
     def _showContextMenu(self, position):
         index = self.list_view.indexAt(position)
         if index.isValid():
-            self.list_view.setCurrentIndex(index)
+            selection_model = self.list_view.selectionModel()
+            if selection_model.isSelected(index):
+                selection_model.setCurrentIndex(
+                    index, QtCore.QItemSelectionModel.NoUpdate)
+            else:
+                selection_model.setCurrentIndex(
+                    index, QtCore.QItemSelectionModel.ClearAndSelect
+                    | QtCore.QItemSelectionModel.Rows)
         if not self.list_view.currentIndex().isValid():
             return
         menu = QtWidgets.QMenu(self)
-        copy_action = menu.addAction('Copy line')
+        selected_count = self.selectedRowCount()
+        copy_action = menu.addAction(
+            'Copy selected lines' if selected_count > 1 else 'Copy line')
         move_action = menu.addAction('Move Here')
         selected_action = menu.exec_(
             self.list_view.viewport().mapToGlobal(position))
         if selected_action == copy_action:
-            self.copyCurrentLine()
+            self.copySelectedLines()
         elif selected_action == move_action:
             self.moveHere()
 
+    def selectedSourceRows(self):
+        rows = {
+            self.line_model.sourceRow(index)
+            for index in self.list_view.selectionModel().selectedIndexes()
+        }
+        rows.discard(-1)
+        if not rows:
+            current_row = self._currentSourceRow()
+            if current_row >= 0:
+                rows.add(current_row)
+        return sorted(rows)
+
+    def selectedRowCount(self):
+        return sum(
+            selection_range.bottom() - selection_range.top() + 1
+            for selection_range in
+            self.list_view.selectionModel().selection())
+
+    def copySelectedLines(self):
+        rows = self.selectedSourceRows()
+        if rows:
+            QtWidgets.QApplication.clipboard().setText('\n'.join(
+                self.lines[row].rstrip('\r\n') for row in rows))
+
     def copyCurrentLine(self):
-        index = self.list_view.currentIndex()
-        if index.isValid():
-            QtWidgets.QApplication.clipboard().setText(
-                index.data(RAW_LINE_ROLE))
+        """Backward-compatible alias that now copies all selected rows."""
+        self.copySelectedLines()
 
     def moveHere(self):
         index = self.list_view.currentIndex()
@@ -319,6 +408,87 @@ class LogViewer(QtWidgets.QWidget):
         if match:
             self.moveHere_flag = True
             self.moveHereSignal.emit(rbktimetodate(match.group(1)))
+
+    def _currentSourceRow(self):
+        return self.line_model.sourceRow(self.list_view.currentIndex())
+
+    def _setVisibleRows(self, source_rows):
+        selected_rows = self.selectedSourceRows()
+        current_row = self._currentSourceRow()
+        self.line_model.setVisibleRows(source_rows)
+
+        selection_model = self.list_view.selectionModel()
+        selection_model.clearSelection()
+        for source_row in selected_rows:
+            index = self.line_model.indexForSourceRow(source_row)
+            if index.isValid():
+                selection_model.select(
+                    index, QtCore.QItemSelectionModel.Select
+                    | QtCore.QItemSelectionModel.Rows)
+        current_index = self.line_model.indexForSourceRow(current_row)
+        if current_index.isValid():
+            selection_model.setCurrentIndex(
+                current_index, QtCore.QItemSelectionModel.NoUpdate)
+
+    def _filterToggled(self, checked):
+        self._cancelSearch()
+        self._last_search_signature = None
+        if checked:
+            self._startFilter()
+        else:
+            self._cancelFilter()
+            self._setVisibleRows(None)
+            self._updatePosition()
+
+    def _startFilter(self):
+        self._cancelFilter()
+        if not self.filter_checkbox.isChecked():
+            return
+        if self._search_error is not None:
+            self._setVisibleRows([])
+            self._showSearchError()
+            return
+        if self._search_pattern is None:
+            self._setVisibleRows(None)
+            self._updatePosition()
+            return
+
+        generation = self._filter_generation
+        self._filter_state = {
+            'pattern': self._search_pattern,
+            'row': 0,
+            'matches': [],
+        }
+        self.position_label.setText('Filtering...')
+        QtCore.QTimer.singleShot(
+            0, lambda: self._filterBatch(generation))
+
+    def _filterBatch(self, generation):
+        if (generation != self._filter_generation
+                or self._filter_state is None):
+            return
+        state = self._filter_state
+        total = len(self.lines)
+        batch_end = min(total, state['row'] + self.FILTER_BATCH_SIZE)
+        while state['row'] < batch_end:
+            source_row = state['row']
+            if state['pattern'].search(
+                    self.lines[source_row].rstrip('\r\n')) is not None:
+                state['matches'].append(source_row)
+            state['row'] += 1
+
+        if state['row'] >= total:
+            matches = state['matches']
+            self._filter_state = None
+            self._setVisibleRows(matches)
+            self._updatePosition()
+            return
+        QtCore.QTimer.singleShot(
+            0, lambda: self._filterBatch(generation))
+
+    def _cancelFilter(self):
+        self._filter_generation += 1
+        self._filter_state = None
 
     def findUp(self):
         self._startSearch(-1)
@@ -337,7 +507,32 @@ class LogViewer(QtWidgets.QWidget):
             self._showSearchError()
             return
 
-        current_row = self.list_view.currentIndex().row()
+        if self.filter_checkbox.isChecked():
+            if self._filter_state is not None:
+                self.position_label.setText('Filtering...')
+                return
+            visible_rows = self.line_model.visibleSourceRows()
+            if visible_rows is None:
+                visible_rows = list(range(len(self.lines)))
+            if not visible_rows:
+                self.position_label.setText('No matches')
+                return
+            current_visible_row = self.list_view.currentIndex().row()
+            signature = self._searchSignature()
+            same_search = (signature == self._last_search_signature
+                           and current_visible_row >= 0)
+            if current_visible_row < 0:
+                target_row = 0 if direction > 0 else len(visible_rows) - 1
+            elif same_search:
+                target_row = ((current_visible_row + direction)
+                              % len(visible_rows))
+            else:
+                target_row = current_visible_row
+            self._last_search_signature = signature
+            self._selectLine(visible_rows[target_row])
+            return
+
+        current_row = self._currentSourceRow()
         signature = self._searchSignature()
         same_search = (signature == self._last_search_signature
                        and current_row >= 0)
@@ -388,9 +583,11 @@ class LogViewer(QtWidgets.QWidget):
         self._cancelSearch()
         self._last_search_signature = None
         self._updateSearchPattern()
+        if self.filter_checkbox.isChecked():
+            self._startFilter()
         if self._search_error is not None:
             self._showSearchError()
-        else:
+        elif not self.filter_checkbox.isChecked():
             self._updatePosition()
 
     def _searchOptionsChanged(self, _checked):
@@ -431,16 +628,43 @@ class LogViewer(QtWidgets.QWidget):
     def _currentChanged(self, current, previous):
         self._updatePosition()
 
+    def _selectionChanged(self, selected, deselected):
+        self._updatePosition()
+
     def _updatePosition(self):
         if self._search_error is not None and self.find_edit.text():
             self._showSearchError()
             return
-        row = self.list_view.currentIndex().row()
-        if row >= 0:
+        if self._filter_state is not None:
+            self.position_label.setText('Filtering...')
+            return
+        selected_count = self.selectedRowCount()
+        visible_count = self.line_model.rowCount()
+        if selected_count > 1:
+            if self.filter_checkbox.isChecked():
+                self.position_label.setText(
+                    '{} selected | {} / {} lines'.format(
+                        selected_count, visible_count, len(self.lines)))
+            else:
+                self.position_label.setText(
+                    '{} selected / {} lines'.format(
+                        selected_count, len(self.lines)))
+            return
+        source_row = self._currentSourceRow()
+        if source_row >= 0:
+            if self.filter_checkbox.isChecked():
+                self.position_label.setText(
+                    'Line {} | {} / {} lines'.format(
+                        source_row + 1, visible_count, len(self.lines)))
+            else:
+                self.position_label.setText(
+                    'Line {} / {}'.format(source_row + 1, len(self.lines)))
+        elif self.filter_checkbox.isChecked():
             self.position_label.setText(
-                'Line {} / {}'.format(row + 1, len(self.lines)))
+                '{} / {} lines'.format(visible_count, len(self.lines)))
         else:
-            self.position_label.setText('{} lines'.format(len(self.lines)))
+            self.position_label.setText(
+                '{} lines'.format(len(self.lines)))
 
     def _focusSearch(self):
         self.find_edit.setFocus()

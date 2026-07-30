@@ -56,6 +56,14 @@ def main():
         return 1
 
     rt = win.read_thread
+    win.openViewer(True)
+    win.log_widget.find_edit.setText('[MotorInfo')
+    win.log_widget.filter_checkbox.setChecked(True)
+    filter_deadline = time.time() + 30
+    while (win.log_widget._filter_state is not None
+           and time.time() < filter_deadline):
+        app.processEvents()
+    n_filtered_lines = win.log_widget.line_model.rowCount()
     n_fatal = len(rt.fatal.content()[0])
     n_err = len(rt.err.content()[0])
     n_war = len(rt.war.content()[0])
@@ -67,12 +75,16 @@ def main():
     print('FATAL=%d ERROR=%d WARNING=%d NOTICE=%d'
           % (n_fatal, n_err, n_war, n_notice))
     print('data series: %d total, %d non-empty' % (n_series, nonempty))
+    print('filtered MotorInfo lines:', n_filtered_lines)
     print('tlist:', rt.tlist)
     print('report file:', rt.getReportFileAddr())
 
     ok = (n_series > 0 and nonempty > 0
           and len(rt.tlist) == 2 and rt.tlist[0] is not None
-          and win.finishReadFlag)
+          and win.finishReadFlag
+          and win.add_log_config_action.isEnabled()
+          and win.log_widget._filter_state is None
+          and n_filtered_lines > 0)
     print('SMOKE PASS' if ok else 'SMOKE FAIL: empty parse result')
     return 0 if ok else 1
 

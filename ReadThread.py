@@ -1,9 +1,7 @@
 from PyQt5.QtCore import QThread, pyqtSignal
 from loglibPlus import Data, Laser, ErrorLine, WarningLine, ReadLog, FatalLine, NoticeLine, TaskStart, TaskFinish, Service, ParticleState
 from loglibPlus import Memory, DepthCamera, RobotStatus, obsDetect
-from datetime import timedelta
-from datetime import datetime
-import os
+from logconfig import append_log_config_entries
 import json as js
 import logging
 import math
@@ -28,14 +26,6 @@ def rad2LSB(data):
 def Fdir2Flink(f):
     flink = " <a href='file:///" + f + "'>"+f+"</a>"
     return flink
-
-def printData(data, fid):
-    try:
-        print(data, file= fid)
-    except UnicodeEncodeError:
-        data = data.encode(errors='ignore')  
-        print(data, file= fid)
-    return
 
 class ReadThread(QThread):
     signal = pyqtSignal('PyQt_PyObject')
@@ -65,14 +55,103 @@ class ReadThread(QThread):
         self.rstatus = RobotStatus()
         self.log =  []
         self.tlist = []
+        self.output_fname = ""
         self.cpu_num = 4
         self.reader = None
         try:
-            f = open('log_config.json',encoding= 'UTF-8')
-            self.js = js.load(f)
+            with open(self.log_config, encoding='UTF-8') as f:
+                self.js = js.load(f)
         except FileNotFoundError:
             logging.error('Failed to open log_config.json')
             self.log.append('Failed to open log_config.json')
+
+    @staticmethod
+    def _create_config_parsers(entry):
+        """Create the Data objects represented by one config entry."""
+        rule_type = entry['type']
+        if isinstance(rule_type, list):
+            return {
+                item: Data(entry, item)
+                for item in rule_type
+            }
+        if rule_type == 'Text':
+            text_key = entry.get('textKey')
+            return {text_key: Data(entry, rule_type, text_key)}
+        path_flag = entry['content'] == 'path'
+        return {rule_type: Data(entry, rule_type, None, path_flag)}
+
+    @staticmethod
+    def _content_series(content_key, parser):
+        real_key = content_key
+        array_data_name = None
+        if 'name' in parser.data and parser.data['name']:
+            array_data_name = parser.data['name'][0]
+            real_key = content_key[:-1] + '.' + array_data_name
+
+        series = []
+        for field_name in parser.data:
+            if field_name == 't':
+                continue
+            data_key = real_key + '.' + field_name
+            description = parser.description[field_name]
+            if array_data_name is not None:
+                ylabel = array_data_name + '.' + description
+            else:
+                ylabel = description
+                if (isinstance(description, str) and description
+                        and description in data_key):
+                    ylabel = data_key
+            series.append((data_key, field_name, ylabel))
+        return real_key, series
+
+    def _register_content_data(self, content_keys):
+        for content_key in content_keys:
+            parser = self.content[content_key]
+            real_key, series = self._content_series(content_key, parser)
+            self.name2orgKey[real_key] = content_key
+            for data_key, field_name, ylabel in series:
+                self.data[data_key] = (
+                    parser[field_name], parser['t'])
+                self.ylabel[data_key] = ylabel
+                self.data_org_key[data_key] = content_key
+
+    def add_log_configs(self, entries, config_path=None):
+        """Persist and register new parsing rules against loaded log lines."""
+        if self.isRunning():
+            raise RuntimeError('日志仍在加载，暂时不能添加解释规则')
+        if self.reader is None:
+            raise RuntimeError('请先加载日志，再添加解释规则')
+
+        new_parsers = {}
+        for entry in entries.values():
+            for content_key, parser in self._create_config_parsers(entry).items():
+                if content_key in self.content or content_key in new_parsers:
+                    raise ValueError(
+                        '日志类型已存在：{}'.format(content_key))
+                new_parsers[content_key] = parser
+
+        # Parse before persistence so malformed runtime rules leave the file
+        # and the active data dictionaries untouched.
+        for parser in new_parsers.values():
+            parser.parse_now(self.reader.lines)
+
+        new_series = []
+        for content_key, parser in new_parsers.items():
+            _real_key, series = self._content_series(content_key, parser)
+            for data_key, _field_name, _ylabel in series:
+                if data_key in self.data or data_key in new_series:
+                    raise ValueError(
+                        '曲线数据名称已存在：{}'.format(data_key))
+                new_series.append(data_key)
+
+        target_path = config_path or self.log_config
+        append_log_config_entries(target_path, entries)
+        self.js.update(entries)
+        self.content.update(new_parsers)
+        self._register_content_data(new_parsers.keys())
+        self.log.append(
+            'Added log config: {}'.format(', '.join(entries.keys())))
+        return new_series
 
     # run method gets called when we start the thread
     def run(self):
@@ -81,7 +160,6 @@ class ReadThread(QThread):
         try:
             with open(self.log_config,encoding= 'UTF-8') as f:
                 self.js = js.load(f)
-                f.close()
                 logging.info("Load {}".format(self.log_config))
                 self.log.append("Load {}".format(self.log_config))
         except FileNotFoundError:
@@ -175,53 +253,18 @@ class ReadThread(QThread):
                 tmin = self.reader.tmin
             dt = tmax - tmin
             self.tlist = [tmin, tmax]
-            #save Error
-            ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            self.output_fname = "Report_" + str(ts).replace(':','-').replace(' ','_') + ".txt"
-            path = os.path.dirname(self.filenames[0])
-            self.output_fname = path + "/" + self.output_fname
-            self.log.append("Report File:" + Fdir2Flink(self.output_fname))
-            fid = open(self.output_fname,"w") 
-            print("="*20, file = fid)
-            print("Files: ", self.filenames, file = fid)
-            print(len(self.fatal.content()[0]), " FATALs, ", len(self.err.content()[0]), " ERRORs, ", 
-                    len(self.war.content()[0]), " WARNINGs, ", len(self.notice.content()[0]), " NOTICEs", file = fid)
-            self.log.append(str(len(self.fatal.content()[0])) + " FATALs, " + str(len(self.err.content()[0])) + 
-                " ERRORs, " + str(len(self.war.content()[0])) + " WARNINGs, " + str(len(self.notice.content()[0])) + " NOTICEs")
-            print("FATALs:", file = fid)
-            for data in self.fatal.content()[0]:
-                printData(data, fid)
-            print("ERRORs:", file = fid)
-            for data in self.err.content()[0]:
-                printData(data, fid)
-            print("WARNINGs:", file = fid)
-            for data in self.war.content()[0]:
-                printData(data, fid)
-            print("NOTICEs:", file = fid)
-            for data in self.notice.content()[0]:
-                printData(data, fid)
-            fid.close()
-        #creat dic
-        for k in self.content.keys():
-            real_k = k
-            array_data_name = None
-            if "name" in self.content[k].data.keys() and len(self.content[k].data["name"]) > 0:
-                array_data_name = self.content[k].data["name"][0] 
-                real_k = k[:-1]+"."+ array_data_name
-            self.name2orgKey[real_k] = k
-            for name in self.content[k].data.keys():
-                if name != 't':
-                    self.data[real_k+'.'+name] = (self.content[k][name], self.content[k]['t'])
-                    if array_data_name is not None:
-                        self.ylabel[real_k+'.'+name] = array_data_name + "." + self.content[k].description[name]
-                    else:
-                        decrip = self.content[k].description[name]
-                        data_key = real_k+'.'+name
-                        self.ylabel[data_key] = decrip
-                        if isinstance(decrip, str) and len(decrip) > 0:
-                            if decrip in data_key:
-                                self.ylabel[data_key] = data_key
-                    self.data_org_key[real_k+'.'+name] = k
+            self.log.append(
+                '{} FATALs, {} ERRORs, {} WARNINGs, {} NOTICEs, '
+                '{} TASK STARTs, {} TASK FINISHes, {} SERVICEs'.format(
+                    len(self.fatal.content()[0]),
+                    len(self.err.content()[0]),
+                    len(self.war.content()[0]),
+                    len(self.notice.content()[0]),
+                    len(self.taskstart.content()[0]),
+                    len(self.taskfinish.content()[0]),
+                    len(self.service.content()[0])))
+        # create curve data dictionaries
+        self._register_content_data(self.content.keys())
         if 'IMU' in self.js:
             self.data["IMU.org_gx"] = ([i+j for (i,j) in zip(self.content['IMU']['gx'],self.content['IMU']['offx'])], self.content['IMU']['t'])
             self.data["IMU.org_gy"] = ([i+j for (i,j) in zip(self.content['IMU']['gy'],self.content['IMU']['offy'])], self.content['IMU']['t'])
@@ -278,23 +321,26 @@ class ReadThread(QThread):
                                 self.ylabel[org_key+'.'+name] = self.content[org_key].description[name]                    
                         # time_end=time.time()
                         # print('real read time cost: ' + str(time_end-time_start))
-                    tmp = vkey.split(".")
-                    k = tmp[0]
-                    name = tmp[1]
-                    if k == "IMU" and "org" in name:
+                    name = vkey.rsplit('.', 1)[-1]
+                    if org_key == "IMU" and "org" in name:
                         if len(name) == 6:
                             g = name[4::]  #org_gx, org_gy, org_gz
                             off = "off" + name[-1] #offx, offy, offz
-                            self.data[vkey] = ([i+j for (i,j) in zip(self.content[k][g],self.content[k][off])], self.content[k]['t'])   
+                            self.data[vkey] = (
+                                [i + j for (i, j) in zip(
+                                    self.content[org_key][g],
+                                    self.content[org_key][off])],
+                                self.content[org_key]['t'])
                         else:
                             self.data[vkey] = ([], [])              
                     else:
-                        self.data[vkey] = (self.content[k][name], self.content[k]['t'])
+                        self.data[vkey] = (self.content[org_key][name], self.content[org_key]['t'])
             return self.data[vkey]
         else:
             return [[],[]]
 
     def getReportFileAddr(self):
+        """Backward-compatible API; reports are now kept in memory."""
         return self.output_fname
 
 

@@ -47,6 +47,7 @@ from maputils import (
     normalize_theta,
     normalize_theta_deg,
     _curve_points_to_xy,
+    _curve_polygons_to_xy,
     _curve_xy_values,
     _find_curve_xy,
     parse_curve_data,

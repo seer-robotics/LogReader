@@ -25,6 +25,7 @@ from maputils import (
     nearest_value_at_time,
     read_goods_dimensions,
     _curve_points_to_xy,
+    _curve_polygons_to_xy,
     _curve_xy_values,
     _find_curve_xy,
     parse_curve_data,
@@ -263,6 +264,19 @@ class TestCurveHelpers(unittest.TestCase):
         self.assertIsNone(_curve_points_to_xy([{"x": 1}]))
         self.assertIsNone(_curve_points_to_xy([1, 2, 3]))
 
+    def test_curve_polygons_to_xy_flattens_polygons(self):
+        polygons = [
+            {"type": "Polygon", "points": [
+                {"x": 1, "y": 2}, {"x": 3, "y": 4}
+            ], "radius": None},
+            {"type": "Polygon", "points": [
+                {"x": 5, "y": 6}, {"x": 7, "y": 8}
+            ], "radius": None},
+        ]
+        x, y = _curve_polygons_to_xy(polygons)
+        self.assertEqual(x, [1, 3, 5, 7])
+        self.assertEqual(y, [2, 4, 6, 8])
+
     def test_curve_xy_values_valid(self):
         self.assertEqual(_curve_xy_values([1, 2], [3.0, 4.0]), ([1, 2], [3.0, 4.0]))
 
@@ -309,6 +323,27 @@ class TestParseCurveData(unittest.TestCase):
     def test_python_literal_point_array(self):
         x, y = parse_curve_data("[{'x': 1, 'y': 2}, {'x': 3, 'y': 4}]")
         self.assertEqual((x, y), ([1, 3], [2, 4]))
+
+    def test_json_polygon_array(self):
+        source = '''[
+            {"type": "Polygon", "points": [
+                {"x": 0.78417, "y": -24.06445},
+                {"x": -1.61261, "y": -24.02261},
+                {"x": -1.5908, "y": -22.7728},
+                {"x": 0.80599, "y": -22.81464}
+            ], "radius": null},
+            {"type": "Polygon", "points": [
+                {"x": 0.76735, "y": -24.21293},
+                {"x": -2.02937, "y": -24.16411},
+                {"x": -2.00232, "y": -22.61435},
+                {"x": 0.79441, "y": -22.66316}
+            ], "radius": null}
+        ]'''
+        x, y = parse_curve_data(source)
+        self.assertEqual(x, [0.78417, -1.61261, -1.5908, 0.80599,
+                             0.76735, -2.02937, -2.00232, 0.79441])
+        self.assertEqual(y, [-24.06445, -24.02261, -22.7728, -22.81464,
+                             -24.21293, -24.16411, -22.61435, -22.66316])
 
     def test_xy_variables(self):
         x, y = parse_curve_data("x = [1, 2, 3]\ny = [4, 5, 6]")

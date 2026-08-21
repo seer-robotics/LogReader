@@ -61,6 +61,53 @@ class EventTableModel(QtCore.QAbstractTableModel):
         return None
 
 
+class EventTableView(QtWidgets.QTableView):
+    """QTableView that wraps long event text across multiple lines."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._wrapped_rows = set()
+        self._height_timer = QtCore.QTimer(self)
+        self._height_timer.setSingleShot(True)
+        self._height_timer.setInterval(150)
+        self._height_timer.timeout.connect(self.updateRowHeights)
+
+    def scheduleRowHeightUpdate(self):
+        # Debounce resize-driven height recomputation during drag.
+        self._height_timer.start()
+
+    def updateRowHeights(self):
+        """Resize rows so wrapped event text fits the current column width."""
+        model = self.model()
+        if model is None:
+            return
+        default_height = self.verticalHeader().defaultSectionSize()
+        width = self.columnWidth(1) - 12
+        metrics = self.fontMetrics()
+        # Widest expected char (CJK) for a cheap one-line pre-check.
+        wide_char = max(1.0, float(metrics.horizontalAdvance('汉')))
+        wrapped = {}
+        if width > 20:
+            for row in range(model.rowCount()):
+                content = model.data(
+                    model.index(row, 1), QtCore.Qt.DisplayRole)
+                if content and len(content) * wide_char > width:
+                    height = metrics.boundingRect(
+                        QtCore.QRect(0, 0, width, 0),
+                        QtCore.Qt.TextWordWrap, content).height()
+                    wrapped[row] = max(
+                        default_height, height + metrics.lineSpacing() + 4)
+        for row, height in wrapped.items():
+            self.setRowHeight(row, height)
+        for row in self._wrapped_rows - wrapped.keys():
+            self.setRowHeight(row, default_height)
+        self._wrapped_rows = set(wrapped)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.scheduleRowHeightUpdate()
+
+
 class EventViewer(QtWidgets.QWidget):
     hiddened = QtCore.pyqtSignal('PyQt_PyObject')
     moveHereSignal = QtCore.pyqtSignal('PyQt_PyObject')
@@ -96,10 +143,10 @@ class EventViewer(QtWidgets.QWidget):
             proxy.setFilterCaseSensitivity(QtCore.Qt.CaseInsensitive)
             proxy.setFilterKeyColumn(-1)
 
-            view = QtWidgets.QTableView(self.tabs)
+            view = EventTableView(self.tabs)
             view.setModel(proxy)
             view.setFont(fixed_font)
-            view.setWordWrap(False)
+            view.setWordWrap(True)
             view.setAlternatingRowColors(True)
             view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
             view.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -110,6 +157,9 @@ class EventViewer(QtWidgets.QWidget):
                 self._showContextMenu(table, position))
             view.verticalHeader().setVisible(False)
             view.horizontalHeader().setStretchLastSection(True)
+            view.horizontalHeader().sectionResized.connect(
+                lambda _col, _old, _new, table=view:
+                table.scheduleRowHeightUpdate())
             view.setColumnWidth(0, 190)
 
             self.models[key] = model
@@ -194,6 +244,7 @@ class EventViewer(QtWidgets.QWidget):
             self.result_label.setText('0 events')
             return
         key = self._tab_keys[index]
+        self.views[key].updateRowHeights()
         visible = self.proxies[key].rowCount()
         total = self.models[key].rowCount()
         if visible == total:

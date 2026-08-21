@@ -280,6 +280,28 @@ def _curve_points_to_xy(value):
             [point['y'] for point in value])
 
 
+def _curve_polygons_to_xy(value):
+    """Flatten Polygon objects into x/y sequences in input order."""
+    if not isinstance(value, (list, tuple)) or not value:
+        return None
+    if not all(isinstance(polygon, dict)
+               and polygon.get('type') == 'Polygon'
+               and 'points' in polygon
+               for polygon in value):
+        return None
+
+    x_values = []
+    y_values = []
+    for polygon in value:
+        point_data = _curve_points_to_xy(polygon['points'])
+        if point_data is None:
+            return None
+        point_x, point_y = point_data
+        x_values.extend(point_x)
+        y_values.extend(point_y)
+    return x_values, y_values
+
+
 def _curve_xy_values(x, y):
     """Validate and normalize two coordinate sequences for matplotlib."""
     if isinstance(x, (str, bytes)) or isinstance(y, (str, bytes)):
@@ -324,7 +346,7 @@ def _find_curve_xy(namespace):
 
 
 def parse_curve_data(text):
-    """Parse curve input in x/y-variable or JSON point-array form."""
+    """Parse curve input in x/y-variable, point-array, or Polygon form."""
     source = text.strip()
     if not source:
         raise ValueError("curve input is empty")
@@ -347,6 +369,9 @@ def parse_curve_data(text):
             point_data = _curve_points_to_xy(parsed)
             if point_data is not None:
                 return _curve_xy_values(*point_data)
+            polygon_data = _curve_polygons_to_xy(parsed)
+            if polygon_data is not None:
+                return _curve_xy_values(*polygon_data)
 
     # Do not execute JSON-like input as Python.  Apart from being unsafe,
     # this produces confusing annotation errors for malformed pasted JSON.

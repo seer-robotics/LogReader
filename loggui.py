@@ -934,6 +934,7 @@ class ApplicationWindow(QtWidgets.QMainWindow):
                     self.popMenu.addAction('&- Data', lambda:self.negData(event.inaxes))
                     self.popMenu.addAction('&Rad2Deg', lambda:self.rad2Deg(event.inaxes))
                     self.popMenu.addAction('&Deg2Rad', lambda:self.deg2Rad(event.inaxes))
+                    self.popMenu.addAction('&NormalizeAngle', lambda:self.normalizeAngle(event.inaxes))
                     self.popMenu.addAction('&Add Data', lambda:self.addData(event.inaxes))
                     self.popMenu.addAction('&Statistic', lambda:self.statistic(event.inaxes))
                     cursor = QtGui.QCursor()
@@ -1211,6 +1212,36 @@ class ApplicationWindow(QtWidgets.QMainWindow):
             else:
                 data.append(a)
         self.drawdata(cur_ax, (data, tmpdata[1]), self.read_thread.ylabel[xy.y_combo.currentText()]+" rad", False)
+
+    def normalizeAngle(self, cur_ax):
+        """将缠绕在 (-period/2, period/2] 的角度展开为连续曲线。
+        保持 self.mid_line_t 时刻对应的角度值不变（若无 mid_line_t 则保持首个点不变）。"""
+        indx = self.axs.tolist().index(cur_ax)
+        xy = self.xys[indx]        
+        group_name = xy.y_combo.currentText().split('.')[0]
+        if xy.x_combo.currentText() == 'timestamp':
+            org_t = self.getTsFromT(self.read_thread.getData(group_name + '.timestamp'))
+            if len(org_t) > 0:
+                tmpdata = (self.read_thread.getData(xy.y_combo.currentText())[0], org_t)
+            else:
+                tmpdata = self.read_thread.getData(xy.y_combo.currentText())
+        else:
+            tmpdata = self.read_thread.getData(xy.y_combo.currentText())
+        list_tmpdata = [(t, d) for t, d in zip(tmpdata[1], tmpdata[0])
+                        if isinstance(d, (int, float)) and not isinstance(d, bool) and not np.isnan(d)]
+        if len(list_tmpdata) < 2:
+            return
+        list_tmpdata.sort(key=lambda d: d[0])
+        ts = [d[0] for d in list_tmpdata]
+        data = np.array([d[1] for d in list_tmpdata], dtype=float)
+        period = 2.0*np.pi if np.max(np.abs(data)) <= np.pi + 0.5 else 360.0
+        unwrap_data = np.unwrap(data, period=period)
+        idx = 0
+        if self.mid_line_t is not None:
+            idx = int(np.abs(np.array([(t - self.mid_line_t).total_seconds() for t in ts])).argmin())
+        unwrap_data = unwrap_data + round((data[idx] - unwrap_data[idx])/period)*period
+        self.drawdata(cur_ax, (unwrap_data.tolist(), ts), 'norm_'+self.read_thread.ylabel[xy.y_combo.currentText()], False)
+
 
     def addData(self, cur_ax):
         keys = list(self.read_thread.data.keys())
